@@ -5,5 +5,7 @@ import (
 )
 
 func TestCumulus(t *testing.T) {
-
+	if !dummy() {
+		t.Fail()
+	}
 }
