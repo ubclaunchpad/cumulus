@@ -1,26 +1,73 @@
 package main
 
 import (
+    "context"
+    "flag"
     "fmt"
-    "log"
+    "io/ioutil"
 
-    golog "github.com/ipfs/go-log"
-    gologging "github.com/whyrusleeping/go-logging"
-    cmlPeer "github.com/ubclaunchpad/cumulus/cumulus-peer"
+    logger "github.com/ubclaunchpad/cumulus/logging"
+    cumuluspeer "github.com/ubclaunchpad/cumulus/cumulus-peer"
+    pstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
 func main() {
     fmt.Println("Starting Cumulus Peer")
 
-    // Set up a logger. Change to DEBUG for extra info
-    golog.SetAllLoggers(gologging.INFO)
+    // Initialize Cumulus logger
+    logger.Init()
+
+    // Get and parse command line arguments
+    // targetPeer is a Multiaddr representing the target peer to connect to
+    // when joining the Cumulus Network.
+    targetPeer := flag.String("p", "", "target peer to connect to")
+    flag.Parse()
 
     // Set up a new host on the Cumulus network
-    host, err := cmlPeer.MakeHost()
+    host, err := cumuluspeer.MakeHost()
     if err != nil {
-        log.Fatal(err)
+        logger.Log.Error(err)
     }
 
-    // TODO: remove this when we figure out what to do with this host.
-    fmt.Println(host.ID())
+    // Set the host StreamHandler for the Cumulus Protocol and use
+    // BasicStreamHandler as its StreamHandler.
+    host.SetStreamHandler(cumuluspeer.CumulusProtocol,
+        cumuluspeer.BasicStreamHandler)
+
+    if *targetPeer == "" {
+        // No target was specified, wait for incoming connections
+        logger.Log.Info("No target provided. Listening for incoming connections...")
+        select {} // Hang until someone connects to us
+    }
+
+    // Target is specified so connect to it and remember its address
+    peerid, targetAddr := cumuluspeer.ExtractPeerInfo(*targetPeer)
+
+    // Store the peer's address in this host's PeerStore
+    host.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+
+    logger.Log.Notice("Connected to Cumulus Peer:")
+    logger.Log.Notice("\tPeer ID:", peerid.Pretty())
+    logger.Log.Notice("\tPeer Address:", targetAddr)
+
+    // Open a stream with the peer
+    stream, err := host.NewStream(context.Background(), peerid,
+        cumuluspeer.CumulusProtocol)
+	if err != nil {
+		logger.Log.Error(err)
+	}
+
+    // Send a message to the peer
+	_, err = stream.Write([]byte("Hello, world!\n"))
+	if err != nil {
+		logger.Log.Error(err)
+	}
+
+    // Read the reply from the peer
+	reply, err := ioutil.ReadAll(stream)
+	if err != nil {
+		logger.Log.Error(err)
+	}
+
+	logger.Log.Info("read reply: %q\n", reply)
 }
