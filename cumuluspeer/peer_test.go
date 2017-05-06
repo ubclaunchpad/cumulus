@@ -8,7 +8,7 @@ import (
 
 // Tests if we can make a basic host on a valid TCP port
 func TestMakeBasicHostValidPort(t *testing.T) {
-    h, ps, err := cumuluspeer.MakeBasicHost(8000)
+    h, ps, err := cumuluspeer.MakeBasicHost(cumuluspeer.DefaultIP, 8000)
     if err != nil {
         t.Fail()
     }
@@ -22,6 +22,14 @@ func TestMakeBasicHostValidPort(t *testing.T) {
     }
 
     if ps != h.Peerstore() {
+        t.Fail()
+    }
+}
+
+// Make sure MakeBasicHost fails with invalid IP
+func TestMakeBasicHostInvalidIP(t *testing.T) {
+    _, _, err := cumuluspeer.MakeBasicHost("asdfasdf", 123)
+    if err == nil {
         t.Fail()
     }
 }

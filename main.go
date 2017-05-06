@@ -16,13 +16,15 @@ func main() {
     // Get and parse command line arguments
     // targetPeer is a Multiaddr representing the target peer to connect to
     // when joining the Cumulus Network.
-    // port is the port to communicate over (defaults to peer.CumulusPort)
+    // port is the port to communicate over (defaults to peer.DefaultPort).
+    // ip is the public IP address of the this host.
     targetPeer := flag.String("t", "", "target peer to connect to")
-    port := flag.Int("p", cumuluspeer.CumulusPort, "TCP port to use")
+    port := flag.Int("p", cumuluspeer.DefaultPort, "TCP port to use for this host")
+    ip := flag.String("i", cumuluspeer.DefaultIP, "IP address to use for this host")
     flag.Parse()
 
     // Set up a new host on the Cumulus network
-    host, ps, err := cumuluspeer.MakeBasicHost(*port)
+    host, ps, err := cumuluspeer.MakeBasicHost(*ip, *port)
     if err != nil {
         log.Fatal(err)
     }
@@ -70,5 +72,5 @@ func main() {
 		log.Error(err)
 	}
 
-	log.Infof("Read reply: %s", string(reply))
+	log.Info("Read reply: ", string(reply))
 }

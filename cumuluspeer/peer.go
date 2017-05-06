@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	CumulusPort 	= 8765 // Cumulus peers communicate over this TCP port
+	DefaultPort 	= 8765 // Cumulus peers communicate over this TCP port
 	CumulusProtocol	= "/cumulate/0.0.1" // Cumulus communication protocol
+	DefaultIP		= "127.0.0.1" // Default Host IP address if none given
 )
 
 // A basic StreamHandler for a very basic host.
@@ -56,7 +57,7 @@ func doCumulate(s net.Stream) {
 // Create a Cumulus host.
 // This may throw an error if we fail to create a key pair, a pid, or a new
 // multiaddress.
-func MakeBasicHost(port int) (host.Host, pstore.Peerstore, error) {
+func MakeBasicHost(ip string, port int) (host.Host, pstore.Peerstore, error) {
 	// Make sure we received a valid port number
 
     // Generate a key pair for this host. We will only use the pudlic key to
@@ -73,7 +74,7 @@ func MakeBasicHost(port int) (host.Host, pstore.Peerstore, error) {
     }
 
     // Create a multiaddress (IP address and TCP port for this peer).
-    addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port))
+    addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
     if err != nil {
 		return nil, nil, err
 	}
