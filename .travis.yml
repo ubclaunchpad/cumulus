@@ -5,5 +5,8 @@ go:
   - master
 before_install:
   - go get github.com/mattn/goveralls
+  - go get github.com/sirupsen/logrus
+  - go get github.com/libp2p/go-libp2p
+  - go get github.com/multiformats/go-multiaddr
 script:
   - $HOME/gopath/bin/goveralls -service=travis-ci

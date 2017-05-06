@@ -56,7 +56,9 @@ func doCumulate(s net.Stream) {
 // Create a Cumulus host.
 // This may throw an error if we fail to create a key pair, a pid, or a new
 // multiaddress.
-func MakeHost(port int) (host.Host, pstore.Peerstore, error) {
+func MakeBasicHost(port int) (host.Host, pstore.Peerstore, error) {
+	// Make sure we received a valid port number
+
     // Generate a key pair for this host. We will only use the pudlic key to
     // obtain a valid host ID.
     _, pub, err := crypto.GenerateKeyPair(crypto.RSA, 2048)

@@ -6,7 +6,7 @@ import (
     "io/ioutil"
 
     log "github.com/sirupsen/logrus"
-    cumuluspeer "github.com/ubclaunchpad/cumulus/cumulus-peer"
+    cumuluspeer "github.com/ubclaunchpad/cumulus/cumuluspeer"
     pstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
@@ -22,7 +22,7 @@ func main() {
     flag.Parse()
 
     // Set up a new host on the Cumulus network
-    host, ps, err := cumuluspeer.MakeHost(*port)
+    host, ps, err := cumuluspeer.MakeBasicHost(*port)
     if err != nil {
         log.Fatal(err)
     }
