@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	logger "github.com/ubclaunchpad/cumulus/logging"
+	log "github.com/sirupsen/logrus"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	host "github.com/libp2p/go-libp2p-host"
 	peer "github.com/libp2p/go-libp2p-peer"
@@ -27,7 +27,7 @@ const (
 // SetStreamHandler() is called on.
 // We may want to implement another type of StreamHandler in the future.
 func BasicStreamHandler(s net.Stream) {
-	logger.Log.Info("Setting basic stream handler.")
+	log.Info("Setting basic stream handler.")
 	defer s.Close()
 	doCumulate(s)
 }
@@ -39,43 +39,41 @@ func doCumulate(s net.Stream) {
 	buf := bufio.NewReader(s)
 	str, err := buf.ReadString('\n')
 	if err != nil {
-		logger.Log.Error(err)
+		log.Error(err)
 		return
 	}
 
-	logger.Log.Info("Read: %s", str)
+	log.Info("Read: %s", str)
 	_, err = s.Write([]byte(str))
 	if err != nil {
-		logger.Log.Error(err)
+		log.Error(err)
 		return
 	}
 
-	logger.Log.Info("Done now. Bye!")
+	log.Info("Done now. Bye!")
 }
 
 // Create a Cumulus host.
 // This may throw an error if we fail to create a key pair, a pid, or a new
 // multiaddress.
-func MakeHost() (host.Host, error) {
+func MakeHost(port int) (host.Host, pstore.Peerstore, error) {
     // Generate a key pair for this host. We will only use the pudlic key to
     // obtain a valid host ID.
     _, pub, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
     if err != nil {
-        return nil, err
+        return nil, nil, err
     }
 
     // Obtain Peer ID from public key.
     pid, err := peer.IDFromPublicKey(pub)
     if err != nil {
-        return nil, err
+        return nil, nil, err
     }
 
     // Create a multiaddress (IP address and TCP port for this peer).
-    addr, err := ma.NewMultiaddr(
-        fmt.Sprintf("/ip4/127.0.0.1/tcp/%d",
-        CumulusPort))
+    addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port))
     if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
     // Create a peerstore (this stores information about other peers in the
@@ -91,7 +89,7 @@ func MakeHost() (host.Host, error) {
 		ps,
 		nil)
     if err != nil {
-        return nil, err
+        return nil, nil, err
     }
 
 	// Actually create the host with the network we just set up.
@@ -104,28 +102,34 @@ func MakeHost() (host.Host, error) {
 	// Now we can build a full multiaddress to reach this host
 	// by encapsulating both addresses:
 	fullAddr := addr.Encapsulate(hostAddr)
-	logger.Log.Notice("I am", fullAddr)
+	log.Info("I am ", fullAddr)
 
-	return basicHost, nil
+	// Add this host's address to its peerstore (avoid's net/identi error)
+	ps.AddAddr(pid, fullAddr, pstore.PermanentAddrTTL)
+
+	return basicHost, ps, nil
 }
 
 // Extracts target's the peer ID and multiaddress from the given multiaddress.
 // Returns peer ID (esentially 46 character hash created by the peer)
 // and the peer's multiaddress in the form /ip4/<peer IP>/tcp/<CumulusPort>.
-func ExtractPeerInfo(peerma string) (peer.ID, ma.Multiaddr) {
+func ExtractPeerInfo(peerma string) (peer.ID, ma.Multiaddr, error) {
 	ipfsaddr, err := ma.NewMultiaddr(peerma)
 	if err != nil {
-		logger.Log.Error(err)
+		log.Error(err)
+		return "-", nil, err
 	}
 
 	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
 	if err != nil {
-		logger.Log.Error(err)
+		log.Error(err)
+		return "-", nil, err
 	}
 
 	peerid, err := peer.IDB58Decode(pid)
 	if err != nil {
-		logger.Log.Error(err)
+		log.Error(err)
+		return "-", nil, err
 	}
 
 	// Decapsulate the /ipfs/<peerID> part from the target
@@ -134,5 +138,5 @@ func ExtractPeerInfo(peerma string) (peer.ID, ma.Multiaddr) {
 		fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
 	trgtAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 
-	return peerid, trgtAddr
+	return peerid, trgtAddr, nil
 }

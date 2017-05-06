@@ -3,30 +3,28 @@ package main
 import (
     "context"
     "flag"
-    "fmt"
     "io/ioutil"
 
-    logger "github.com/ubclaunchpad/cumulus/logging"
+    log "github.com/sirupsen/logrus"
     cumuluspeer "github.com/ubclaunchpad/cumulus/cumulus-peer"
     pstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
 func main() {
-    fmt.Println("Starting Cumulus Peer")
-
-    // Initialize Cumulus logger
-    logger.Init()
+    log.Info("Starting Cumulus Peer")
 
     // Get and parse command line arguments
     // targetPeer is a Multiaddr representing the target peer to connect to
     // when joining the Cumulus Network.
-    targetPeer := flag.String("p", "", "target peer to connect to")
+    // port is the port to communicate over (defaults to peer.CumulusPort)
+    targetPeer := flag.String("t", "", "target peer to connect to")
+    port := flag.Int("p", cumuluspeer.CumulusPort, "TCP port to use")
     flag.Parse()
 
     // Set up a new host on the Cumulus network
-    host, err := cumuluspeer.MakeHost()
+    host, ps, err := cumuluspeer.MakeHost(*port)
     if err != nil {
-        logger.Log.Error(err)
+        log.Fatal(err)
     }
 
     // Set the host StreamHandler for the Cumulus Protocol and use
@@ -36,38 +34,41 @@ func main() {
 
     if *targetPeer == "" {
         // No target was specified, wait for incoming connections
-        logger.Log.Info("No target provided. Listening for incoming connections...")
+        log.Info("No target provided. Listening for incoming connections...")
         select {} // Hang until someone connects to us
     }
 
     // Target is specified so connect to it and remember its address
-    peerid, targetAddr := cumuluspeer.ExtractPeerInfo(*targetPeer)
+    peerid, targetAddr, err := cumuluspeer.ExtractPeerInfo(*targetPeer)
+    if err != nil {
+        log.Fatal(err)
+    }
 
     // Store the peer's address in this host's PeerStore
-    host.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+    ps.AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
 
-    logger.Log.Notice("Connected to Cumulus Peer:")
-    logger.Log.Notice("\tPeer ID:", peerid.Pretty())
-    logger.Log.Notice("\tPeer Address:", targetAddr)
+    log.Info("Connected to Cumulus Peer:")
+    log.Info("\tPeer ID:", peerid.Pretty())
+    log.Info("\tPeer Address:", targetAddr)
 
     // Open a stream with the peer
     stream, err := host.NewStream(context.Background(), peerid,
         cumuluspeer.CumulusProtocol)
 	if err != nil {
-		logger.Log.Error(err)
+		log.Fatal(err)
 	}
 
     // Send a message to the peer
 	_, err = stream.Write([]byte("Hello, world!\n"))
 	if err != nil {
-		logger.Log.Error(err)
+		log.Error(err)
 	}
 
     // Read the reply from the peer
 	reply, err := ioutil.ReadAll(stream)
 	if err != nil {
-		logger.Log.Error(err)
+		log.Error(err)
 	}
 
-	logger.Log.Info("read reply: %q\n", reply)
+	log.Infof("Read reply: %s", string(reply))
 }
