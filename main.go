@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 
 	log "github.com/sirupsen/logrus"
-	peer "github.com/ubclaunchpad/cumulus/peer"
+	"github.com/ubclaunchpad/cumulus/peer"
 )
 
 func main() {
