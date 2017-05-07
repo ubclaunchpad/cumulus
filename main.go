@@ -1,76 +1,81 @@
 package main
 
 import (
-    "context"
-    "flag"
-    "io/ioutil"
+	"context"
+	"flag"
+	"io/ioutil"
 
-    log "github.com/sirupsen/logrus"
-    cumuluspeer "github.com/ubclaunchpad/cumulus/cumuluspeer"
-    pstore "github.com/libp2p/go-libp2p-peerstore"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
+	log "github.com/sirupsen/logrus"
+	peer "github.com/ubclaunchpad/cumulus/peer"
 )
 
 func main() {
-    log.Info("Starting Cumulus Peer")
+	log.Info("Starting Cumulus Peer")
 
-    // Get and parse command line arguments
-    // targetPeer is a Multiaddr representing the target peer to connect to
-    // when joining the Cumulus Network.
-    // port is the port to communicate over (defaults to peer.DefaultPort).
-    // ip is the public IP address of the this host.
-    targetPeer := flag.String("t", "", "target peer to connect to")
-    port := flag.Int("p", cumuluspeer.DefaultPort, "TCP port to use for this host")
-    ip := flag.String("i", cumuluspeer.DefaultIP, "IP address to use for this host")
-    flag.Parse()
+	// Get and parse command line arguments
+	// targetPeer is a Multiaddr representing the target peer to connect to
+	// when joining the Cumulus Network.
+	// port is the port to communicate over (defaults to peer.DefaultPort).
+	// ip is the public IP address of the this host.
+	targetPeer := flag.String("t", "", "target peer to connect to")
+	port := flag.Int("p", peer.DefaultPort, "TCP port to use for this host")
+	ip := flag.String("i", peer.DefaultIP, "IP address to use for this host")
+	debug := flag.Bool("d", false, "Enable debug logging")
+	flag.Parse()
 
-    // Set up a new host on the Cumulus network
-    host, ps, err := cumuluspeer.MakeBasicHost(*ip, *port)
-    if err != nil {
-        log.Fatal(err)
-    }
+	if *debug {
+		log.SetLevel(log.DebugLevel)
+	}
 
-    // Set the host StreamHandler for the Cumulus Protocol and use
-    // BasicStreamHandler as its StreamHandler.
-    host.SetStreamHandler(cumuluspeer.CumulusProtocol,
-        cumuluspeer.BasicStreamHandler)
-
-    if *targetPeer == "" {
-        // No target was specified, wait for incoming connections
-        log.Info("No target provided. Listening for incoming connections...")
-        select {} // Hang until someone connects to us
-    }
-
-    // Target is specified so connect to it and remember its address
-    peerid, targetAddr, err := cumuluspeer.ExtractPeerInfo(*targetPeer)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Store the peer's address in this host's PeerStore
-    ps.AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
-
-    log.Info("Connected to Cumulus Peer:")
-    log.Info("\tPeer ID:", peerid.Pretty())
-    log.Info("\tPeer Address:", targetAddr)
-
-    // Open a stream with the peer
-    stream, err := host.NewStream(context.Background(), peerid,
-        cumuluspeer.CumulusProtocol)
+	// Set up a new host on the Cumulus network
+	host, err := peer.NewPeer(*ip, *port)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-    // Send a message to the peer
+	// Set the host StreamHandler for the Cumulus Protocol and use
+	// BasicStreamHandler as its StreamHandler.
+	host.SetStreamHandler(peer.CumulusProtocol, host.Receive)
+	if *targetPeer == "" {
+		// No target was specified, wait for incoming connections
+		log.Info("No target provided. Listening for incoming connections...")
+		select {} // Hang until someone connects to us
+	}
+
+	// Target is specified so connect to it and remember its address
+	peerid, targetAddr, err := peer.ExtractPeerInfo(*targetPeer)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Store the peer's address in this host's PeerStore
+	host.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+
+	log.Info("Connected to Cumulus Peer:")
+	log.Info("Peer ID:", peerid.Pretty())
+	log.Info("Peer Address:", targetAddr)
+
+	// Open a stream with the peer
+	stream, err := host.NewStream(context.Background(), peerid,
+		peer.CumulusProtocol)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Send a message to the peer
 	_, err = stream.Write([]byte("Hello, world!\n"))
 	if err != nil {
 		log.Error(err)
 	}
 
-    // Read the reply from the peer
+	// Read the reply from the peer
 	reply, err := ioutil.ReadAll(stream)
 	if err != nil {
 		log.Error(err)
 	}
 
-	log.Info("Read reply: ", string(reply))
+	log.Debugf("Peer %s read reply: ", host.ID(), string(reply))
+
+	stream.Close()
 }
