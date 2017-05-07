@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"io/ioutil"
 
-	pstore "github.com/libp2p/go-libp2p-peerstore"
 	log "github.com/sirupsen/logrus"
 	peer "github.com/ubclaunchpad/cumulus/peer"
 )
@@ -43,24 +41,9 @@ func main() {
 		select {} // Hang until someone connects to us
 	}
 
-	// Target is specified so connect to it and remember its address
-	peerid, targetAddr, err := peer.ExtractPeerInfo(*targetPeer)
+	stream, err := host.Connect(*targetPeer)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Store the peer's address in this host's PeerStore
-	host.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
-
-	log.Info("Connected to Cumulus Peer:")
-	log.Info("Peer ID:", peerid.Pretty())
-	log.Info("Peer Address:", targetAddr)
-
-	// Open a stream with the peer
-	stream, err := host.NewStream(context.Background(), peerid,
-		peer.CumulusProtocol)
-	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
 	// Send a message to the peer
@@ -75,7 +58,7 @@ func main() {
 		log.Error(err)
 	}
 
-	log.Debugf("Peer %s read reply: ", host.ID(), string(reply))
+	log.Debugf("Peer %s read reply: %s", host.ID(), string(reply))
 
 	stream.Close()
 }

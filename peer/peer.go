@@ -109,6 +109,7 @@ func (p *Peer) doCumulus(s net.Stream) {
 	}
 
 	log.Debugf("Peer %s read: %s", p.ID(), str)
+
 	_, err = s.Write([]byte(str))
 	if err != nil {
 		log.Error(err)
@@ -121,15 +122,20 @@ func (p *Peer) doCumulus(s net.Stream) {
 // Returns peer ID (esentially 46 character hash created by the peer)
 // and the peer's multiaddress in the form /ip4/<peer IP>/tcp/<CumulusPort>.
 func ExtractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
+	log.Debug("Extracting peer info from ", peerma)
+
 	ipfsaddr, err := ma.NewMultiaddr(peerma)
 	if err != nil {
 		return "-", nil, err
 	}
 
 	// Cannot throw error when passed P_IPFS
-	pid, _ := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+	if err != nil {
+		return "-", nil, err
+	}
 
-	// Cannot return error if no error was returned in NewMultiaddr
+	// Cannot return error if no error was returned in ValueForProtocol
 	peerid, _ := lpeer.IDB58Decode(pid)
 
 	// Decapsulate the /ipfs/<peerID> part from the target
@@ -143,4 +149,30 @@ func ExtractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
 	trgtAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 
 	return peerid, trgtAddr, nil
+}
+
+// Connect adds the given multiaddress to p's Peerstore and opens a stream
+// with the peer at that multiaddress if the multiaddress is valid, otherwise
+// returns error.
+func (p *Peer) Connect(peerma string) (net.Stream, error) {
+	peerid, targetAddr, err := ExtractPeerInfo(peerma)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store the peer's address in this host's PeerStore
+	p.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+
+	log.Debug("Connected to Cumulus Peer:")
+	log.Debug("Peer ID:", peerid.Pretty())
+	log.Debug("Peer Address:", targetAddr)
+
+	// Open a stream with the peer
+	stream, err := p.NewStream(context.Background(), peerid,
+		CumulusProtocol)
+	if err != nil {
+		return nil, err
+	}
+
+	return stream, nil
 }

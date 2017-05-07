@@ -1,11 +1,9 @@
 package peer
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	pstore "github.com/libp2p/go-libp2p-peerstore"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -101,14 +99,7 @@ func TestReceiveValidMessage(t *testing.T) {
 	receiverMA := fmt.Sprintf("%s/ipfs/%s",
 		receiver.Addrs()[0].String(), receiver.ID().Pretty())
 
-	receiverID, receiverAddr, err := ExtractPeerInfo(receiverMA)
-	if err != nil {
-		t.Fail()
-	}
-
-	sender.Peerstore().AddAddr(receiverID, receiverAddr, pstore.PermanentAddrTTL)
-	stream, err := sender.NewStream(context.Background(), receiverID,
-		CumulusProtocol)
+	stream, err := sender.Connect(receiverMA)
 	if err != nil {
 		t.Fail()
 	}
@@ -137,14 +128,7 @@ func TestReceiveInvalidMessage(t *testing.T) {
 	receiverMA := fmt.Sprintf("%s/ipfs/%s",
 		receiver.Addrs()[0].String(), receiver.ID().Pretty())
 
-	receiverID, receiverAddr, err := ExtractPeerInfo(receiverMA)
-	if err != nil {
-		t.Fail()
-	}
-
-	sender.Peerstore().AddAddr(receiverID, receiverAddr, pstore.PermanentAddrTTL)
-	stream, err := sender.NewStream(context.Background(), receiverID,
-		CumulusProtocol)
+	stream, err := sender.Connect(receiverMA)
 	if err != nil {
 		t.Fail()
 	}
@@ -155,4 +139,23 @@ func TestReceiveInvalidMessage(t *testing.T) {
 	}
 
 	stream.Close()
+}
+
+func TestReceiveInvalidAddress(t *testing.T) {
+	receiver, err := NewPeer(DefaultIP, DefaultPort)
+	if err != nil {
+		t.Fail()
+	}
+
+	sender, err := NewPeer(DefaultIP, 8080)
+	if err != nil {
+		t.Fail()
+	}
+
+	receiver.SetStreamHandler(CumulusProtocol, receiver.Receive)
+
+	_, err = sender.Connect(receiver.Addrs()[0].String())
+	if err == nil {
+		t.Fail()
+	}
 }
