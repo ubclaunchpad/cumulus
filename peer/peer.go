@@ -37,8 +37,6 @@ type Peer struct {
 // This may throw an error if we fail to create a key pair, a pid, or a new
 // multiaddress.
 func NewPeer(ip string, port int) (*Peer, error) {
-	// Make sure we received a valid port number
-
 	// Generate a key pair for this host. We will only use the pudlic key to
 	// obtain a valid host ID.
 	// Cannot throw error with given arguments
@@ -54,7 +52,9 @@ func NewPeer(ip string, port int) (*Peer, error) {
 		return nil, err
 	}
 
+	// Create Peerstore and add host's public key to it (avoids annoying err)
 	ps := pstore.NewPeerstore()
+	ps.AddPubKey(pid, pub)
 
 	// Create swarm (this is the interface to the libP2P Network) using the
 	// multiaddress, peerID, and peerStore we just created.
