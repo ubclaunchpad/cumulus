@@ -124,6 +124,7 @@ func TestReceiveInvalidMessage(t *testing.T) {
 	}
 
 	receiver.SetStreamHandler(CumulusProtocol, receiver.Receive)
+	sender.SetStreamHandler(CumulusProtocol, sender.Receive)
 
 	receiverMA := fmt.Sprintf("%s/ipfs/%s",
 		receiver.Addrs()[0].String(), receiver.ID().Pretty())
