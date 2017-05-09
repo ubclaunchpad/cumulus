@@ -8,13 +8,11 @@ import (
 	"math/big"
 )
 
+// The curve we use for our ECC crypto.
 var curve = elliptic.P256()
 
 // Wallet represents a Cumulus wallet address in the blockchain.
 type Wallet ecdsa.PublicKey
-
-// Hash represents a hash of a transaction.
-type Hash []byte
 
 // Signature represents a signature of a transaction.
 type Signature struct {
@@ -23,7 +21,7 @@ type Signature struct {
 }
 
 // New creates a new Wallet backed by a ECC key pair. Uses system entropy.
-func NewWallet() (*Wallet, error) {
+func newWallet() (*Wallet, error) {
 	k, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return nil, err
@@ -32,19 +30,17 @@ func NewWallet() (*Wallet, error) {
 	return &pk, nil
 }
 
+// String returns a human-readable string representation of a wallet
 func (w *Wallet) String() string {
 	return fmt.Sprintf("%x-%x", w.X, w.Y)
 }
 
+// Marshal converts the Wallet to a byte slice
 func (w *Wallet) Marshal() []byte {
 	return elliptic.Marshal(curve, w.X, w.Y)
 }
 
+// Equals checks whether two wallets are the same.
 func (w *Wallet) Equals(other *Wallet) bool {
 	return w.X.Cmp(other.X) == 0 && w.Y.Cmp(other.Y) == 0
-}
-
-func Unmarshal(wallet []byte) *Wallet {
-	x, y := elliptic.Unmarshal(curve, wallet)
-	return &Wallet{curve, x, y}
 }

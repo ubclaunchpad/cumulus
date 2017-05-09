@@ -1,36 +1,35 @@
 package blockchain
 
-import (
-	"encoding/binary"
-)
+import "encoding/binary"
 
 // TxHashPointer is a reference to a transaction on the blockchain.
 type TxHashPointer struct {
 	blockNumber uint32
-	hash        []byte
+	hash        Hash
 }
 
+// Marshal converts a TxHashPointer to a byte slice
 func (thp TxHashPointer) Marshal() []byte {
 	buf := []byte{}
 	binary.LittleEndian.PutUint32(buf, thp.blockNumber)
-	return append(buf, thp.hash...)
+	for _, b := range thp.hash {
+		buf = append(buf, b)
+	}
+	return buf
 }
 
 // TxBody contains all relevant information about a transaction.
 type TxBody struct {
-	sender  Wallet
-	inputs  []TxHashPointer
-	outputs []TxHashPointer
+	sender Wallet
+	input  TxHashPointer
+	output TxHashPointer
 }
 
-func (tb *TxBody) Marshal() []byte {
+// Marshal converts a TxBody to a byte slice
+func (tb TxBody) Marshal() []byte {
 	buf := tb.sender.Marshal()
-	for _, input := range tb.inputs {
-		buf = append(buf, input.Marshal()...)
-	}
-	for _, output := range tb.outputs {
-		buf = append(buf, output.Marshal()...)
-	}
+	buf = append(buf, tb.input.Marshal()...)
+	buf = append(buf, tb.output.Marshal()...)
 	return buf
 }
 
@@ -41,9 +40,12 @@ type Transaction struct {
 	sig  Signature
 }
 
+// Marshal converts a Transaction to a byte slice
 func (t *Transaction) Marshal() []byte {
 	buf := t.TxBody.Marshal()
-	buf = append(buf, t.hash...)
+	for _, b := range t.hash {
+		buf = append(buf, b)
+	}
 	buf = append(buf, t.sig.X.Bytes()...)
 	buf = append(buf, t.sig.Y.Bytes()...)
 	return buf
