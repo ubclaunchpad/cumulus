@@ -20,6 +20,11 @@ type Signature struct {
 	Y big.Int
 }
 
+// Marshal converts a signature to a byte slice
+func (s *Signature) Marshal() []byte {
+	return append(s.X.Bytes(), s.Y.Bytes()...)
+}
+
 // New creates a new Wallet backed by a ECC key pair. Uses system entropy.
 func newWallet() (*Wallet, error) {
 	k, err := ecdsa.GenerateKey(curve, rand.Reader)
