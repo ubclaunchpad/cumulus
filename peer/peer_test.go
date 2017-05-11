@@ -83,63 +83,32 @@ func TestExtractPeerInfoInvalidIP(t *testing.T) {
 }
 
 func TestReceiveValidMessage(t *testing.T) {
-	receiver, err := NewPeer(DefaultIP, DefaultPort)
+	sender, err := NewPeer(DefaultIP, DefaultPort)
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
 
-	sender, err := NewPeer(DefaultIP, 8080)
+	sender.SetStreamHandler(CumulusProtocol, sender.Receive)
+
+	receiver, err := NewPeer(DefaultIP, 8080)
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
 
 	receiver.SetStreamHandler(CumulusProtocol, receiver.Receive)
-	sender.SetStreamHandler(CumulusProtocol, sender.Receive)
 
-	receiverMA := fmt.Sprintf("%s/ipfs/%s",
-		receiver.Addrs()[0].String(), receiver.ID().Pretty())
+	receiverMultiAddr := fmt.Sprintf("%s/ipfs/%s",
+		receiver.Addrs()[0], receiver.ID().Pretty())
 
-	stream, err := sender.Connect(receiverMA)
+	stream, err := sender.Connect(receiverMultiAddr)
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
 
-	_, err = stream.Write([]byte("Hello, world!\n"))
+	_, err = stream.Write([]byte("This is a test\n"))
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
-
-	stream.Close()
-}
-
-func TestReceiveInvalidMessage(t *testing.T) {
-	receiver, err := NewPeer(DefaultIP, DefaultPort)
-	if err != nil {
-		t.Fail()
-	}
-
-	sender, err := NewPeer(DefaultIP, 8080)
-	if err != nil {
-		t.Fail()
-	}
-
-	receiver.SetStreamHandler(CumulusProtocol, receiver.Receive)
-	sender.SetStreamHandler(CumulusProtocol, sender.Receive)
-
-	receiverMA := fmt.Sprintf("%s/ipfs/%s",
-		receiver.Addrs()[0].String(), receiver.ID().Pretty())
-
-	stream, err := sender.Connect(receiverMA)
-	if err != nil {
-		t.Fail()
-	}
-
-	_, err = stream.Write([]byte("Hello, world!"))
-	if err != nil {
-		t.Fail()
-	}
-
-	stream.Close()
 }
 
 func TestReceiveInvalidAddress(t *testing.T) {
