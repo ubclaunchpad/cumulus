@@ -43,22 +43,22 @@ func main() {
 
 	stream, err := host.Connect(*targetPeer)
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 	}
 
 	// Send a message to the peer
-	_, err = stream.Write([]byte("Hello, world!\n"))
+	_, err = stream.Write([]byte("Hello, world!"))
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 	}
 
 	// Read the reply from the peer
 	reply, err := ioutil.ReadAll(stream)
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 	}
 
 	log.Debugf("Peer %s read reply: %s", host.ID(), string(reply))
 
-	stream.Close()
+	host.Close()
 }

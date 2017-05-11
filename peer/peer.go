@@ -94,7 +94,6 @@ func NewPeer(ip string, port int) (*Peer, error) {
 // We may want to implement another type of StreamHandler in the future.
 func (p *Peer) Receive(s net.Stream) {
 	log.Debug("Setting basic stream handler.")
-	defer s.Close()
 	p.doCumulus(s)
 }
 
@@ -114,7 +113,6 @@ func (p *Peer) doCumulus(s net.Stream) {
 	_, err = s.Write([]byte(str))
 	if err != nil {
 		log.Error(err)
-		return
 	}
 }
 
@@ -171,9 +169,6 @@ func (p *Peer) Connect(peerma string) (net.Stream, error) {
 	// Open a stream with the peer
 	stream, err := p.NewStream(context.Background(), peerid,
 		CumulusProtocol)
-	if err != nil {
-		return nil, err
-	}
 
-	return stream, nil
+	return stream, err
 }
