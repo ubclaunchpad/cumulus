@@ -12,8 +12,8 @@ func TestMain(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 }
 
-func TestNewPeerDefault(t *testing.T) {
-	h, err := NewPeer(DefaultIP, DefaultPort)
+func TestNewDefault(t *testing.T) {
+	h, err := New(DefaultIP, DefaultPort)
 	if err != nil {
 		t.Fail()
 	}
@@ -27,8 +27,8 @@ func TestNewPeerDefault(t *testing.T) {
 	}
 }
 
-func TestNewPeerValidPort(t *testing.T) {
-	h, err := NewPeer(DefaultIP, 8000)
+func TestNewValidPort(t *testing.T) {
+	h, err := New(DefaultIP, 8000)
 	if err != nil {
 		t.Fail()
 	}
@@ -42,15 +42,15 @@ func TestNewPeerValidPort(t *testing.T) {
 	}
 }
 
-func TestNewPeerValidIP(t *testing.T) {
-	_, err := NewPeer("123.211.231.45", DefaultPort)
+func TestNewValidIP(t *testing.T) {
+	_, err := New("123.211.231.45", DefaultPort)
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestNewPeerInvalidIP(t *testing.T) {
-	_, err := NewPeer("asdfasdf", 123)
+func TestNewInvalidIP(t *testing.T) {
+	_, err := New("asdfasdf", 123)
 	if err == nil {
 		t.Fail()
 	}
@@ -83,14 +83,14 @@ func TestExtractPeerInfoInvalidIP(t *testing.T) {
 }
 
 func TestReceiveValidMessage(t *testing.T) {
-	sender, err := NewPeer(DefaultIP, DefaultPort)
+	sender, err := New(DefaultIP, DefaultPort)
 	if err != nil {
 		t.FailNow()
 	}
 
 	sender.SetStreamHandler(CumulusProtocol, sender.Receive)
 
-	receiver, err := NewPeer(DefaultIP, 8080)
+	receiver, err := New(DefaultIP, 8080)
 	if err != nil {
 		t.FailNow()
 	}
@@ -112,12 +112,12 @@ func TestReceiveValidMessage(t *testing.T) {
 }
 
 func TestReceiveInvalidAddress(t *testing.T) {
-	receiver, err := NewPeer(DefaultIP, DefaultPort)
+	receiver, err := New(DefaultIP, DefaultPort)
 	if err != nil {
 		t.Fail()
 	}
 
-	sender, err := NewPeer(DefaultIP, 8080)
+	sender, err := New(DefaultIP, 8080)
 	if err != nil {
 		t.Fail()
 	}

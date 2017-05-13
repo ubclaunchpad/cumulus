@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// Set up a new host on the Cumulus network
-	host, err := peer.NewPeer(*ip, *port)
+	host, err := peer.New(*ip, *port)
 	if err != nil {
 		log.Fatal(err)
 	}

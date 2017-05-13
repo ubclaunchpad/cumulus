@@ -33,10 +33,10 @@ type Peer struct {
 	host.Host
 }
 
-// NewPeer creates a Cumulus host with the given IP addr and TCP port.
+// New creates a Cumulus host with the given IP addr and TCP port.
 // This may throw an error if we fail to create a key pair, a pid, or a new
 // multiaddress.
-func NewPeer(ip string, port int) (*Peer, error) {
+func New(ip string, port int) (*Peer, error) {
 	// Generate a key pair for this host. We will only use the pudlic key to
 	// obtain a valid host ID.
 	// Cannot throw error with given arguments
