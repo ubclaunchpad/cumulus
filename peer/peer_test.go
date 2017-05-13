@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 )
 
 func TestMain(t *testing.T) {
