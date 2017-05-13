@@ -94,6 +94,7 @@ func New(ip string, port int) (*Peer, error) {
 // We may want to implement another type of StreamHandler in the future.
 func (p *Peer) Receive(s net.Stream) {
 	log.Debug("Setting basic stream handler.")
+	defer s.Close()
 	p.doCumulus(s)
 }
 
