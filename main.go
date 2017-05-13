@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// Send a message to the peer
-	_, err = stream.Write([]byte("Hello, world!"))
+	_, err = stream.Write([]byte("Hello, world!\n"))
 	if err != nil {
 		log.Fatal(err)
 	}
