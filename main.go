@@ -4,7 +4,7 @@ import (
 	"flag"
 	"io/ioutil"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
