@@ -5,13 +5,25 @@ import (
 	"io"
 )
 
+// HashLen is the length in bytes of a hash.
+const HashLen = 32
+
 // Hash represents a 256-bit hash of a block or transaction
-type Hash [32]byte
+type Hash [HashLen]byte
+
+// Marshal converts a Hash to a slice.
+func (h Hash) Marshal() []byte {
+	buf := make([]byte, HashLen)
+	for i, b := range h {
+		buf[i] = b
+	}
+	return buf
+}
 
 // BlockChain represents a linked list of blocks
 type BlockChain struct {
-	blocks []*Block
-	head   Hash
+	Blocks []*Block
+	Head   Hash
 }
 
 // Encode writes the marshalled blockchain to the given io.Writer
@@ -34,7 +46,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 
 // ValidBlock checks whether a block is valid
 func (bc *BlockChain) ValidBlock(b *Block) bool {
-	for _, t := range b.transactions {
+	for _, t := range b.Transactions {
 		if !bc.ValidTransaction(t) {
 			return false
 		}
