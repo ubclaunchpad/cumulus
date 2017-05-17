@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"crypto/ecdsa"
 	"encoding/gob"
 	"io"
 )
@@ -24,22 +25,60 @@ func (bc *BlockChain) Decode(r io.Reader) {
 	gob.NewDecoder(r).Decode(bc)
 }
 
-// ValidTransaction checks whether a transaction is valid, assuming the blockchain is valid.
+// ValidTransaction checks whether a transaction is valid, assuming the
+// blockchain is valid.
 func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
+
 	// Find the transaction input (I) in the chain (by hash)
+	var I *Transaction
+	inBlock := bc.blocks[t.Input.BlockNumber]
+	for _, transaction := range inBlock.Transactions {
+		if transaction.Input.Hash == t.Input.Hash {
+			I = transaction
+		}
+	}
+	if I == nil {
+		return false
+	}
+
 	// Check that output to sender in I is equal to outputs in T
+	var inAmount uint64
+	for _, output := range I.Outputs {
+		if output.Recipient == t.Sender {
+			inAmount += output.Amount
+		}
+	}
+	var outAmount uint64
+	for _, output := range t.Outputs {
+		outAmount += output.Amount
+	}
+	if inAmount != outAmount {
+		return false
+	}
+
 	// Verify signature of T
-	return false
+	ecdsa.Verify(t.Sender, t.Sig.Marshal(), &t.Sig.R, &t.Sig.S)
+	return true
 }
 
 // ValidBlock checks whether a block is valid
 func (bc *BlockChain) ValidBlock(b *Block) bool {
-	for _, t := range b.transactions {
+	for _, t := range b.Transactions {
 		if !bc.ValidTransaction(t) {
 			return false
 		}
 	}
+
 	// Check that block number is one greater than last block
+	lastBlock := bc.blocks[b.BlockNumber-1]
+	if lastBlock.BlockNumber != b.BlockNumber-1 {
+		return false
+	}
+
 	// Check that hash of last block is correct
+	if lastBlock.Hash() != b.LastBlock {
+		return false
+	}
+
 	return false
 }
