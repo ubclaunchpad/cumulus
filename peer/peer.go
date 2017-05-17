@@ -14,16 +14,16 @@ import (
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	ma "github.com/multiformats/go-multiaddr"
+	log "github.com/sirupsen/logrus"
+	sn "github.com/ubclaunchpad/cumulus/subnet"
 )
 
 const (
 	// DefaultPort is the TCP port hosts will communicate over if none is
 	// provided
 	DefaultPort = 8765
-
 	// CumulusProtocol is the name of the protocol peers communicate over
 	CumulusProtocol = "/cumulus/0.0.1"
-
 	// DefaultIP is the IP address new hosts will use if none if provided
 	DefaultIP = "127.0.0.1"
 )
@@ -31,6 +31,7 @@ const (
 // Peer is a cumulus Peer composed of a host
 type Peer struct {
 	host.Host
+	subnet sn.Subnet
 }
 
 // New creates a Cumulus host with the given IP addr and TCP port.
@@ -69,9 +70,11 @@ func New(ip string, port int) (*Peer, error) {
 		return nil, err
 	}
 
+	subnet := *sn.New(sn.DefaultMaxPeers)
+
 	// Actually create the host and peer with the network we just set up.
 	host := bhost.New(netwrk)
-	peer := &Peer{Host: host}
+	peer := &Peer{Host: host, subnet: subnet}
 
 	// Build host multiaddress
 	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s",
@@ -89,12 +92,22 @@ func New(ip string, port int) (*Peer, error) {
 }
 
 // Receive is the function that gets called when a remote peer
-// opens a new stream with the host that SetStreamHandler() is called on.
+// opens a new stream with this peer.
 // This should be passed as the second argument to SetStreamHandler().
 // We may want to implement another type of StreamHandler in the future.
 func (p *Peer) Receive(s net.Stream) {
 	log.Debug("Setting basic stream handler.")
 	defer s.Close()
+
+	// Add the remote peer to this peer's subnet
+	// TODO: discuss this behaviour (for now refuse connections if subnet full)
+	remoteMA := s.Conn().RemoteMultiaddr()
+	err := p.subnet.AddPeer(remoteMA, s)
+	if err != nil {
+		log.Warnln(err)
+	}
+	defer p.subnet.RemovePeer(remoteMA)
+
 	p.doCumulus(s)
 }
 
@@ -121,7 +134,7 @@ func (p *Peer) doCumulus(s net.Stream) {
 // given multiaddress.
 // Returns peer ID (esentially 46 character hash created by the peer)
 // and the peer's multiaddress in the form /ip4/<peer IP>/tcp/<CumulusPort>.
-func ExtractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
+func extractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
 	log.Debug("Extracting peer info from ", peerma)
 
 	ipfsaddr, err := ma.NewMultiaddr(peerma)
@@ -153,9 +166,10 @@ func ExtractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
 
 // Connect adds the given multiaddress to p's Peerstore and opens a stream
 // with the peer at that multiaddress if the multiaddress is valid, otherwise
-// returns error.
+// returns error. On success the stream and corresponding multiaddress are
+// added to this peer's subnet.
 func (p *Peer) Connect(peerma string) (net.Stream, error) {
-	peerid, targetAddr, err := ExtractPeerInfo(peerma)
+	peerid, targetAddr, err := extractPeerInfo(peerma)
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +184,21 @@ func (p *Peer) Connect(peerma string) (net.Stream, error) {
 	// Open a stream with the peer
 	stream, err := p.NewStream(context.Background(), peerid,
 		CumulusProtocol)
+	if err != nil {
+		return nil, err
+	}
+
+	mAddr, err := ma.NewMultiaddr(peerma)
+	if err != nil {
+		stream.Close()
+		return nil, err
+	}
+
+	err = p.subnet.AddPeer(mAddr, stream)
+	if err != nil {
+		stream.Close()
+		return nil, err
+	}
 
 	return stream, err
 }
