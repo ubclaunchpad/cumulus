@@ -1,29 +1,18 @@
 package blockchain
 
 import (
+	"crypto/ecdsa"
 	"encoding/gob"
 	"io"
 )
 
-// HashLen is the length in bytes of a hash.
-const HashLen = 32
-
 // Hash represents a 256-bit hash of a block or transaction
-type Hash [HashLen]byte
-
-// Marshal converts a Hash to a slice.
-func (h Hash) Marshal() []byte {
-	buf := make([]byte, HashLen)
-	for i, b := range h {
-		buf[i] = b
-	}
-	return buf
-}
+type Hash [32]byte
 
 // BlockChain represents a linked list of blocks
 type BlockChain struct {
-	Blocks []*Block
-	Head   Hash
+	blocks []*Block
+	head   Hash
 }
 
 // Encode writes the marshalled blockchain to the given io.Writer
@@ -42,9 +31,9 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 
 	// Find the transaction input (I) in the chain (by hash)
 	var I *Transaction
-	inBlock := bc.blocks[t.input.blockNumber]
-	for _, transaction := range inBlock.transactions {
-		if transaction.input.hash == t.input.hash {
+	inBlock := bc.blocks[t.Input.BlockNumber]
+	for _, transaction := range inBlock.Transactions {
+		if transaction.Input.Hash == t.Input.Hash {
 			I = transaction
 		}
 	}
@@ -54,20 +43,21 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 
 	// Check that output to sender in I is equal to outputs in T
 	var inAmount uint64
-	for _, output := range I.outputs {
-		if output.recipient.Equals(&t.sender) {
-			inAmount += output.amount
+	for _, output := range I.Outputs {
+		if output.Recipient == t.Sender {
+			inAmount += output.Amount
 		}
 	}
 	var outAmount uint64
-	for _, output := range t.outputs {
-		outAmount += output.amount
+	for _, output := range t.Outputs {
+		outAmount += output.Amount
 	}
 	if inAmount != outAmount {
 		return false
 	}
 
-	// TODO: Verify signature of T
+	// Verify signature of T
+	ecdsa.Verify(t.Sender, t.Sig.Marshal(), &t.Sig.R, &t.Sig.S)
 	return true
 }
 
@@ -78,14 +68,15 @@ func (bc *BlockChain) ValidBlock(b *Block) bool {
 			return false
 		}
 	}
+
 	// Check that block number is one greater than last block
-	lastBlock := bc.blocks[b.blockNumber-1]
-	if lastBlock.blockNumber != b.blockNumber-1 {
+	lastBlock := bc.blocks[b.BlockNumber-1]
+	if lastBlock.BlockNumber != b.BlockNumber-1 {
 		return false
 	}
 
 	// Check that hash of last block is correct
-	if lastBlock.Hash() != b.lastBlock {
+	if lastBlock.Hash() != b.LastBlock {
 		return false
 	}
 
