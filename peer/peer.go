@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/Sirupsen/logrus"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	host "github.com/libp2p/go-libp2p-host"
 	net "github.com/libp2p/go-libp2p-net"
@@ -15,6 +14,7 @@ import (
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
+	msg "github.com/ubclaunchpad/cumulus/message"
 	sn "github.com/ubclaunchpad/cumulus/subnet"
 )
 
@@ -93,28 +93,29 @@ func New(ip string, port int) (*Peer, error) {
 
 // Receive is the function that gets called when a remote peer
 // opens a new stream with this peer.
-// This should be passed as the second argument to SetStreamHandler().
-// We may want to implement another type of StreamHandler in the future.
+// This should be passed as the second argument to SetStreamHandler() after this
+// peer is initialized.
 func (p *Peer) Receive(s net.Stream) {
-	log.Debug("Setting basic stream handler.")
 	defer s.Close()
 
-	// Add the remote peer to this peer's subnet
-	// TODO: discuss this behaviour (for now refuse connections if subnet full)
-	remoteMA := s.Conn().RemoteMultiaddr()
-	err := p.subnet.AddPeer(remoteMA, s)
+	// Get remote peer's full multiaddress
+	remoteMA, err := makeMultiaddr(
+		s.Conn().RemoteMultiaddr(), s.Conn().RemotePeer())
 	if err != nil {
-		log.Warnln(err)
+		log.Fatal("Failed to obtain valid remote peer multiaddress")
+	}
+
+	// Add the remote peer to this peer's subnet
+	err = p.subnet.AddPeer(remoteMA, s)
+	if err != nil {
+		// Subnet is full, advertise other available peers and then close
+		// the stream
+		log.Debug("Peer subnet full. Advertising peers...")
+		p.advertisePeers(s)
+		return
 	}
 	defer p.subnet.RemovePeer(remoteMA)
 
-	p.doCumulus(s)
-}
-
-// Communicate with peers.
-// TODO: Update this to do something useful. For now it just reads from the
-// stream and writes back what it read.
-func (p *Peer) doCumulus(s net.Stream) {
 	buf := bufio.NewReader(s)
 	str, err := buf.ReadString('\n')
 	if err != nil {
@@ -128,6 +129,45 @@ func (p *Peer) doCumulus(s net.Stream) {
 	if err != nil {
 		log.Error(err)
 	}
+}
+
+// Connect adds the given multiaddress to p's Peerstore and opens a stream
+// with the peer at that multiaddress if the multiaddress is valid, otherwise
+// returns error. On success the stream and corresponding multiaddress are
+// added to this peer's subnet.
+func (p *Peer) Connect(peerma string) (net.Stream, error) {
+	peerid, targetAddr, err := extractPeerInfo(peerma)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store the peer's address in this host's PeerStore
+	p.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+
+	log.Debug("Connected to Cumulus Peer:")
+	log.Debugf("Peer ID: %s", peerid.Pretty())
+	log.Debug("Peer Address:", targetAddr)
+
+	// Open a stream with the peer
+	stream, err := p.NewStream(context.Background(), peerid,
+		CumulusProtocol)
+	if err != nil {
+		return nil, err
+	}
+
+	mAddr, err := ma.NewMultiaddr(peerma)
+	if err != nil {
+		stream.Close()
+		return nil, err
+	}
+
+	err = p.subnet.AddPeer(mAddr, stream)
+	if err != nil {
+		stream.Close()
+		return nil, err
+	}
+
+	return stream, err
 }
 
 // ExtractPeerInfo extracts the peer ID and multiaddress from the
@@ -164,41 +204,33 @@ func extractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
 	return peerid, trgtAddr, nil
 }
 
-// Connect adds the given multiaddress to p's Peerstore and opens a stream
-// with the peer at that multiaddress if the multiaddress is valid, otherwise
-// returns error. On success the stream and corresponding multiaddress are
-// added to this peer's subnet.
-func (p *Peer) Connect(peerma string) (net.Stream, error) {
-	peerid, targetAddr, err := extractPeerInfo(peerma)
-	if err != nil {
-		return nil, err
+// advertisePeers writes messages into the given stream advertising the
+// multiaddress of each peer in this peer's subnet.
+func (p *Peer) advertisePeers(s net.Stream) {
+	mAddrs := p.subnet.Multiaddrs()
+	log.Debug("Peers on this subnet: ")
+	for mAddr := range mAddrs {
+		mAddrString := string(mAddr)
+		log.Debug("\t", mAddrString)
+		message, msgErr := msg.New([]byte(mAddrString), msg.PeerInfo)
+		if msgErr != nil {
+			log.Error("Failed to create message")
+			return
+		}
+		_, msgErr = s.Write(message.Bytes())
+		if msgErr != nil {
+			log.Errorf("Failed to send message to %s", string(mAddr))
+		}
 	}
+}
 
-	// Store the peer's address in this host's PeerStore
-	p.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
-
-	log.Debug("Connected to Cumulus Peer:")
-	log.Debug("Peer ID:", peerid.Pretty())
-	log.Debug("Peer Address:", targetAddr)
-
-	// Open a stream with the peer
-	stream, err := p.NewStream(context.Background(), peerid,
-		CumulusProtocol)
-	if err != nil {
-		return nil, err
-	}
-
-	mAddr, err := ma.NewMultiaddr(peerma)
-	if err != nil {
-		stream.Close()
-		return nil, err
-	}
-
-	err = p.subnet.AddPeer(mAddr, stream)
-	if err != nil {
-		stream.Close()
-		return nil, err
-	}
-
-	return stream, err
+// makeMultiaddr creates a Multiaddress from the given Multiaddress (of the form
+// /ip4/<ip address>/tcp/<TCP port>) and the peer id (a hash) and turn them
+// into one Multiaddress. Will return error if Multiaddress is invalid.
+func makeMultiaddr(iAddr ma.Multiaddr, pid lpeer.ID) (ma.Multiaddr, error) {
+	strAddr := iAddr.String()
+	strID := pid.Pretty()
+	strMA := fmt.Sprintf("%s/ipfs/%s", strAddr, strID)
+	mAddr, err := ma.NewMultiaddr(strMA)
+	return mAddr, err
 }

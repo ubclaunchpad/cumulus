@@ -4,7 +4,7 @@ import (
 	"flag"
 	"io/ioutil"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
@@ -59,6 +59,9 @@ func main() {
 	}
 
 	log.Debugf("Peer %s read reply: %s", host.ID(), string(reply))
+
+	log.Debug("Hanging...")
+	select {}
 
 	host.Close()
 }

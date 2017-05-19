@@ -1,6 +1,9 @@
 package message
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Message types
 // NOTE: because of the way iota works, changing the order in which the
@@ -43,4 +46,9 @@ func New(c []byte, t int) (*Message, error) {
 
 	m := &Message{msgType: t, content: c}
 	return m, nil
+}
+
+// Bytes returns the given message in []byte format
+func (m *Message) Bytes() []byte {
+	return []byte(fmt.Sprintf("%d:%s", m.msgType, string(m.content)))
 }

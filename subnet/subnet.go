@@ -5,6 +5,7 @@ import (
 
 	net "github.com/libp2p/go-libp2p-net"
 	ma "github.com/multiformats/go-multiaddr"
+	log "github.com/sirupsen/logrus"
 	msg "github.com/ubclaunchpad/cumulus/message"
 )
 
@@ -42,14 +43,21 @@ func (sn *Subnet) AddPeer(mAddr ma.Multiaddr, stream net.Stream) error {
 		return err
 	}
 
-	sn.peers[mAddr] = stream
-	sn.numPeers++
+	// Check if it's already in this subnet
+	if sn.peers[mAddr] != nil {
+		log.Debugf("Peer %s is already in subnet", mAddr.String())
+	} else {
+		log.Debugf("Adding peer %s to subnet", mAddr.String())
+		sn.peers[mAddr] = stream
+		sn.numPeers++
+	}
 	return nil
 }
 
 // RemovePeer removes the mapping with the key mAddr from the subnet if it
 // exists.
 func (sn *Subnet) RemovePeer(mAddr ma.Multiaddr) {
+	log.Debugf("Removing peer %s from subnet", mAddr.String())
 	delete(sn.peers, mAddr)
 	sn.numPeers--
 }
@@ -58,6 +66,15 @@ func (sn *Subnet) RemovePeer(mAddr ma.Multiaddr) {
 // limit set for that subnet, otherwise returns false.
 func (sn *Subnet) isFull() bool {
 	return sn.numPeers >= sn.maxPeers
+}
+
+// Multiaddrs returns a list of all multiaddresses contined in this subnet
+func (sn *Subnet) Multiaddrs() []ma.Multiaddr {
+	mAddrs := make([]ma.Multiaddr, 0, len(sn.peers))
+	for mAddr := range sn.peers {
+		mAddrs = append(mAddrs, mAddr)
+	}
+	return mAddrs
 }
 
 // Broadcast sends information to all peers we are currently connected to
