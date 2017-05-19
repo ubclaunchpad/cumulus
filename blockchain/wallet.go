@@ -73,13 +73,9 @@ func (w *wallet) Public() Address {
 }
 
 // Sign returns a signature of the digest.
-func (w *wallet) Sign(digest Hash, random io.Reader) Signature {
+func (w *wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
 	r, s, err := ecdsa.Sign(random, w.key(), digest.Marshal())
-	if err != nil {
-		// Signing failed
-		return NilSig
-	}
-	return Signature{r, s}
+	return Signature{r, s}, err
 }
 
 // Signature represents a signature of a transaction.

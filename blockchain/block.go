@@ -2,7 +2,6 @@ package blockchain
 
 // BlockHeader contains metadata about a block
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
@@ -67,12 +66,9 @@ func (b *Block) Encode(w io.Writer) {
 	}
 }
 
-// Decode reads the marshalled block from the given io.Reader and populates b
-func (b *Block) Decode(r io.Reader) {
-	gob.NewDecoder(r).Decode(b)
-}
-
-// Hash computes and returns the SHA256 hash of the block
-func (b *Block) Hash() Hash {
-	return sha256.Sum256(b.Marshal())
+// DecodeBlock reads the marshalled block from the given io.Reader and populates b
+func DecodeBlock(r io.Reader) *Block {
+	var b Block
+	gob.NewDecoder(r).Decode(&b)
+	return &b
 }

@@ -49,7 +49,7 @@ func newTxBody() TxBody {
 func newTransaction() *Transaction {
 	sender := newWallet()
 	tbody := newTxBody()
-	digest := tbody.Hash()
+	digest := HashSum(tbody)
 	sig := sender.Sign(digest, crand.Reader)
 	return &Transaction{
 		TxBody: tbody,
@@ -76,4 +76,15 @@ func newBlock() *Block {
 		b.Transactions[i] = newTransaction()
 	}
 	return &b
+}
+
+func newBlockChain() *BlockChain {
+	// Uniform distribution on [10, 50]
+	nBlocks := mrand.Intn(40) + 10
+	bc := BlockChain{Blocks: make([]*Block, nBlocks)}
+	for i := 0; i < nBlocks; i++ {
+		bc.Blocks[i] = newBlock()
+	}
+	bc.Head = HashSum(bc.Blocks[nBlocks-1])
+	return &bc
 }

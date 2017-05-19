@@ -5,25 +5,28 @@ import (
 	"io"
 )
 
-// HashLen is the length in bytes of a hash.
-const HashLen = 32
-
-// Hash represents a 256-bit hash of a block or transaction
-type Hash [HashLen]byte
-
-// Marshal converts a Hash to a slice.
-func (h Hash) Marshal() []byte {
-	buf := make([]byte, HashLen)
-	for i, b := range h {
-		buf[i] = b
-	}
-	return buf
-}
-
 // BlockChain represents a linked list of blocks
 type BlockChain struct {
 	Blocks []*Block
 	Head   Hash
+}
+
+// Len returns the length of the BlockChain when marshalled
+func (bc *BlockChain) Len() int {
+	l := 0
+	for _, b := range bc.Blocks {
+		l += b.Len()
+	}
+	return l + HashLen
+}
+
+// Marshal converts the BlockChain to a byte slice.
+func (bc *BlockChain) Marshal() []byte {
+	buf := make([]byte, 0, bc.Len())
+	for _, b := range bc.Blocks {
+		buf = append(buf, b.Marshal()...)
+	}
+	return append(buf, bc.Head.Marshal()...)
 }
 
 // Encode writes the marshalled blockchain to the given io.Writer
@@ -31,9 +34,11 @@ func (bc *BlockChain) Encode(w io.Writer) {
 	gob.NewEncoder(w).Encode(bc)
 }
 
-// Decode reads the marshalled blockchain from the given io.Reader
-func (bc *BlockChain) Decode(r io.Reader) {
-	gob.NewDecoder(r).Decode(bc)
+// DecodeBlockChain reads the marshalled blockchain from the given io.Reader
+func DecodeBlockChain(r io.Reader) *BlockChain {
+	var bc BlockChain
+	gob.NewDecoder(r).Decode(&bc)
+	return &bc
 }
 
 // ValidTransaction checks whether a transaction is valid, assuming the blockchain is valid.
