@@ -40,7 +40,7 @@ func (a Address) Marshal() []byte {
 // Wallet represents a wallet that we have the ability to sign for.
 type Wallet interface {
 	Public() Address
-	Sign(digest Hash, random io.Reader) Signature
+	Sign(digest Hash, random io.Reader) (Signature, error)
 }
 
 // Internal representation of a wallet.

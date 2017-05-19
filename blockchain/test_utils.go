@@ -50,7 +50,7 @@ func newTransaction() *Transaction {
 	sender := newWallet()
 	tbody := newTxBody()
 	digest := HashSum(tbody)
-	sig := sender.Sign(digest, crand.Reader)
+	sig, _ := sender.Sign(digest, crand.Reader)
 	return &Transaction{
 		TxBody: tbody,
 		Sig:    sig,
