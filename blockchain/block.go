@@ -26,9 +26,7 @@ type BlockHeader struct {
 func (bh *BlockHeader) Marshal() []byte {
 	buf := make([]byte, 4, BlockHeaderLen)
 	binary.LittleEndian.PutUint32(buf, bh.BlockNumber)
-	for _, b := range bh.LastBlock {
-		buf = append(buf, b)
-	}
+	buf = append(buf, bh.LastBlock.Marshal()...)
 	buf = append(buf, bh.Miner.Marshal()...)
 	return buf
 }
