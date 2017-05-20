@@ -2,40 +2,55 @@ package blockchain
 
 // BlockHeader contains metadata about a block
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	"io"
+)
+
+const (
+	// BlockSize is the maximum size of a block in bytes when marshaled (about 250K).
+	BlockSize = 1 << 18
+	// BlockHeaderLen is the length in bytes of a block header.
+	BlockHeaderLen = 32/8 + HashLen + AddrLen
 )
 
 // BlockHeader contains metadata about a block
 type BlockHeader struct {
-	blockNumber uint32
-	lastBlock   Hash
-	miner       Wallet
+	BlockNumber uint32
+	LastBlock   Hash
+	Miner       Address
 }
 
 // Marshal converts a BlockHeader to a byte slice
 func (bh *BlockHeader) Marshal() []byte {
-	buf := []byte{}
-	binary.LittleEndian.PutUint32(buf, bh.blockNumber)
-	for _, b := range bh.lastBlock {
-		buf = append(buf, b)
-	}
-	buf = append(buf, bh.miner.Marshal()...)
+	buf := make([]byte, 4, BlockHeaderLen)
+	binary.LittleEndian.PutUint32(buf, bh.BlockNumber)
+	buf = append(buf, bh.LastBlock.Marshal()...)
+	buf = append(buf, bh.Miner.Marshal()...)
 	return buf
 }
 
 // Block represents a block in the blockchain. Contains transactions and header metadata.
 type Block struct {
 	BlockHeader
-	transactions []*Transaction
+	Transactions []*Transaction
 }
 
-// Marshal converts a Block to a byte slice
+// Len returns the length in bytes of the Block.
+func (b *Block) Len() int {
+	l := BlockHeaderLen
+	for _, t := range b.Transactions {
+		l += t.Len()
+	}
+	return l
+}
+
+// Marshal converts a Block to a byte slice.
 func (b *Block) Marshal() []byte {
-	buf := b.BlockHeader.Marshal()
-	for _, t := range b.transactions {
+	buf := make([]byte, 0, b.Len())
+	buf = append(buf, b.BlockHeader.Marshal()...)
+	for _, t := range b.Transactions {
 		buf = append(buf, t.Marshal()...)
 	}
 	return buf
@@ -43,15 +58,15 @@ func (b *Block) Marshal() []byte {
 
 // Encode writes the marshalled block to the given io.Writer
 func (b *Block) Encode(w io.Writer) {
-	gob.NewEncoder(w).Encode(b)
+	err := gob.NewEncoder(w).Encode(b)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 }
 
-// Decode reads the marshalled block from the given io.Reader
-func (b *Block) Decode(r io.Reader) {
-	gob.NewDecoder(r).Decode(b)
-}
-
-// Hash computes and returns the SHA256 hash of the block
-func (b *Block) Hash() Hash {
-	return sha256.Sum256(b.Marshal())
+// DecodeBlock reads the marshalled block from the given io.Reader and populates b
+func DecodeBlock(r io.Reader) *Block {
+	var b Block
+	gob.NewDecoder(r).Decode(&b)
+	return &b
 }
