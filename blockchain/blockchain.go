@@ -74,7 +74,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 	}
 
 	// Verify signature of T
-	ecdsa.Verify(t.Sender.Marshal(), t.Sig.Marshal(), &t.Sig.R, &t.Sig.S)
+	ecdsa.Verify(t.Sender, t.Sig.Marshal(), &t.Sig.R, &t.Sig.S)
 	return true
 }
 
@@ -93,7 +93,7 @@ func (bc *BlockChain) ValidBlock(b *Block) bool {
 	}
 
 	// Check that hash of last block is correct
-	if lastBlock.Hash() != b.LastBlock {
+	if HashSum(lastBlock) != b.LastBlock {
 		return false
 	}
 
