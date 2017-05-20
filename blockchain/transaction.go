@@ -1,9 +1,6 @@
 package blockchain
 
-import (
-	"crypto/sha256"
-	"encoding/binary"
-)
+import "encoding/binary"
 
 const (
 	// TxHashPointerLen is the length in bytes of a hash pointer.
@@ -63,11 +60,6 @@ func (tb TxBody) Marshal() []byte {
 	return buf
 }
 
-// Hash computes the SHA256 hash of a transaction body.
-func (tb TxBody) Hash() Hash {
-	return sha256.Sum256(tb.Marshal())
-}
-
 // Transaction contains a TxBody and a signature verifying it
 type Transaction struct {
 	TxBody
@@ -85,9 +77,4 @@ func (t *Transaction) Marshal() []byte {
 	buf = append(buf, t.TxBody.Marshal()...)
 	buf = append(buf, t.Sig.Marshal()...)
 	return buf
-}
-
-// Hash returns the SHA256 hash of a transaction
-func (t *Transaction) Hash() Hash {
-	return sha256.Sum256(t.Marshal())
 }

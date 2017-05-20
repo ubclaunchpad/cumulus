@@ -5,16 +5,15 @@ import (
 	"testing"
 )
 
-func TestEncodeBlock(t *testing.T) {
+func TestEncodeDecodeBlock(t *testing.T) {
 	b1 := newBlock()
-	b2 := Block{}
 
 	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
 
 	b1.Encode(buf)
-	b2.Decode(buf)
+	b2 := DecodeBlock(buf)
 
-	if b1.Hash() != b2.Hash() {
+	if HashSum(b1) != HashSum(b2) {
 		t.Fail()
 	}
 }

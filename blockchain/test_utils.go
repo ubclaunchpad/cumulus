@@ -49,8 +49,8 @@ func newTxBody() TxBody {
 func newTransaction() *Transaction {
 	sender := newWallet()
 	tbody := newTxBody()
-	digest := tbody.Hash()
-	sig := sender.Sign(digest, crand.Reader)
+	digest := HashSum(tbody)
+	sig, _ := sender.Sign(digest, crand.Reader)
 	return &Transaction{
 		TxBody: tbody,
 		Sig:    sig,
@@ -76,4 +76,56 @@ func newBlock() *Block {
 		b.Transactions[i] = newTransaction()
 	}
 	return &b
+}
+
+func newBlockChain() *BlockChain {
+	// Uniform distribution on [10, 50]
+	nBlocks := mrand.Intn(40) + 10
+	bc := BlockChain{Blocks: make([]*Block, nBlocks)}
+	for i := 0; i < nBlocks; i++ {
+		bc.Blocks[i] = newBlock()
+	}
+	bc.Head = HashSum(bc.Blocks[nBlocks-1])
+	return &bc
+}
+
+func newInputBlock(t []*Transaction) *Block {
+	return &Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: 0,
+			LastBlock:   newHash(),
+			Miner:       newWallet().Public(),
+		},
+		Transactions: t,
+	}
+}
+
+func newOutputBlock(t []*Transaction, input *Block) *Block {
+	return &Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: input.BlockNumber + 1,
+			LastBlock:   HashSum(input),
+			Miner:       newWallet().Public(),
+		},
+		Transactions: t,
+	}
+}
+
+func newTransactionValue(a uint64, r Address) *Transaction {
+	sender := newWallet()
+	tbody := TxBody{
+		Sender:  newWallet().Public(),
+		Input:   newTxHashPointer(),
+		Outputs: make([]TxOutput, 1),
+	}
+	tbody.Outputs[0] = TxOutput{
+		Amount:    a,
+		Recipient: r,
+	}
+	digest := HashSum(tbody)
+	sig, _ := sender.Sign(digest, crand.Reader)
+	return &Transaction{
+		TxBody: tbody,
+		Sig:    sig,
+	}
 }

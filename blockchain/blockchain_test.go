@@ -1,6 +1,8 @@
 package blockchain
 
 import (
+	"bytes"
+	crand "crypto/rand"
 	"testing"
 
 	log "github.com/Sirupsen/logrus"
@@ -11,82 +13,63 @@ func TestMain(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 }
 
-func newInputBlock(t *[]Transaction) {
-	return Block{
-		BlockNumber:  0,
-		LastBlock:    nil,
-		Miner:        Address{},
-		Transactions: &t,
-	}
-}
-
-func newOutputBlock(t *[]Transaction, b *inputBlock) {
-	return Block{
-		BlockHeader: BlockHeader{
-			BlockNumber: 1,
-			LastBlock:   Hash(),
-			Miner:       Address{},
-		},
-		Transactions: &t,
-	}
-}
-
-func newTransactionValue(uint64 amount) {
-	sender := newWallet()
-	tbody := TxBody{
-		Sender:  newWallet().Public(),
-		Input:   newTxHashPointer(),
-		Outputs: make([]TxOutput, 1),
-	}
-	tbody.Outputs[0] = amount
-	digest := tbody.Hash()
-	sig := sender.Sign(digest, crand.Reader)
-	return &Transaction{
-		TxBody: tbody,
-		Sig:    sig,
-	}
-}
-
 func TestValidTransactionNotInBlock(t *testing.T) {
-	tr := newTransactionValue(5)
-	inputTransactions = make([]Transaction, 0)
-	outputTransactions = make([]Transaction, 0)
+	tr := newTransactionValue(5, Address{})
+
+	inputTransactions := make([]*Transaction, 0)
+	outputTransactions := make([]*Transaction, 0)
+
 	inputBlock := newInputBlock(inputTransactions)
-	outputBlock := newOutputBlock(outputTransactions)
+	outputBlock := newOutputBlock(outputTransactions, inputBlock)
+
 	bc := BlockChain{
-		Blocks: []Block{
-			{b},
-		},
-		Hash: Hash{newHash()},
+		Blocks: []*Block{inputBlock, outputBlock},
+		Head:   newHash(),
 	}
+
 	if bc.ValidTransaction(tr) {
 		t.Fail()
 	}
 }
 
-// The output(s) in the inputBlock do not equal the outputs in t.
 func TestValidTransactionInputsFail(t *testing.T) {
-	tr := newTransaction()
-	b := Block{
-		BlockNumber: 3,
-		LastBlock:   2,
-		Miner:       Address{},
-	}
-	b.LastBlock = inputBlock.Hash()
+	// 2 + 2 = 5 ?
+	trA := newTransactionValue(2, newWallet().Public())
+	trB := newTransactionValue(2, newWallet().Public())
+	trC := newTransactionValue(5, newWallet().Public())
+
+	inputTransactions := []*Transaction{trA, trB}
+	outputTransactions := []*Transaction{trC}
+
+	inputBlock := newInputBlock(inputTransactions)
+	outputBlock := newOutputBlock(outputTransactions, inputBlock)
+
 	bc := BlockChain{
-		Blocks: []Block{
-			{inputBlock, b},
-		},
+		Blocks: []*Block{inputBlock, outputBlock},
+		Head:   newHash(),
 	}
 
-	// Create new transactions and add them to blocks.
-	if bc.ValidTransaction(tr) {
+	if bc.ValidTransaction(trC) {
 		t.Fail()
 	}
 }
 
 func TestValidTransactionSignatureFail(t *testing.T) {
-	// The signature is invalid
+	tr := newTransactionValue(2, newWallet().Public())
+
+	// Fake sender puts in a silly signature.
+	fakeSender := newWallet()
+	fakeTransaction := newTransaction()
+	digest := HashSum(fakeTransaction.TxBody)
+	tr.Sig, _ = fakeSender.Sign(digest, crand.Reader)
+
+	transactions := []*Transaction{tr}
+	b := newInputBlock(transactions)
+
+	bc := BlockChain{
+		Blocks: []*Block{b},
+		Head:   newHash(),
+	}
 
 	if bc.ValidTransaction(tr) {
 		t.Fail()
@@ -99,7 +82,17 @@ func TestValidBlock(t *testing.T) {
 	// b conains invalid transaction.
 	// Block number for b is not one greater than the last block.
 	// The hash of the last block is incorrect.
-	if bc.ValidTransaction(tr) {
+}
+
+func TestEncodeDecodeBlockChain(t *testing.T) {
+	b1 := newBlockChain()
+
+	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
+
+	b1.Encode(buf)
+	b2 := DecodeBlockChain(buf)
+
+	if HashSum(b1) != HashSum(b2) {
 		t.Fail()
 	}
 }

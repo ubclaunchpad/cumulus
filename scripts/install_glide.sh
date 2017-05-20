@@ -6,4 +6,3 @@ go install
 glide --version
 
 cd $GOPATH/src/github.com/ubclaunchpad/cumulus
-glide install
