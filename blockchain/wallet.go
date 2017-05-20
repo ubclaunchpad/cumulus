@@ -26,15 +26,25 @@ var (
 )
 
 // Address represents a wallet that can be a recipient in a transaction.
-type Address [AddrLen]byte
+type Address struct {
+	X, Y *big.Int
+}
 
 // Marshal converts an Address to a byte slice.
 func (a Address) Marshal() []byte {
 	buf := make([]byte, AddrLen)
-	for i, b := range a {
-		buf[i] = b
-	}
+	buf = append(buf, a.X.Bytes()...)
+	buf = append(buf, a.Y.Bytes()...)
 	return buf
+}
+
+// Key returns the ECDSA public key representation of the address.
+func (a Address) Key() *ecdsa.PublicKey {
+	return &ecdsa.PublicKey{
+		Curve: curve,
+		X:     a.X,
+		Y:     a.X,
+	}
 }
 
 // Wallet represents a wallet that we have the ability to sign for.
@@ -53,23 +63,7 @@ func (w *wallet) key() *ecdsa.PrivateKey {
 
 // Public returns the public key as byte array, or address, of the wallet.
 func (w *wallet) Public() Address {
-	addr := Address{}
-	x := w.PublicKey.X.Bytes()
-	y := w.PublicKey.Y.Bytes()
-
-	if len(x) != CoordLen || len(y) != CoordLen {
-		// Invalid wallet
-		return NilAddr
-	}
-
-	for i, b := range x {
-		addr[i] = b
-	}
-	for i, b := range y {
-		addr[CoordLen+i] = b
-	}
-
-	return addr
+	return Address{X: w.PublicKey.X, Y: w.PublicKey.Y}
 }
 
 // Sign returns a signature of the digest.
