@@ -3,6 +3,7 @@ package peer
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 
 	crypto "github.com/libp2p/go-libp2p-crypto"
@@ -117,18 +118,23 @@ func (p *Peer) Receive(s net.Stream) {
 	defer p.subnet.RemovePeer(remoteMA)
 
 	buf := bufio.NewReader(s)
-	str, err := buf.ReadString('\n')
+	strMsg, err := buf.ReadString('\n') // TODO: set timeout here
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	log.Debugf("Peer %s read: %s", p.ID(), str)
-
-	_, err = s.Write([]byte(str))
+	// Turn the string into a message we can deal with
+	message, err := msg.FromString(strMsg)
 	if err != nil {
 		log.Error(err)
+		return
 	}
+
+	log.Debugf("Peer %s message:\n%s", p.ID(), strMsg)
+
+	// Respond to message
+	p.handleMessage(*message, s)
 }
 
 // Connect adds the given multiaddress to p's Peerstore and opens a stream
@@ -168,6 +174,11 @@ func (p *Peer) Connect(peerma string) (net.Stream, error) {
 	}
 
 	return stream, err
+}
+
+// Broadcast sends message to all peers this peer is currently connected to
+func (p *Peer) Broadcast(m msg.Message) error {
+	return errors.New("Function not implemented")
 }
 
 // ExtractPeerInfo extracts the peer ID and multiaddress from the
@@ -212,13 +223,18 @@ func (p *Peer) advertisePeers(s net.Stream) {
 	for mAddr := range mAddrs {
 		mAddrString := string(mAddr)
 		log.Debug("\t", mAddrString)
-		message, msgErr := msg.New([]byte(mAddrString), msg.PeerInfo)
-		if msgErr != nil {
+		message, err := msg.New([]byte(mAddrString), msg.PeerInfo)
+		if err != nil {
 			log.Error("Failed to create message")
 			return
 		}
-		_, msgErr = s.Write(message.Bytes())
-		if msgErr != nil {
+		msgBytes, err := message.Bytes()
+		if err != nil {
+			log.Error("Failed to marshal message")
+			return
+		}
+		_, err = s.Write(msgBytes)
+		if err != nil {
 			log.Errorf("Failed to send message to %s", string(mAddr))
 		}
 	}
@@ -233,4 +249,14 @@ func makeMultiaddr(iAddr ma.Multiaddr, pid lpeer.ID) (ma.Multiaddr, error) {
 	strMA := fmt.Sprintf("%s/ipfs/%s", strAddr, strID)
 	mAddr, err := ma.NewMultiaddr(strMA)
 	return mAddr, err
+}
+
+func (p *Peer) handleMessage(m msg.Message, s net.Stream) {
+	switch m.Type() {
+	case msg.RequestPeerInfo:
+		p.advertisePeers(s)
+		break
+	default:
+		// Do nothing. WHEOOO!
+	}
 }

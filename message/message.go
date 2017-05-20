@@ -1,8 +1,9 @@
 package message
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
+	"strings"
 )
 
 // Message types
@@ -12,6 +13,8 @@ import (
 const (
 	// Send the multiaddress of a peer to another peer
 	PeerInfo = iota
+	// Request addressess of peers in the remote peer's subnet
+	RequestPeerInfo = iota
 	// Send information about a block that was just hashed
 	NewBlock = iota
 	// Request chunk of the blockchain from peer
@@ -48,7 +51,23 @@ func New(c []byte, t int) (*Message, error) {
 	return m, nil
 }
 
-// Bytes returns the given message in []byte format
-func (m *Message) Bytes() []byte {
-	return []byte(fmt.Sprintf("%d:%s", m.msgType, string(m.content)))
+// Bytes returns JSON representation of message as a byte array, or error if
+// message cannot be marshalled.
+func (m *Message) Bytes() ([]byte, error) {
+	return json.Marshal(m)
+}
+
+// FromString parses a message in the form of a string and returns a pointer
+// to a new Message struct made from the contents of the string. Returns error
+// if string is malformed.
+func FromString(s string) (*Message, error) {
+	var msg Message
+	s = strings.TrimSpace(s)
+	err := json.Unmarshal([]byte(s), &msg)
+	return &msg, err
+}
+
+// Type returns msgType for message
+func (m *Message) Type() int {
+	return m.msgType
 }

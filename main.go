@@ -60,8 +60,5 @@ func main() {
 
 	log.Debugf("Peer %s read reply: %s", host.ID(), string(reply))
 
-	log.Debug("Hanging...")
-	select {}
-
 	host.Close()
 }

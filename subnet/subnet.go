@@ -6,7 +6,6 @@ import (
 	net "github.com/libp2p/go-libp2p-net"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
-	msg "github.com/ubclaunchpad/cumulus/message"
 )
 
 const (
@@ -75,15 +74,4 @@ func (sn *Subnet) Multiaddrs() []ma.Multiaddr {
 		mAddrs = append(mAddrs, mAddr)
 	}
 	return mAddrs
-}
-
-// Broadcast sends information to all peers we are currently connected to
-func (sn *Subnet) Broadcast(m msg.Message) error {
-	return errors.New("Function not implemented")
-}
-
-// Listen listens to all peers we are currently connected to
-// Call appropriate routines in response to new messages
-func (sn *Subnet) Listen() {
-	panic("Function not implemented")
 }
