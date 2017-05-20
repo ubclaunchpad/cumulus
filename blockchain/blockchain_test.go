@@ -74,7 +74,6 @@ func TestValidTransactionSignatureFail(t *testing.T) {
 	if bc.ValidTransaction(tr) {
 		t.Fail()
 	}
-
 }
 
 // TestValidBlock tests the three cases in which a block can fail to be valid.
