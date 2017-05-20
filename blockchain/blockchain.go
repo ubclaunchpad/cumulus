@@ -74,7 +74,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 	}
 
 	// Verify signature of T
-	ecdsa.Verify(t.Sender, t.Sig.Marshal(), &t.Sig.R, &t.Sig.S)
+	ecdsa.Verify(t.Sender.Key(), t.Sig.Marshal(), t.Sig.R, t.Sig.S)
 	return true
 }
 
