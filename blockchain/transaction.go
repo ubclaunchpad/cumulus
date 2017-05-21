@@ -1,6 +1,9 @@
 package blockchain
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"io"
+)
 
 const (
 	// TxHashPointerLen is the length in bytes of a hash pointer.
@@ -58,6 +61,13 @@ func (tb TxBody) Marshal() []byte {
 		buf = append(buf, out.Marshal()...)
 	}
 	return buf
+}
+
+// Signed returns a signed Transaction from a TxBody
+func (tb TxBody) Signed(w Wallet, r io.Reader) (*Transaction, error) {
+	digest := HashSum(tb)
+	sig, err := w.Sign(digest, r)
+	return &Transaction{tb, sig}, err
 }
 
 // Transaction contains a TxBody and a signature verifying it
