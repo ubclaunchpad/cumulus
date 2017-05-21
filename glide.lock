@@ -135,7 +135,7 @@ imports:
   version: b8f1996688ab586031517919b49b1967fca8d5d9
 - name: github.com/satori/go.uuid
   version: 5bf94b69c6b68ee1b541973bb8e1144db23a194b
-- name: github.com/Sirupsen/logrus
+- name: github.com/sirupsen/logrus
   version: acfabf31db8f45a9174f54a0d48ea4d15627af4d
 - name: github.com/spaolacci/murmur3
   version: 0d12bf811670bf6a1a63828dfbd003eded177fce

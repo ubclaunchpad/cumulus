@@ -4,7 +4,7 @@ import (
 	"flag"
 	"io/ioutil"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// Send a message to the peer
-	_, err = stream.Write([]byte("Hello, world!"))
+	_, err = stream.Write([]byte("Hello, world!\n"))
 	if err != nil {
 		log.Fatal(err)
 	}
