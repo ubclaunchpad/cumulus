@@ -63,8 +63,8 @@ func (tb TxBody) Marshal() []byte {
 	return buf
 }
 
-// Signed returns a signed Transaction from a TxBody
-func (tb TxBody) Signed(w Wallet, r io.Reader) (*Transaction, error) {
+// Sign returns a signed Transaction from a TxBody
+func (tb TxBody) Sign(w Wallet, r io.Reader) (*Transaction, error) {
 	digest := HashSum(tb)
 	sig, err := w.Sign(digest, r)
 	return &Transaction{tb, sig}, err

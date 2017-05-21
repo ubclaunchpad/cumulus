@@ -49,7 +49,7 @@ func newTxBody() TxBody {
 func newTransaction() *Transaction {
 	sender := newWallet()
 	tbody := newTxBody()
-	t, _ := tbody.Signed(sender, crand.Reader)
+	t, _ := tbody.Sign(sender, crand.Reader)
 	return t
 }
 
