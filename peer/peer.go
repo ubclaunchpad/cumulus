@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	host "github.com/libp2p/go-libp2p-host"
 	net "github.com/libp2p/go-libp2p-net"
@@ -14,7 +15,6 @@ import (
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	ma "github.com/multiformats/go-multiaddr"
-	log "github.com/sirupsen/logrus"
 	msg "github.com/ubclaunchpad/cumulus/message"
 	sn "github.com/ubclaunchpad/cumulus/subnet"
 )
