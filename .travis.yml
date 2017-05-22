@@ -4,5 +4,8 @@ go:
   - 1.7
 before_install:
   - go get github.com/mattn/goveralls
+install:
+  - make install-glide
+  - make deps
 script:
   - $HOME/gopath/bin/goveralls -service=travis-ci
