@@ -37,6 +37,14 @@ type Message struct {
 	Payload interface{}
 }
 
+// New returns a new Message.
+func New(t Type, payload interface{}) *Message {
+	return &Message{
+		Type:    t,
+		Payload: payload,
+	}
+}
+
 // Request is a container for a request payload, containing a unique request ID,
 // the resource type we are requesting, and a Params field specifying request
 // parameters. PeerInfo requests should send all info of all peers. Block requests
@@ -63,13 +71,13 @@ type Push struct {
 	Resource     interface{}
 }
 
-// Encode encodes and writes the Message into the given Writer.
-func (m *Message) Encode(w io.Writer) error {
+// Write encodes and writes the Message into the given Writer.
+func (m *Message) Write(w io.Writer) error {
 	return gob.NewEncoder(w).Encode(m)
 }
 
-// Decode decodes a message from a Reader and returns it.
-func Decode(r io.Reader) (*Message, error) {
+// Read decodes a message from a Reader and returns it.
+func Read(r io.Reader) (*Message, error) {
 	var m Message
 	err := gob.NewDecoder(r).Decode(&m)
 	return &m, err
