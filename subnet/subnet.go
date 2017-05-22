@@ -3,9 +3,9 @@ package subnet
 import (
 	"errors"
 
+	log "github.com/Sirupsen/logrus"
 	net "github.com/libp2p/go-libp2p-net"
 	ma "github.com/multiformats/go-multiaddr"
-	log "github.com/sirupsen/logrus"
 )
 
 const (

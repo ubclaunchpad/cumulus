@@ -1,73 +1,84 @@
 package message
 
 import (
-	"encoding/json"
-	"errors"
-	"strings"
+	"encoding/gob"
+	"io"
 )
 
-// Message types
-// NOTE: because of the way iota works, changing the order in which the
-// following constants appear will change their values, which may affect the
-// ability of your peer to communicate with others.
+type (
+	// Type specifies the type of a message.
+	Type int
+	// ResourceType specifies the type of a resource in a message.
+	ResourceType int
+)
+
 const (
-	// Send the multiaddress of a peer to another peer
-	PeerInfo = iota
-	// Request addressess of peers in the remote peer's subnet
-	RequestPeerInfo = iota
-	// Send information about a block that was just hashed
-	NewBlock = iota
-	// Request chunk of the blockchain from peer
-	RequestChunk = iota
-	// Advertise that we have a chunk of the blockchain
-	AdvertiseChunk = iota
-	// Send information about a new transaction to another peer
-	Transaction = iota
+	// MessageRequest messages ask a peer for a resource.
+	MessageRequest Type = iota
+	// MessageResponse messages repond to a request message with an error or a resource.
+	MessageResponse
+	// MessagePush messages proactively send a resource to a peer.
+	MessagePush
 )
 
-// Message is a container for information and its type that is
-// sent between Cumulus peers.
+const (
+	// ResourcePeerInfo resources contain a list of peers.
+	ResourcePeerInfo ResourceType = iota
+	// ResourceBlock resources contain a block in the blockchain.
+	ResourceBlock
+	// ResourceTransaction resources contain a transaction to add to the blockchain.
+	ResourceTransaction
+)
+
+// Message is a container for messages, containing a type and either a Request,
+// Response, or Push in the payload.
 type Message struct {
-	msgType int
-	content []byte
+	Type    Type
+	Payload interface{}
 }
 
-// New returns a pointer to a message initialized with a byte array
-// of content and a message type, or an error if the type is not one
-// of those defined above.
-func New(c []byte, t int) (*Message, error) {
-	switch t {
-	case PeerInfo:
-	case NewBlock:
-	case RequestChunk:
-	case AdvertiseChunk:
-	case Transaction:
-		break
-	default:
-		return nil, errors.New("Invalid message type")
+// New returns a new Message.
+func New(t Type, payload interface{}) *Message {
+	return &Message{
+		Type:    t,
+		Payload: payload,
 	}
-
-	m := &Message{msgType: t, content: c}
-	return m, nil
 }
 
-// Bytes returns JSON representation of message as a byte array, or error if
-// message cannot be marshalled.
-func (m *Message) Bytes() ([]byte, error) {
-	return json.Marshal(m)
+// Request is a container for a request payload, containing a unique request ID,
+// the resource type we are requesting, and a Params field specifying request
+// parameters. PeerInfo requests should send all info of all peers. Block requests
+// should specify block number in parameters.
+type Request struct {
+	ID           string
+	ResourceType ResourceType
+	Params       map[string]interface{}
 }
 
-// FromString parses a message in the form of a string and returns a pointer
-// to a new Message struct made from the contents of the string. Returns error
-// if string is malformed.
-func FromString(s string) (*Message, error) {
-	var msg Message
-	s = strings.TrimSpace(s)
-	err := json.Unmarshal([]byte(s), &msg)
-	return &msg, err
+// Response is a container for a response payload, containing the unique request
+// ID of the request prompting it, an Error (if one occurred), and the requested
+// resource (if no error occurred).
+type Response struct {
+	ID       string
+	Error    error
+	Resource interface{}
 }
 
-// Type returns msgType for message
-func (m *Message) Type() int {
-	return m.msgType
+// Push is a container for a push payload, containing a resource proactively sent
+// to us by another peer.
+type Push struct {
+	ResourceType ResourceType
+	Resource     interface{}
+}
+
+// Write encodes and writes the Message into the given Writer.
+func (m *Message) Write(w io.Writer) error {
+	return gob.NewEncoder(w).Encode(m)
+}
+
+// Read decodes a message from a Reader and returns it.
+func Read(r io.Reader) (*Message, error) {
+	var m Message
+	err := gob.NewDecoder(r).Decode(&m)
+	return &m, err
 }

@@ -12,25 +12,21 @@ Install dependencies. We need to manually use version 0.11.1 of Glide temporaril
 
 Install Glide.
 ```sh
-go get github.com/Masterminds/glide
-cd $GOPATH/src/github.com/Masterminds/glide
-git checkout tags/v0.11.1
-go install
-```
-
-Verify you have the correct version installed.
-```sh
-glide --version
+make install-glide
 ```
 
 Get dependencies.
 ```sh
-cd $GOPATH/src/github.com/ubclaunchpad/cumulus
-glide install
+make deps
+```
+
+Build.
+```sh
+make
 ```
 
 ## Testing
 
 ```
-go test ./...
+make test
 ```
