@@ -3,6 +3,9 @@ package message
 import (
 	"encoding/gob"
 	"io"
+
+	"github.com/google/uuid"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 type (
@@ -55,6 +58,17 @@ type Request struct {
 	Params       map[string]interface{}
 }
 
+// NewRequestMessage returns a new Message continaing a request with the given
+// parameters.
+func NewRequestMessage(rt ResourceType, p map[string]interface{}) *Message {
+	req := Request{
+		ID:           uuid.New().String(),
+		ResourceType: rt,
+		Params:       p,
+	}
+	return New(MessageRequest, req)
+}
+
 // Response is a container for a response payload, containing the unique request
 // ID of the request prompting it, an Error (if one occurred), and the requested
 // resource (if no error occurred).
@@ -64,11 +78,33 @@ type Response struct {
 	Resource interface{}
 }
 
+// NewResponseMessage returns a new Message continaing a response with the given
+// parameters. ResponseMessages should have the same ID as that of the request
+// message they are a response to.
+func NewResponseMessage(id string, err error, resource interface{}) *Message {
+	res := &Response{
+		ID:       id,
+		Error:    err,
+		Resource: resource,
+	}
+	return New(MessageResponse, res)
+}
+
 // Push is a container for a push payload, containing a resource proactively sent
 // to us by another peer.
 type Push struct {
 	ResourceType ResourceType
 	Resource     interface{}
+}
+
+// NewPushMessage returns a new Message continaing a response with the given
+// parameters.
+func NewPushMessage(rt ResourceType, resource interface{}) *Message {
+	res := &Push{
+		ResourceType: rt,
+		Resource:     resource,
+	}
+	return New(MessageResponse, res)
 }
 
 // Write encodes and writes the Message into the given Writer.
@@ -81,4 +117,14 @@ func Read(r io.Reader) (*Message, error) {
 	var m Message
 	err := gob.NewDecoder(r).Decode(&m)
 	return &m, err
+}
+
+// RegisterGobTypes registers all the types used by gob in reading and writing
+// messages. This should only be called once during initializaiton.
+func RegisterGobTypes() {
+	dummy, _ := ma.NewMultiaddr("")
+	gob.Register(dummy)
+	gob.Register(Request{})
+	gob.Register(Response{})
+	gob.Register(Push{})
 }
