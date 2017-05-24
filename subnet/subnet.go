@@ -17,14 +17,13 @@ const (
 // Subnet represents the set of peers a peer is connected to at any given time
 type Subnet struct {
 	peers    map[ma.Multiaddr]net.Stream
-	maxPeers uint16
-	numPeers uint16
+	maxPeers int
 }
 
 // New returns a pointer to an empty Subnet with the given maxPeers.
-func New(maxPeers uint16) *Subnet {
+func New(maxPeers int) *Subnet {
 	p := make(map[ma.Multiaddr]net.Stream)
-	sn := Subnet{maxPeers: maxPeers, numPeers: 0, peers: p}
+	sn := Subnet{maxPeers: maxPeers, peers: p}
 	return &sn
 }
 
@@ -32,7 +31,7 @@ func New(maxPeers uint16) *Subnet {
 // local peer and the remote peer to the subnet. If the subnet is already
 // full, or the multiaddress is not valid, returns error.
 func (sn *Subnet) AddPeer(mAddr ma.Multiaddr, stream net.Stream) error {
-	if sn.isFull() {
+	if sn.Full() {
 		return errors.New("Cannot insert new mapping, Subnet is already full")
 	}
 
@@ -48,7 +47,6 @@ func (sn *Subnet) AddPeer(mAddr ma.Multiaddr, stream net.Stream) error {
 	} else {
 		log.Debugf("Adding peer %s to subnet", mAddr.String())
 		sn.peers[mAddr] = stream
-		sn.numPeers++
 	}
 	return nil
 }
@@ -58,13 +56,12 @@ func (sn *Subnet) AddPeer(mAddr ma.Multiaddr, stream net.Stream) error {
 func (sn *Subnet) RemovePeer(mAddr ma.Multiaddr) {
 	log.Debugf("Removing peer %s from subnet", mAddr.String())
 	delete(sn.peers, mAddr)
-	sn.numPeers--
 }
 
-// isFull returns true if the number of peers in the sunbet is at or over the
+// Full returns true if the number of peers in the sunbet is at or over the
 // limit set for that subnet, otherwise returns false.
-func (sn *Subnet) isFull() bool {
-	return sn.numPeers >= sn.maxPeers
+func (sn *Subnet) Full() bool {
+	return len(sn.peers) >= sn.maxPeers
 }
 
 // Multiaddrs returns a list of all multiaddresses contined in this subnet
@@ -72,6 +69,15 @@ func (sn *Subnet) Multiaddrs() []ma.Multiaddr {
 	mAddrs := make([]ma.Multiaddr, 0, len(sn.peers))
 	for mAddr := range sn.peers {
 		mAddrs = append(mAddrs, mAddr)
+	}
+	return mAddrs
+}
+
+// StringMultiaddrs returns a list of all multiaddrs in this subnet as strings
+func (sn *Subnet) StringMultiaddrs() []string {
+	mAddrs := make([]string, 0, len(sn.peers))
+	for mAddr := range sn.peers {
+		mAddrs = append(mAddrs, mAddr.String())
 	}
 	return mAddrs
 }
