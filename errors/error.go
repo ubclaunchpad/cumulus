@@ -3,12 +3,9 @@ package errors
 import "fmt"
 
 const (
-	// InvalidMessageType occurs when a message is received with an unknown
-	// MesssageType value.
-	InvalidMessageType = 401
 	// InvalidResourceType occurs when a request is received with an unknown
 	// ResourceType value.
-	InvalidResourceType = 402
+	InvalidResourceType = 401
 	// SubnetFull occurs when a stream is opened with a peer who's Subnet is
 	// already full.
 	SubnetFull = 501
@@ -18,7 +15,6 @@ const (
 )
 
 const (
-	invalidMessageTypeMsg  = "Invalid message type"
 	invalidResourceTypeMsg = "Invalid resource type"
 	subnetFullMsg          = "Failed to add peer to subnet (peer subnet full)"
 	notImplementedMsg      = "Functionality not yet implemented"
@@ -39,9 +35,6 @@ func New(code int) *ProtocolError {
 	switch code {
 	case SubnetFull:
 		msg = subnetFullMsg
-		break
-	case InvalidMessageType:
-		msg = invalidMessageTypeMsg
 		break
 	case InvalidResourceType:
 		msg = invalidResourceTypeMsg

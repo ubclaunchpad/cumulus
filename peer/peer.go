@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p-host"
 	"github.com/libp2p/go-libp2p-net"
@@ -34,15 +34,12 @@ const (
 	Timeout = time.Second * 30
 )
 
-// MessageHandler is any package that implements HandleMessage
-type MessageHandler interface {
-	HandleMessage(m message.Message, s net.Stream)
-}
-
 // Peer is a cumulus Peer composed of a host
 type Peer struct {
 	host.Host
-	subnet sn.Subnet
+	subnet        sn.Subnet
+	listeners     map[string]chan message.Response
+	listenersLock *sync.RWMutex
 }
 
 // New creates a Cumulus host with the given IP addr and TCP port.
@@ -85,7 +82,12 @@ func New(ip string, port int) (*Peer, error) {
 
 	// Actually create the host and peer with the network we just set up.
 	host := bhost.New(netwrk)
-	peer := &Peer{Host: host, subnet: subnet}
+	peer := &Peer{
+		Host:          host,
+		subnet:        subnet,
+		listeners:     make(map[string]chan message.Response),
+		listenersLock: &sync.RWMutex{},
+	}
 
 	// Build host multiaddress
 	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s",
@@ -98,7 +100,6 @@ func New(ip string, port int) (*Peer, error) {
 
 	// Add this host's address to its peerstore (avoid's net/identi error)
 	ps.AddAddr(pid, fullAddr, pstore.PermanentAddrTTL)
-
 	return peer, nil
 }
 
@@ -122,12 +123,12 @@ func (p *Peer) Receive(s net.Stream) {
 		// Subnet is full, advertise other available peers and then close
 		// the stream
 		log.WithError(err).Debug("Peer subnet full. Advertising peers...")
-		msg := message.NewResponseMessage(uuid.New().String(),
-			nil, p.subnet.StringMultiaddrs())
+		msg := message.NewPushMessage(message.ResourcePeerInfo, p.subnet.StringMultiaddrs())
 		msgErr := msg.Write(s)
 		if msgErr != nil {
 			log.WithError(err).Error("Failed to send ResourcePeerInfo")
 		}
+		s.Close()
 		return
 	}
 	go p.Listen(remoteMA, s)
@@ -147,8 +148,7 @@ func (p *Peer) Connect(peerma string) (net.Stream, error) {
 	p.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
 
 	// Open a stream with the peer
-	stream, err := p.NewStream(context.Background(), peerid,
-		CumulusProtocol)
+	stream, err := p.NewStream(context.Background(), peerid, CumulusProtocol)
 	if err != nil {
 		return nil, err
 	}
@@ -178,53 +178,44 @@ func (p *Peer) Broadcast(m message.Message) error {
 
 // Request sends a request to a remote peer over the given stream.
 // Returns response if a response was received, otherwise returns error.
+// You should typically run this function in a goroutine
 func (p *Peer) Request(req message.Request, s net.Stream) (*message.Response, error) {
+	// Set up a listen channel to listen for the response (remove when done)
+	lchan := p.newListener(req.ID)
+	defer p.removeListener(req.ID)
+
+	// Send request
 	reqMsg := message.New(message.MessageRequest, req)
 	err := reqMsg.Write(s)
 	if err != nil {
 		return nil, err
 	}
-	resMsg, err := message.Read(s)
-	if err != nil {
-		return nil, err
+
+	// Receive response or timeout
+	select {
+	case res := <-lchan:
+		return &res, nil
+	case <-time.After(Timeout):
+		return nil, errors.New("Timed out waiting for response")
 	}
-	res := resMsg.Payload.(message.Response)
-	log.Debugf("Sending request with ResourceType: %d", req.ResourceType)
-	return &res, nil
 }
 
 // Respond responds to a request from another peer
 func (p *Peer) Respond(req message.Request, s net.Stream) {
-	var response message.Response
+	response := message.Response{ID: req.ID, Error: nil, Resource: nil}
 
 	switch req.ResourceType {
 	case message.ResourcePeerInfo:
-		response = message.Response{
-			ID:       req.ID,
-			Error:    nil,
-			Resource: p.subnet.StringMultiaddrs(),
-		}
+		response.Resource = p.subnet.StringMultiaddrs()
 		break
 	case message.ResourceBlock:
-		response = message.Response{
-			ID:       req.ID,
-			Error:    protoerr.New(protoerr.NotImplemented),
-			Resource: nil,
-		}
+		response.Error = protoerr.New(protoerr.NotImplemented)
 		break
 	case message.ResourceTransaction:
-		response = message.Response{
-			ID:       req.ID,
-			Error:    protoerr.New(protoerr.NotImplemented),
-			Resource: nil,
-		}
+		response.Error = protoerr.New(protoerr.NotImplemented)
 		break
 	default:
-		response = message.Response{
-			ID:       req.ID,
-			Error:    protoerr.New(protoerr.InvalidResourceType),
-			Resource: nil,
-		}
+		response.Error = protoerr.New(protoerr.InvalidResourceType)
 	}
 
 	msg := message.New(message.MessageResponse, response)
@@ -255,21 +246,22 @@ func (p *Peer) HandleMessage(m message.Message, s net.Stream) {
 
 	switch m.Type {
 	case message.MessageRequest:
+		// Respond to the request by sending request resource
 		p.Respond(m.Payload.(message.Request), s)
 		break
 	case message.MessageResponse:
-		log.Error("Message response handling not yet implemented")
+		// Pass the response to the goroutine that requested it
+		lchan := p.listeners[m.Payload.(message.Response).ID]
+		if lchan != nil {
+			lchan <- m.Payload.(message.Response)
+		}
 		break
 	case message.MessagePush:
+		// Handle data from push message
 		log.Error("Message push handling not yet implemented")
 		break
 	default:
-		errRes := protoerr.New(protoerr.InvalidMessageType)
-		res := message.NewResponseMessage(uuid.New().String(), errRes, nil)
-		err := res.Write(s)
-		if err != nil {
-			log.WithError(err).Error("Failed to handle message")
-		}
+		// Invalid message type, ignore
 	}
 }
 
@@ -323,6 +315,20 @@ func extractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
 	}
 
 	trgtAddr := ipfsaddr.Decapsulate(targetPeerAddr)
-
 	return peerid, trgtAddr, nil
+}
+
+// newListener synchronously adds a listener to this peer's listeners map
+func (p *Peer) newListener(id string) chan message.Response {
+	p.listenersLock.Lock()
+	p.listeners[id] = make(chan message.Response)
+	p.listenersLock.Unlock()
+	return p.listeners[id]
+}
+
+// removeListener synchronously removes a listener from this peer's listeners map
+func (p *Peer) removeListener(id string) {
+	p.listenersLock.Lock()
+	delete(p.listeners, id)
+	p.listenersLock.Unlock()
 }
