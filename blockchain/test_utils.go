@@ -49,8 +49,12 @@ func newTxBody() TxBody {
 func newTransaction() *Transaction {
 	sender := newWallet()
 	tbody := newTxBody()
-	t, _ := tbody.Sign(sender, crand.Reader)
-	return t
+	digest := HashSum(tbody)
+	sig, _ := sender.Sign(digest, crand.Reader)
+	return &Transaction{
+		TxBody: tbody,
+		Sig:    sig,
+	}
 }
 
 func newBlockHeader() BlockHeader {
