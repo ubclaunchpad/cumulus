@@ -168,7 +168,8 @@ func (p *Peer) Connect(peerma string) (net.Stream, error) {
 		stream.Close()
 	}
 
-	return stream, err
+	go p.Listen(mAddr, stream)
+	return stream, nil
 }
 
 // Broadcast sends message to all peers this peer is currently connected to
@@ -241,8 +242,10 @@ func NewMultiaddr(iAddr ma.Multiaddr, pid lpeer.ID) (ma.Multiaddr, error) {
 
 // HandleMessage responds to a received message
 func (p *Peer) HandleMessage(m message.Message, s net.Stream) {
-	msgJSON, _ := json.Marshal(m)
-	log.Info("Received message: \n%s", string(msgJSON))
+	msgJSON, err := json.Marshal(m)
+	if err == nil {
+		log.Info("Received message: \n%s", string(msgJSON))
+	}
 
 	switch m.Type {
 	case message.MessageRequest:
@@ -251,9 +254,11 @@ func (p *Peer) HandleMessage(m message.Message, s net.Stream) {
 		break
 	case message.MessageResponse:
 		// Pass the response to the goroutine that requested it
-		lchan := p.listeners[m.Payload.(message.Response).ID]
+		res := m.Payload.(message.Response)
+		lchan := p.getListener(res.ID)
 		if lchan != nil {
-			lchan <- m.Payload.(message.Response)
+			log.Debug("Found listener channel for response")
+			lchan <- res
 		}
 		break
 	case message.MessagePush:
@@ -262,6 +267,7 @@ func (p *Peer) HandleMessage(m message.Message, s net.Stream) {
 		break
 	default:
 		// Invalid message type, ignore
+		log.Errorln("Received message with invalid type")
 	}
 }
 
@@ -271,17 +277,19 @@ func (p *Peer) HandleMessage(m message.Message, s net.Stream) {
 func (p *Peer) Listen(remoteMA ma.Multiaddr, s net.Stream) {
 	defer s.Close()
 	defer p.subnet.RemovePeer(remoteMA)
-	for s != nil {
+	for {
 		err := s.SetDeadline(time.Now().Add(Timeout))
 		if err != nil {
 			log.WithError(err).Error("Failed to set read deadline on stream")
+			return
 		}
 		msg, err := message.Read(s)
 		if err != nil {
 			log.WithError(err).Error("Error reading from the stream")
 			return
 		}
-		p.HandleMessage(*msg, s)
+		log.Debug("Listener received message")
+		go p.HandleMessage(*msg, s)
 	}
 }
 
@@ -331,4 +339,11 @@ func (p *Peer) removeListener(id string) {
 	p.listenersLock.Lock()
 	delete(p.listeners, id)
 	p.listenersLock.Unlock()
+}
+
+func (p *Peer) getListener(id string) chan message.Response {
+	p.listenersLock.RLock()
+	lchan := p.listeners[id]
+	p.listenersLock.RUnlock()
+	return lchan
 }

@@ -11,7 +11,6 @@ import (
 
 func main() {
 	log.Info("Starting Cumulus Peer")
-	message.RegisterGobTypes()
 
 	// Get and parse command line arguments
 	// targetPeer is a Multiaddr representing the target peer to connect to
@@ -52,7 +51,6 @@ func main() {
 	request := message.Request{
 		ID:           uuid.New().String(),
 		ResourceType: message.ResourcePeerInfo,
-		Params:       nil,
 	}
 	response, err := host.Request(request, stream)
 	if err != nil {

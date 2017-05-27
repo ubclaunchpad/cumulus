@@ -121,7 +121,7 @@ func Read(r io.Reader) (*Message, error) {
 
 // RegisterGobTypes registers all the types used by gob in reading and writing
 // messages. This should only be called once during initializaiton.
-func RegisterGobTypes() {
+func init() {
 	dummy, _ := ma.NewMultiaddr("")
 	gob.Register(dummy)
 	gob.Register(Request{})
