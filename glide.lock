@@ -1,5 +1,5 @@
-hash: 474d608bbb499683dec7db95f6a10f5df61bd5d447651e04567c0d10b816cfe3
-updated: 2017-05-13T15:17:47.793598435-07:00
+hash: 1b81695a566f49c0195d3c273cd75f43c864147343e6beac071fc67daf29b6d5
+updated: 2017-05-27T15:51:45.462122864-07:00
 imports:
 - name: github.com/agl/ed25519
   version: 5312a61534124124185d41f09206b9fef1d88403
@@ -25,6 +25,8 @@ imports:
   subpackages:
   - proto
   - io
+- name: github.com/google/uuid
+  version: 064e2069ce9c359c118179501254f67d7d37ba24
 - name: github.com/gxed/eventfd
   version: 80a92cca79a8041496ccc9dd773fcb52a57ec6f9
 - name: github.com/gxed/GoEndian

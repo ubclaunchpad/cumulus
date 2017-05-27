@@ -13,13 +13,13 @@ import (
 	"github.com/libp2p/go-libp2p-host"
 	"github.com/libp2p/go-libp2p-net"
 	lpeer "github.com/libp2p/go-libp2p-peer"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
+	"github.com/libp2p/go-libp2p-peerstore"
 	"github.com/libp2p/go-libp2p-swarm"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	ma "github.com/multiformats/go-multiaddr"
-	protoerr "github.com/ubclaunchpad/cumulus/errors"
+	"github.com/multiformats/go-multiaddr"
+	perr "github.com/ubclaunchpad/cumulus/errors"
 	"github.com/ubclaunchpad/cumulus/message"
-	sn "github.com/ubclaunchpad/cumulus/subnet"
+	"github.com/ubclaunchpad/cumulus/subnet"
 )
 
 const (
@@ -37,9 +37,9 @@ const (
 // Peer is a cumulus Peer composed of a host
 type Peer struct {
 	host.Host
-	subnet        sn.Subnet
+	subnet        subnet.Subnet
 	listeners     map[string]chan message.Response
-	listenersLock *sync.RWMutex
+	listenersLock sync.RWMutex
 }
 
 // New creates a Cumulus host with the given IP addr and TCP port.
@@ -56,21 +56,21 @@ func New(ip string, port int) (*Peer, error) {
 	pid, _ := lpeer.IDFromPublicKey(pub)
 
 	// Create a multiaddress (IP address and TCP port for this peer).
-	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
 	if err != nil {
 		return nil, err
 	}
 
 	// Create Peerstore and add host's keys to it (avoids annoying err)
-	ps := pstore.NewPeerstore()
+	ps := peerstore.NewPeerstore()
 	ps.AddPubKey(pid, pub)
 	ps.AddPrivKey(pid, priv)
 
 	// Create swarm (this is the interface to the libP2P Network) using the
 	// multiaddress, peerID, and peerStore we just created.
-	netwrk, err := swarm.NewNetwork(
+	network, err := swarm.NewNetwork(
 		context.Background(),
-		[]ma.Multiaddr{addr},
+		[]multiaddr.Multiaddr{addr},
 		pid,
 		ps,
 		nil)
@@ -78,19 +78,19 @@ func New(ip string, port int) (*Peer, error) {
 		return nil, err
 	}
 
-	subnet := *sn.New(sn.DefaultMaxPeers)
+	sn := *subnet.New(subnet.DefaultMaxPeers)
 
 	// Actually create the host and peer with the network we just set up.
-	host := bhost.New(netwrk)
+	host := bhost.New(network)
 	peer := &Peer{
 		Host:          host,
-		subnet:        subnet,
+		subnet:        sn,
 		listeners:     make(map[string]chan message.Response),
-		listenersLock: &sync.RWMutex{},
+		listenersLock: sync.RWMutex{},
 	}
 
 	// Build host multiaddress
-	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s",
+	hostAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ipfs/%s",
 		host.ID().Pretty()))
 
 	// Now we can build a full multiaddress to reach this host
@@ -99,7 +99,7 @@ func New(ip string, port int) (*Peer, error) {
 	log.Info("I am ", fullAddr)
 
 	// Add this host's address to its peerstore (avoid's net/identi error)
-	ps.AddAddr(pid, fullAddr, pstore.PermanentAddrTTL)
+	ps.AddAddr(pid, fullAddr, peerstore.PermanentAddrTTL)
 	return peer, nil
 }
 
@@ -109,21 +109,20 @@ func New(ip string, port int) (*Peer, error) {
 // peer is initialized.
 func (p *Peer) Receive(s net.Stream) {
 	// Get remote peer's full multiaddress
-	remoteMA, err := NewMultiaddr(
+	ma, err := NewMultiaddr(
 		s.Conn().RemoteMultiaddr(), s.Conn().RemotePeer())
 	if err != nil {
-		log.WithError(err).Error(
-			"Failed to obtain valid remote peer multiaddress")
+		log.WithError(err).Error("Failed to obtain valid remote peer multiaddress")
 		return
 	}
 
 	// Add the remote peer to this peer's subnet
-	err = p.subnet.AddPeer(remoteMA, s)
+	err = p.subnet.AddPeer(ma.String(), s)
 	if err != nil {
 		// Subnet is full, advertise other available peers and then close
 		// the stream
 		log.WithError(err).Debug("Peer subnet full. Advertising peers...")
-		msg := message.NewPushMessage(message.ResourcePeerInfo, p.subnet.StringMultiaddrs())
+		msg := message.NewPushMessage(message.ResourcePeerInfo, p.subnet.Multiaddrs())
 		msgErr := msg.Write(s)
 		if msgErr != nil {
 			log.WithError(err).Error("Failed to send ResourcePeerInfo")
@@ -131,24 +130,24 @@ func (p *Peer) Receive(s net.Stream) {
 		s.Close()
 		return
 	}
-	go p.Listen(remoteMA, s)
+	go p.Listen(ma.String(), s)
 }
 
 // Connect adds the given multiaddress to p's Peerstore and opens a stream
 // with the peer at that multiaddress if the multiaddress is valid, otherwise
 // returns error. On success the stream and corresponding multiaddress are
 // added to this peer's subnet.
-func (p *Peer) Connect(peerma string) (net.Stream, error) {
-	peerid, targetAddr, err := extractPeerInfo(peerma)
+func (p *Peer) Connect(sma string) (net.Stream, error) {
+	pid, targetAddr, err := extractPeerInfo(sma)
 	if err != nil {
 		return nil, err
 	}
 
 	// Store the peer's address in this host's PeerStore
-	p.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+	p.Peerstore().AddAddr(pid, targetAddr, peerstore.PermanentAddrTTL)
 
 	// Open a stream with the peer
-	stream, err := p.NewStream(context.Background(), peerid, CumulusProtocol)
+	stream, err := p.NewStream(context.Background(), pid, CumulusProtocol)
 	if err != nil {
 		return nil, err
 	}
@@ -157,24 +156,25 @@ func (p *Peer) Connect(peerma string) (net.Stream, error) {
 		log.WithError(err).Error("Failed to set read deadline on stream")
 	}
 
-	mAddr, err := ma.NewMultiaddr(peerma)
-	if err != nil {
-		stream.Close()
-		return nil, err
-	}
-
-	err = p.subnet.AddPeer(mAddr, stream)
+	err = p.subnet.AddPeer(sma, stream)
 	if err != nil {
 		stream.Close()
 	}
 
-	go p.Listen(mAddr, stream)
+	go p.Listen(sma, stream)
 	return stream, nil
 }
 
 // Broadcast sends message to all peers this peer is currently connected to
 func (p *Peer) Broadcast(m message.Message) error {
-	return errors.New("Function not implemented")
+	var err error
+	for _, ma := range p.subnet.Multiaddrs() {
+		err = m.Write(p.subnet.Stream(ma))
+		if err != nil {
+			log.WithError(err).Error("Failed to send broadcast message to peer")
+		}
+	}
+	return err
 }
 
 // Request sends a request to a remote peer over the given stream.
@@ -203,20 +203,26 @@ func (p *Peer) Request(req message.Request, s net.Stream) (*message.Response, er
 
 // Respond responds to a request from another peer
 func (p *Peer) Respond(req message.Request, s net.Stream) {
-	response := message.Response{ID: req.ID, Error: nil, Resource: nil}
+	response := message.Response{
+		ID:    req.ID,
+		Error: perr.ProtocolError{},
+	}
 
 	switch req.ResourceType {
 	case message.ResourcePeerInfo:
-		response.Resource = p.subnet.StringMultiaddrs()
+		response.Resource = p.subnet.Multiaddrs()
 		break
 	case message.ResourceBlock:
-		response.Error = protoerr.New(protoerr.NotImplemented)
+		response.Error = *perr.New(perr.NotImplemented,
+			"Functionality not yet implemented on this peer")
 		break
 	case message.ResourceTransaction:
-		response.Error = protoerr.New(protoerr.NotImplemented)
+		response.Error = *perr.New(perr.NotImplemented,
+			"Functionality not yet implemented on this peer")
 		break
 	default:
-		response.Error = protoerr.New(protoerr.InvalidResourceType)
+		response.Error = *perr.New(perr.InvalidResourceType,
+			"Invalid resource type")
 	}
 
 	msg := message.New(message.MessageResponse, response)
@@ -225,26 +231,26 @@ func (p *Peer) Respond(req message.Request, s net.Stream) {
 		log.WithError(err).Error("Failed to send reponse")
 	} else {
 		msgJSON, _ := json.Marshal(msg)
-		log.Info("Sending response: \n%s", string(msgJSON))
+		log.Infof("Sending response: \n%s", string(msgJSON))
 	}
 }
 
 // NewMultiaddr creates a Multiaddress from the given Multiaddress (of the form
 // /ip4/<ip address>/tcp/<TCP port>) and the peer id (a hash) and turn them
 // into one Multiaddress. Will return error if Multiaddress is invalid.
-func NewMultiaddr(iAddr ma.Multiaddr, pid lpeer.ID) (ma.Multiaddr, error) {
+func NewMultiaddr(iAddr multiaddr.Multiaddr, pid lpeer.ID) (multiaddr.Multiaddr, error) {
 	strAddr := iAddr.String()
 	strID := pid.Pretty()
 	strMA := fmt.Sprintf("%s/ipfs/%s", strAddr, strID)
-	mAddr, err := ma.NewMultiaddr(strMA)
+	mAddr, err := multiaddr.NewMultiaddr(strMA)
 	return mAddr, err
 }
 
 // HandleMessage responds to a received message
-func (p *Peer) HandleMessage(m message.Message, s net.Stream) {
+func (p *Peer) handleMessage(m message.Message, s net.Stream) {
 	msgJSON, err := json.Marshal(m)
 	if err == nil {
-		log.Info("Received message: \n%s", string(msgJSON))
+		log.Infof("Received message: \n%s", string(msgJSON))
 	}
 
 	switch m.Type {
@@ -274,9 +280,9 @@ func (p *Peer) HandleMessage(m message.Message, s net.Stream) {
 // Listen listens for messages over the stream and responds to them, closing
 // the given stream and removing the remote peer from this peer's subnet when
 // done. This should be run as a goroutine.
-func (p *Peer) Listen(remoteMA ma.Multiaddr, s net.Stream) {
+func (p *Peer) Listen(sma string, s net.Stream) {
 	defer s.Close()
-	defer p.subnet.RemovePeer(remoteMA)
+	defer p.subnet.RemovePeer(sma)
 	for {
 		err := s.SetDeadline(time.Now().Add(Timeout))
 		if err != nil {
@@ -289,7 +295,7 @@ func (p *Peer) Listen(remoteMA ma.Multiaddr, s net.Stream) {
 			return
 		}
 		log.Debug("Listener received message")
-		go p.HandleMessage(*msg, s)
+		go p.handleMessage(*msg, s)
 	}
 }
 
@@ -297,16 +303,16 @@ func (p *Peer) Listen(remoteMA ma.Multiaddr, s net.Stream) {
 // given multiaddress.
 // Returns peer ID (esentially 46 character hash created by the peer)
 // and the peer's multiaddress in the form /ip4/<peer IP>/tcp/<CumulusPort>.
-func extractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
-	log.Debug("Extracting peer info from ", peerma)
+func extractPeerInfo(sma string) (lpeer.ID, multiaddr.Multiaddr, error) {
+	log.Debug("Extracting peer info from ", sma)
 
-	ipfsaddr, err := ma.NewMultiaddr(peerma)
+	ipfsaddr, err := multiaddr.NewMultiaddr(sma)
 	if err != nil {
 		return "-", nil, err
 	}
 
 	// Cannot throw error when passed P_IPFS
-	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+	pid, err := ipfsaddr.ValueForProtocol(multiaddr.P_IPFS)
 	if err != nil {
 		return "-", nil, err
 	}
@@ -316,7 +322,7 @@ func extractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
 
 	// Decapsulate the /ipfs/<peerID> part from the target
 	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
-	targetPeerAddr, err := ma.NewMultiaddr(
+	targetPeerAddr, err := multiaddr.NewMultiaddr(
 		fmt.Sprintf("/ipfs/%s", lpeer.IDB58Encode(peerid)))
 	if err != nil {
 		return "-", nil, err
@@ -341,6 +347,8 @@ func (p *Peer) removeListener(id string) {
 	p.listenersLock.Unlock()
 }
 
+// getListener synchronously retreives and returns the channel associated with
+// the given id
 func (p *Peer) getListener(id string) chan message.Response {
 	p.listenersLock.RLock()
 	lchan := p.listeners[id]

@@ -52,12 +52,10 @@ func main() {
 		ID:           uuid.New().String(),
 		ResourceType: message.ResourcePeerInfo,
 	}
-	response, err := host.Request(request, stream)
+	_, err = host.Request(request, stream)
 	if err != nil {
 		log.WithError(err).Error("Error writing message to stream")
 		return
 	}
-
-	host.HandleMessage(*message.NewResponseMessage("", nil, response), stream)
 	host.Close()
 }

@@ -29,23 +29,7 @@ type ProtocolError struct {
 
 // New returns new ProtocolError with the given parameters.
 // code argument should be one of the error codes defined above.
-func New(code int) *ProtocolError {
-	var msg string
-
-	switch code {
-	case SubnetFull:
-		msg = subnetFullMsg
-		break
-	case InvalidResourceType:
-		msg = invalidResourceTypeMsg
-		break
-	case NotImplemented:
-		msg = notImplementedMsg
-		break
-	default:
-		panic("Attempt to create error with invalid error code")
-	}
-
+func New(code int, msg string) *ProtocolError {
 	return &ProtocolError{
 		Code:    code,
 		Message: msg,

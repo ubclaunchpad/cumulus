@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	ma "github.com/multiformats/go-multiaddr"
+	perr "github.com/ubclaunchpad/cumulus/errors"
 )
 
 type (
@@ -74,14 +75,14 @@ func NewRequestMessage(rt ResourceType, p map[string]interface{}) *Message {
 // resource (if no error occurred).
 type Response struct {
 	ID       string
-	Error    error
+	Error    perr.ProtocolError
 	Resource interface{}
 }
 
 // NewResponseMessage returns a new Message continaing a response with the given
 // parameters. ResponseMessages should have the same ID as that of the request
 // message they are a response to.
-func NewResponseMessage(id string, err error, resource interface{}) *Message {
+func NewResponseMessage(id string, err perr.ProtocolError, resource interface{}) *Message {
 	res := &Response{
 		ID:       id,
 		Error:    err,
