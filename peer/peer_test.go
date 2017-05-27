@@ -6,6 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
+	protoerr "github.com/ubclaunchpad/cumulus/errors"
 	"github.com/ubclaunchpad/cumulus/message"
 	sn "github.com/ubclaunchpad/cumulus/subnet"
 )
@@ -202,11 +203,12 @@ func TestRequest(t *testing.T) {
 		Params:       nil,
 	}
 	response, err := requester.Request(request, stream)
+	emptyErr := protoerr.ProtocolError{}
 	if err != nil {
 		fmt.Printf("Failed to make request: %s", err)
 		t.Fail()
-	} else if response.Error != nil {
-		fmt.Printf("Remote peer returned response %d", response.Error)
+	} else if response.Error != emptyErr {
+		fmt.Printf("Remote peer returned response %s", response.Error)
 		t.Fail()
 	}
 }
