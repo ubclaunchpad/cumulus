@@ -111,10 +111,9 @@ func newOutputBlock(t []*Transaction, input *Block) *Block {
 	}
 }
 
-func newTransactionValue(a uint64, r Address) *Transaction {
-	sender := newWallet()
+func newTransactionValue(s, r Wallet, a uint64) (*Transaction, error) {
 	tbody := TxBody{
-		Sender: newWallet().Public(),
+		Sender: s.Public(),
 		Input: TxHashPointer{
 			BlockNumber: 0,
 			Hash:        newHash(),
@@ -123,12 +122,7 @@ func newTransactionValue(a uint64, r Address) *Transaction {
 	}
 	tbody.Outputs[0] = TxOutput{
 		Amount:    a,
-		Recipient: r,
+		Recipient: r.Public(),
 	}
-	digest := HashSum(tbody)
-	sig, _ := sender.Sign(digest, crand.Reader)
-	return &Transaction{
-		TxBody: tbody,
-		Sig:    sig,
-	}
+	return tbody.Sign(s, crand.Reader)
 }

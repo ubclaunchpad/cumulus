@@ -50,7 +50,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 	var I *Transaction
 	inputBlock := bc.Blocks[t.Input.BlockNumber]
 	for _, transaction := range inputBlock.Transactions {
-		if transaction.Input.Hash == t.Input.Hash {
+		if t.Input.Hash == HashSum(transaction) {
 			I = transaction
 		}
 	}
@@ -74,7 +74,12 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 	}
 
 	// Verify signature of T
-	ecdsa.Verify(t.Sender.Key(), t.Sig.Marshal(), t.Sig.R, t.Sig.S)
+	hash := HashSum(t.TxBody)
+	if !ecdsa.Verify(t.Sender.Key(), hash.Marshal(), t.Sig.R, t.Sig.S) {
+		return false
+	}
+
+	// Validate chain from input block to last block.
 	return true
 }
 
