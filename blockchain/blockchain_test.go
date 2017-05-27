@@ -8,25 +8,13 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-// TestMain sets logging levels for tests.
 func TestMain(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 }
 
 func TestValidTransactionNotInBlock(t *testing.T) {
-	sender := newWallet()
-	tr, _ := newTransactionValue(sender, newWallet(), 1)
-
-	inputTransactions := make([]*Transaction, 0)
-	outputTransactions := make([]*Transaction, 0)
-
-	inputBlock := newInputBlock(inputTransactions)
-	outputBlock := newOutputBlock(outputTransactions, inputBlock)
-
-	bc := BlockChain{
-		Blocks: []*Block{inputBlock, outputBlock},
-		Head:   newHash(),
-	}
+	tr, _ := newTransactionValue(newWallet(), newWallet(), 1)
+	bc := newValidBlockChainFixture()
 
 	if bc.ValidTransaction(tr) {
 		t.Fail()
@@ -35,106 +23,70 @@ func TestValidTransactionNotInBlock(t *testing.T) {
 
 func TestValidTransactionInputsFail(t *testing.T) {
 	// 2 + 2 = 5 ?
-	original := newWallet()
-	sender := newWallet()
-	recipient := newWallet()
+	bc := newValidBlockChainFixture()
+	tr := bc.Blocks[1].Transactions[0]
+	tr.Outputs[0].Amount = 5
 
-	trA, _ := newTransactionValue(original, sender, 2)
-	trA.Outputs = append(trA.Outputs, TxOutput{
-		Amount:    2,
-		Recipient: sender.Public(),
-	})
-
-	trB, _ := newTransactionValue(sender, recipient, 5)
-	trB.Input.Hash = HashSum(trA)
-
-	inputTransactions := []*Transaction{trA}
-	outputTransactions := []*Transaction{trB}
-
-	inputBlock := newInputBlock(inputTransactions)
-	outputBlock := newOutputBlock(outputTransactions, inputBlock)
-
-	bc := BlockChain{
-		Blocks: []*Block{inputBlock, outputBlock},
-		Head:   newHash(),
-	}
-
-	if bc.ValidTransaction(trB) {
+	if bc.ValidTransaction(tr) {
 		t.Fail()
 	}
 }
 
 func TestValidTransactionSignatureFail(t *testing.T) {
-	original := newWallet()
-	sender := newWallet()
-	recipient := newWallet()
-
-	trA, _ := newTransactionValue(original, sender, 2)
-	trA.Outputs = append(trA.Outputs, TxOutput{
-		Amount:    2,
-		Recipient: sender.Public(),
-	})
-
-	trB, _ := newTransactionValue(sender, recipient, 4)
-	trB.Input.Hash = HashSum(trA)
-
-	inputTransactions := []*Transaction{trA}
-	outputTransactions := []*Transaction{trB}
-
-	inputBlock := newInputBlock(inputTransactions)
-	outputBlock := newOutputBlock(outputTransactions, inputBlock)
-
-	bc := BlockChain{
-		Blocks: []*Block{inputBlock, outputBlock},
-		Head:   newHash(),
-	}
+	bc := newValidBlockChainFixture()
+	tr := bc.Blocks[1].Transactions[0]
 
 	fakeSender := newWallet()
-	trB, _ = trB.TxBody.Sign(fakeSender, crand.Reader)
+	tr, _ = tr.TxBody.Sign(fakeSender, crand.Reader)
+	bc.Blocks[1].Transactions[0] = tr
 
-	if bc.ValidTransaction(trB) {
+	if bc.ValidTransaction(tr) {
 		t.Fail()
 	}
 }
 
 func TestValidTransactionPass(t *testing.T) {
-	original := newWallet()
-	sender := newWallet()
-	recipient := newWallet()
+	bc := newValidBlockChainFixture()
+	tr := bc.Blocks[1].Transactions[0]
 
-	trA, _ := newTransactionValue(original, sender, 2)
-	trA.Outputs = append(trA.Outputs, TxOutput{
-		Amount:    2,
-		Recipient: sender.Public(),
-	})
-
-	trB, _ := newTransactionValue(sender, recipient, 4)
-	// trB, _ = trB.TxBody.Sign(sender, crand.Reader)
-	trB.Input.Hash = HashSum(trA)
-
-	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
-
-	inputTransactions := []*Transaction{trA}
-	outputTransactions := []*Transaction{trB}
-
-	inputBlock := newInputBlock(inputTransactions)
-	outputBlock := newOutputBlock(outputTransactions, inputBlock)
-
-	bc := BlockChain{
-		Blocks: []*Block{inputBlock, outputBlock},
-		Head:   newHash(),
-	}
-
-	if !bc.ValidTransaction(trB) {
+	if !bc.ValidTransaction(tr) {
 		t.Fail()
 	}
 }
 
-// TestValidBlock tests the three cases in which a block can fail to be valid.
+func TestValidBlockTransactionInvalid(t *testing.T) {
+	bc := newValidBlockChainFixture()
+	tr := bc.Blocks[1].Transactions[0]
+	tr.Outputs[0].Amount = 5
+
+	if bc.ValidBlock(bc.Blocks[1]) {
+		t.Fail()
+	}
+}
+
+func TestValidBlockNumberWrong(t *testing.T) {
+	bc := newValidBlockChainFixture()
+	bc.Blocks[1].BlockNumber = 2
+
+	if bc.ValidBlock(bc.Blocks[1]) {
+		t.Fail()
+	}
+}
+
+func TestValidBlockHashWrong(t *testing.T) {
+	bc := newValidBlockChainFixture()
+	bc.Blocks[0].BlockHeader.LastBlock = newHash()
+
+	if bc.ValidBlock(bc.Blocks[1]) {
+		t.Fail()
+	}
+}
+
 func TestValidBlock(t *testing.T) {
-	// b conains invalid transaction.
-	// Block number for b is not one greater than the last block.
-	// The hash of the last block is incorrect.
+	bc := newValidBlockChainFixture()
+	if !bc.ValidBlock(bc.Blocks[1]) {
+		t.Fail()
+	}
 }
 
 func TestEncodeDecodeBlockChain(t *testing.T) {

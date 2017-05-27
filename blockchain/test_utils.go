@@ -126,3 +126,31 @@ func newTransactionValue(s, r Wallet, a uint64) (*Transaction, error) {
 	}
 	return tbody.Sign(s, crand.Reader)
 }
+
+func newValidBlockChainFixture() *BlockChain {
+	original := newWallet()
+	sender := newWallet()
+	recipient := newWallet()
+
+	trA, _ := newTransactionValue(original, sender, 2)
+	trA.Outputs = append(trA.Outputs, TxOutput{
+		Amount:    2,
+		Recipient: sender.Public(),
+	})
+
+	trB, _ := newTransactionValue(sender, recipient, 4)
+	trB.Input.Hash = HashSum(trA)
+
+	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
+
+	inputTransactions := []*Transaction{trA}
+	outputTransactions := []*Transaction{trB}
+
+	inputBlock := newInputBlock(inputTransactions)
+	outputBlock := newOutputBlock(outputTransactions, inputBlock)
+
+	return &BlockChain{
+		Blocks: []*Block{inputBlock, outputBlock},
+		Head:   newHash(),
+	}
+}

@@ -85,16 +85,17 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 
 // ValidBlock checks whether a block is valid
 func (bc *BlockChain) ValidBlock(b *Block) bool {
-	for _, t := range b.Transactions {
-		if !bc.ValidTransaction(t) {
-			return false
-		}
-	}
-
 	// Check that block number is one greater than last block
 	lastBlock := bc.Blocks[b.BlockNumber-1]
 	if lastBlock.BlockNumber != b.BlockNumber-1 {
 		return false
+	}
+
+	// Verify every Transaction in the block.
+	for _, t := range b.Transactions {
+		if !bc.ValidTransaction(t) {
+			return false
+		}
 	}
 
 	// Check that hash of last block is correct
@@ -102,5 +103,5 @@ func (bc *BlockChain) ValidBlock(b *Block) bool {
 		return false
 	}
 
-	return false
+	return true
 }
