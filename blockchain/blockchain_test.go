@@ -14,7 +14,7 @@ func TestMain(t *testing.T) {
 }
 
 func TestValidTransactionNotInBlock(t *testing.T) {
-	tr := newTransactionValue(5, Address{})
+	tr := newTransactionValue(5, newWallet().Public())
 
 	inputTransactions := make([]*Transaction, 0)
 	outputTransactions := make([]*Transaction, 0)

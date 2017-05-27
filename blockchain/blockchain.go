@@ -3,6 +3,7 @@ package blockchain
 import (
 	"crypto/ecdsa"
 	"encoding/gob"
+	"fmt"
 	"io"
 )
 
@@ -48,8 +49,9 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 
 	// Find the transaction input (I) in the chain (by hash)
 	var I *Transaction
-	inBlock := bc.Blocks[t.Input.BlockNumber]
-	for _, transaction := range inBlock.Transactions {
+	fmt.Println(t.Input.BlockNumber)
+	inputBlock := bc.Blocks[t.Input.BlockNumber]
+	for _, transaction := range inputBlock.Transactions {
 		if transaction.Input.Hash == t.Input.Hash {
 			I = transaction
 		}

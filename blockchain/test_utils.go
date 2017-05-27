@@ -114,8 +114,11 @@ func newOutputBlock(t []*Transaction, input *Block) *Block {
 func newTransactionValue(a uint64, r Address) *Transaction {
 	sender := newWallet()
 	tbody := TxBody{
-		Sender:  newWallet().Public(),
-		Input:   newTxHashPointer(),
+		Sender: newWallet().Public(),
+		Input: TxHashPointer{
+			BlockNumber: 0,
+			Hash:        newHash(),
+		},
 		Outputs: make([]TxOutput, 1),
 	}
 	tbody.Outputs[0] = TxOutput{
