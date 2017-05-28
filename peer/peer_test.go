@@ -206,9 +206,9 @@ func TestRequest(t *testing.T) {
 	emptyErr := protoerr.ProtocolError{}
 	if err != nil {
 		fmt.Printf("Failed to make request: %s", err)
-		t.Fail()
+		t.FailNow()
 	} else if response.Error != emptyErr {
 		fmt.Printf("Remote peer returned response %s", response.Error)
-		t.Fail()
+		t.FailNow()
 	}
 }

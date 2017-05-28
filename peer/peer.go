@@ -16,8 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-peerstore"
 	"github.com/libp2p/go-libp2p-swarm"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	"github.com/multiformats/go-multiaddr"
-	perr "github.com/ubclaunchpad/cumulus/errors"
+	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/ubclaunchpad/cumulus/message"
 	"github.com/ubclaunchpad/cumulus/subnet"
 )
@@ -37,9 +36,9 @@ const (
 // Peer is a cumulus Peer composed of a host
 type Peer struct {
 	host.Host
-	subnet        subnet.Subnet
-	listeners     map[string]chan message.Response
-	listenersLock sync.RWMutex
+	subnet        sn.Subnet
+	listeners     map[string]chan *message.Response
+	listenersLock *sync.RWMutex
 }
 
 // New creates a Cumulus host with the given IP addr and TCP port.
@@ -84,9 +83,9 @@ func New(ip string, port int) (*Peer, error) {
 	host := bhost.New(network)
 	peer := &Peer{
 		Host:          host,
-		subnet:        sn,
-		listeners:     make(map[string]chan message.Response),
-		listenersLock: sync.RWMutex{},
+		subnet:        subnet,
+		listeners:     make(map[string]chan *message.Response),
+		listenersLock: &sync.RWMutex{},
 	}
 
 	// Build host multiaddress
@@ -122,7 +121,7 @@ func (p *Peer) Receive(s net.Stream) {
 		// Subnet is full, advertise other available peers and then close
 		// the stream
 		log.WithError(err).Debug("Peer subnet full. Advertising peers...")
-		msg := message.NewPushMessage(message.ResourcePeerInfo, p.subnet.Multiaddrs())
+		msg := message.Push{ResourceType: message.ResourcePeerInfo, Resource: p.subnet.StringMultiaddrs}
 		msgErr := msg.Write(s)
 		if msgErr != nil {
 			log.WithError(err).Error("Failed to send ResourcePeerInfo")
@@ -186,8 +185,7 @@ func (p *Peer) Request(req message.Request, s net.Stream) (*message.Response, er
 	defer p.removeListener(req.ID)
 
 	// Send request
-	reqMsg := message.New(message.MessageRequest, req)
-	err := reqMsg.Write(s)
+	err := req.Write(s)
 	if err != nil {
 		return nil, err
 	}
@@ -195,38 +193,31 @@ func (p *Peer) Request(req message.Request, s net.Stream) (*message.Response, er
 	// Receive response or timeout
 	select {
 	case res := <-lchan:
-		return &res, nil
+		return res, nil
 	case <-time.After(Timeout):
 		return nil, errors.New("Timed out waiting for response")
 	}
 }
 
 // Respond responds to a request from another peer
-func (p *Peer) Respond(req message.Request, s net.Stream) {
-	response := message.Response{
-		ID:    req.ID,
-		Error: perr.ProtocolError{},
-	}
+func (p *Peer) Respond(req *message.Request, s net.Stream) {
+	response := message.Response{ID: req.ID}
 
 	switch req.ResourceType {
 	case message.ResourcePeerInfo:
 		response.Resource = p.subnet.Multiaddrs()
 		break
 	case message.ResourceBlock:
-		response.Error = *perr.New(perr.NotImplemented,
-			"Functionality not yet implemented on this peer")
+		// response.Error = protoerr.New(protoerr.NotImplemented)
 		break
 	case message.ResourceTransaction:
-		response.Error = *perr.New(perr.NotImplemented,
-			"Functionality not yet implemented on this peer")
+		// response.Error = protoerr.New(protoerr.NotImplemented)
 		break
 	default:
-		response.Error = *perr.New(perr.InvalidResourceType,
-			"Invalid resource type")
+		// response.Error = protoerr.New(protoerr.InvalidResourceType)
 	}
 
-	msg := message.New(message.MessageResponse, response)
-	err := msg.Write(s)
+	err := response.Write(s)
 	if err != nil {
 		log.WithError(err).Error("Failed to send reponse")
 	} else {
@@ -253,14 +244,14 @@ func (p *Peer) handleMessage(m message.Message, s net.Stream) {
 		log.Infof("Received message: \n%s", string(msgJSON))
 	}
 
-	switch m.Type {
+	switch m.Type() {
 	case message.MessageRequest:
 		// Respond to the request by sending request resource
-		p.Respond(m.Payload.(message.Request), s)
+		p.Respond(m.(*message.Request), s)
 		break
 	case message.MessageResponse:
 		// Pass the response to the goroutine that requested it
-		res := m.Payload.(message.Response)
+		res := m.(*message.Response)
 		lchan := p.getListener(res.ID)
 		if lchan != nil {
 			log.Debug("Found listener channel for response")
@@ -295,7 +286,7 @@ func (p *Peer) Listen(sma string, s net.Stream) {
 			return
 		}
 		log.Debug("Listener received message")
-		go p.handleMessage(*msg, s)
+		go p.HandleMessage(msg, s)
 	}
 }
 
@@ -333,9 +324,9 @@ func extractPeerInfo(sma string) (lpeer.ID, multiaddr.Multiaddr, error) {
 }
 
 // newListener synchronously adds a listener to this peer's listeners map
-func (p *Peer) newListener(id string) chan message.Response {
+func (p *Peer) newListener(id string) chan *message.Response {
 	p.listenersLock.Lock()
-	p.listeners[id] = make(chan message.Response)
+	p.listeners[id] = make(chan *message.Response)
 	p.listenersLock.Unlock()
 	return p.listeners[id]
 }
@@ -347,9 +338,7 @@ func (p *Peer) removeListener(id string) {
 	p.listenersLock.Unlock()
 }
 
-// getListener synchronously retreives and returns the channel associated with
-// the given id
-func (p *Peer) getListener(id string) chan message.Response {
+func (p *Peer) getListener(id string) chan *message.Response {
 	p.listenersLock.RLock()
 	lchan := p.listeners[id]
 	p.listenersLock.RUnlock()
