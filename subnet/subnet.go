@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/libp2p/go-libp2p-net"
+	"github.com/ubclaunchpad/cumulus/stream"
 )
 
 const (
@@ -16,14 +16,14 @@ const (
 
 // Subnet represents the set of peers a peer is connected to at any given time
 type Subnet struct {
-	peers    map[string]net.Stream
+	peers    map[string]*stream.Stream
 	maxPeers int
 	lock     sync.RWMutex
 }
 
 // New returns a pointer to an empty Subnet with the given maxPeers.
 func New(maxPeers int) *Subnet {
-	p := make(map[string]net.Stream)
+	p := make(map[string]*stream.Stream)
 	sn := Subnet{maxPeers: maxPeers, peers: p, lock: sync.RWMutex{}}
 	return &sn
 }
@@ -31,7 +31,7 @@ func New(maxPeers int) *Subnet {
 // AddPeer adds a peer's multiaddress and the corresponding stream between the
 // local peer and the remote peer to the subnet. If the subnet is already
 // full, or the multiaddress is not valid, returns error.
-func (sn *Subnet) AddPeer(sma string, stream net.Stream) error {
+func (sn *Subnet) AddPeer(sma string, stream stream.Stream) error {
 	sn.lock.Lock()
 	if sn.Full() {
 		sn.lock.Unlock()
@@ -43,7 +43,7 @@ func (sn *Subnet) AddPeer(sma string, stream net.Stream) error {
 		log.Debugf("Peer %s is already in subnet", sma)
 	} else {
 		log.Debugf("Adding peer %s to subnet", sma)
-		sn.peers[sma] = stream
+		sn.peers[sma] = &stream
 	}
 	sn.lock.Unlock()
 	return nil
@@ -60,9 +60,9 @@ func (sn *Subnet) RemovePeer(sma string) {
 
 // Stream returns the stream associated with the given multiaddr in this subnet.
 // Returns nil if the multiaddr is not in this subnet.
-func (sn *Subnet) Stream(sma string) net.Stream {
+func (sn *Subnet) Stream(sma string) stream.Stream {
 	sn.lock.RLock()
-	stream := sn.peers[sma]
+	stream := *sn.peers[sma]
 	sn.lock.RUnlock()
 	return stream
 }
