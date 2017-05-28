@@ -89,6 +89,11 @@ func TestValidBlock(t *testing.T) {
 	}
 }
 
+func TestTransactionRespend(t *testing.T) {
+	// test whether the inputs were already spent between the block in which
+	// they were created and the end of the block chain.
+}
+
 func TestEncodeDecodeBlockChain(t *testing.T) {
 	b1 := newBlockChain()
 
