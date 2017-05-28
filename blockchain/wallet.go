@@ -43,7 +43,7 @@ func (a Address) Key() *ecdsa.PublicKey {
 	return &ecdsa.PublicKey{
 		Curve: curve,
 		X:     a.X,
-		Y:     a.X,
+		Y:     a.Y,
 	}
 }
 
@@ -69,7 +69,7 @@ func (w *wallet) Public() Address {
 // Sign returns a signature of the digest.
 func (w *wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
 	r, s, err := ecdsa.Sign(random, w.key(), digest.Marshal())
-	return Signature{r, s}, err
+	return Signature{R: r, S: s}, err
 }
 
 // Signature represents a signature of a transaction.
