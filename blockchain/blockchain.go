@@ -58,7 +58,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 		return false
 	}
 
-	// Check that output to sender in I is equal to outputs in T
+	// Check that output to sender in input is equal to outputs in t
 	var inAmount uint64
 	for _, output := range input.Outputs {
 		if output.Recipient == t.Sender {
@@ -73,7 +73,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 		return false
 	}
 
-	// Verify signature of T
+	// Verify signature of t
 	hash := HashSum(t.TxBody)
 	if !ecdsa.Verify(t.Sender.Key(), hash.Marshal(), t.Sig.R, t.Sig.S) {
 		return false
