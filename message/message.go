@@ -3,9 +3,6 @@ package message
 import (
 	"encoding/gob"
 	"io"
-
-	"github.com/google/uuid"
-	ma "github.com/multiformats/go-multiaddr"
 )
 
 type (
@@ -13,6 +10,8 @@ type (
 	Type int
 	// ResourceType specifies the type of a resource in a message.
 	ResourceType int
+	// ErrorCode is a code associated with an error
+	ErrorCode int
 )
 
 const (
@@ -33,19 +32,46 @@ const (
 	ResourceTransaction
 )
 
-// Message is a container for messages, containing a type and either a Request,
-// Response, or Push in the payload.
-type Message struct {
-	Type    Type
-	Payload interface{}
+const (
+	// InvalidResourceType occurs when a request is received with an unknown
+	// ResourceType value.
+	InvalidResourceType = 401
+	// NotImplemented occurs when a message or request is received whos response
+	// requires functionality that does not yet exist.
+	NotImplemented = 501
+	// SubnetFull occurs when a stream is opened with a peer who's Subnet is
+	// already full.
+	SubnetFull = 503
+)
+
+// Initializes all the types we need to encode.
+func init() {
+	gob.Register(&Request{})
+	gob.Register(&Response{})
+	gob.Register(&Push{})
 }
 
-// New returns a new Message.
-func New(t Type, payload interface{}) *Message {
-	return &Message{
-		Type:    t,
-		Payload: payload,
-	}
+// Error is an error that occured during a request.
+type Error struct {
+	Code    ErrorCode
+	Message string
+}
+
+// NewError returns a new error struct.
+func NewError(code ErrorCode, msg string) *Error {
+	return &Error{code, msg}
+}
+
+// Error returns the error message; to implement `error`.
+func (e *Error) Error() string {
+	return e.Message
+}
+
+// Message is a container for messages, containing a type and either a Request,
+// Response, or Push in the payload.
+type Message interface {
+	Type() Type
+	Write(io.Writer) error
 }
 
 // Request is a container for a request payload, containing a unique request ID,
@@ -58,15 +84,9 @@ type Request struct {
 	Params       map[string]interface{}
 }
 
-// NewRequestMessage returns a new Message continaing a request with the given
-// parameters.
-func NewRequestMessage(rt ResourceType, p map[string]interface{}) *Message {
-	req := Request{
-		ID:           uuid.New().String(),
-		ResourceType: rt,
-		Params:       p,
-	}
-	return New(MessageRequest, req)
+// Type returns the message type
+func (r *Request) Type() Type {
+	return MessageRequest
 }
 
 // Response is a container for a response payload, containing the unique request
@@ -74,20 +94,13 @@ func NewRequestMessage(rt ResourceType, p map[string]interface{}) *Message {
 // resource (if no error occurred).
 type Response struct {
 	ID       string
-	Error    error
+	Error    *Error
 	Resource interface{}
 }
 
-// NewResponseMessage returns a new Message continaing a response with the given
-// parameters. ResponseMessages should have the same ID as that of the request
-// message they are a response to.
-func NewResponseMessage(id string, err error, resource interface{}) *Message {
-	res := &Response{
-		ID:       id,
-		Error:    err,
-		Resource: resource,
-	}
-	return New(MessageResponse, res)
+// Type returns the message type
+func (r *Response) Type() Type {
+	return MessageResponse
 }
 
 // Push is a container for a push payload, containing a resource proactively sent
@@ -97,34 +110,33 @@ type Push struct {
 	Resource     interface{}
 }
 
-// NewPushMessage returns a new Message continaing a response with the given
-// parameters.
-func NewPushMessage(rt ResourceType, resource interface{}) *Message {
-	res := &Push{
-		ResourceType: rt,
-		Resource:     resource,
-	}
-	return New(MessageResponse, res)
+// Type returns the message type
+func (p *Push) Type() Type {
+	return MessagePush
 }
 
 // Write encodes and writes the Message into the given Writer.
-func (m *Message) Write(w io.Writer) error {
-	return gob.NewEncoder(w).Encode(m)
+func (r *Request) Write(w io.Writer) error {
+	var m Message = r
+	return gob.NewEncoder(w).Encode(&m)
+}
+
+func (r *Response) Write(w io.Writer) error {
+	var m Message = r
+	return gob.NewEncoder(w).Encode(&m)
+}
+
+func (p *Push) Write(w io.Writer) error {
+	var m Message = p
+	return gob.NewEncoder(w).Encode(&m)
 }
 
 // Read decodes a message from a Reader and returns it.
-func Read(r io.Reader) (*Message, error) {
+func Read(r io.Reader) (Message, error) {
 	var m Message
 	err := gob.NewDecoder(r).Decode(&m)
-	return &m, err
-}
-
-// RegisterGobTypes registers all the types used by gob in reading and writing
-// messages. This should only be called once during initializaiton.
-func init() {
-	dummy, _ := ma.NewMultiaddr("")
-	gob.Register(dummy)
-	gob.Register(Request{})
-	gob.Register(Response{})
-	gob.Register(Push{})
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }

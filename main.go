@@ -58,6 +58,6 @@ func main() {
 		return
 	}
 
-	host.HandleMessage(*message.NewResponseMessage("", nil, response), stream)
+	host.HandleMessage(response, stream)
 	host.Close()
 }
