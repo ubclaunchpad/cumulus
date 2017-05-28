@@ -46,21 +46,21 @@ func DecodeBlockChain(r io.Reader) *BlockChain {
 // blockchain is valid.
 func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 
-	// Find the transaction input (I) in the chain (by hash)
-	var I *Transaction
+	// Find the transaction input in the chain (by hash)
+	var input *Transaction
 	inputBlock := bc.Blocks[t.Input.BlockNumber]
 	for _, transaction := range inputBlock.Transactions {
 		if t.Input.Hash == HashSum(transaction) {
-			I = transaction
+			input = transaction
 		}
 	}
-	if I == nil {
+	if input == nil {
 		return false
 	}
 
 	// Check that output to sender in I is equal to outputs in T
 	var inAmount uint64
-	for _, output := range I.Outputs {
+	for _, output := range input.Outputs {
 		if output.Recipient == t.Sender {
 			inAmount += output.Amount
 		}
