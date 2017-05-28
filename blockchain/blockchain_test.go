@@ -54,6 +54,11 @@ func TestValidTransactionPass(t *testing.T) {
 	}
 }
 
+func TestTransactionRespend(t *testing.T) {
+	// test whether the inputs were already spent between the block in which
+	// they were created and the end of the block chain.
+}
+
 func TestValidBlockTransactionInvalid(t *testing.T) {
 	bc := newValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
@@ -89,9 +94,9 @@ func TestValidBlock(t *testing.T) {
 	}
 }
 
-func TestTransactionRespend(t *testing.T) {
-	// test whether the inputs were already spent between the block in which
-	// they were created and the end of the block chain.
+func TestBlockTwoInputs(t *testing.T) {
+	// block should fail to be valid if there exists two transactions
+	// referencing the same input, but output > input (double spend attack)
 }
 
 func TestEncodeDecodeBlockChain(t *testing.T) {
