@@ -79,7 +79,14 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 		return false
 	}
 
-	// Validate chain from input block to last block.
+	// Test if identical transaction already exits in chain.
+	endChain := uint32(len(bc.Blocks))
+	for i := t.Input.BlockNumber; i < endChain; i++ {
+		if bc.Blocks[i].ContainsTransaction(t) {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -104,4 +111,12 @@ func (bc *BlockChain) ValidBlock(b *Block) bool {
 	}
 
 	return true
+}
+
+// AppendBlock adds a block to the end of the block chain.
+func (bc *BlockChain) AppendBlock(b *Block, miner Address) {
+	b.BlockNumber = uint32(len(bc.Blocks))
+	b.LastBlock = HashSum(bc.Blocks[b.BlockNumber-1])
+	b.Miner = miner
+	bc.Blocks = append(bc.Blocks, b)
 }

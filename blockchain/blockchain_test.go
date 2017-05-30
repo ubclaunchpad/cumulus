@@ -14,7 +14,7 @@ func TestMain(t *testing.T) {
 
 func TestValidTransactionNotInBlock(t *testing.T) {
 	tr, _ := newTransactionValue(newWallet(), newWallet(), 1)
-	bc := newValidBlockChainFixture()
+	bc, _ := newValidBlockChainFixture()
 
 	if bc.ValidTransaction(tr) {
 		t.Fail()
@@ -23,7 +23,7 @@ func TestValidTransactionNotInBlock(t *testing.T) {
 
 func TestValidTransactionInputsFail(t *testing.T) {
 	// 2 + 2 = 5 ?
-	bc := newValidBlockChainFixture()
+	bc, _ := newValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
 	tr.Outputs[0].Amount = 5
 
@@ -33,7 +33,7 @@ func TestValidTransactionInputsFail(t *testing.T) {
 }
 
 func TestValidTransactionSignatureFail(t *testing.T) {
-	bc := newValidBlockChainFixture()
+	bc, _ := newValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
 
 	fakeSender := newWallet()
@@ -46,8 +46,25 @@ func TestValidTransactionSignatureFail(t *testing.T) {
 }
 
 func TestValidTransactionPass(t *testing.T) {
-	bc := newValidBlockChainFixture()
-	tr := bc.Blocks[1].Transactions[0]
+	bc, s := newValidBlockChainFixture()
+	inputTransaction := bc.Blocks[1].Transactions[0]
+	a := inputTransaction.Outputs[0].Amount
+
+	// Create a legit transaction that does *not* appear in bc.
+	tbody := TxBody{
+		Sender: s.Public(),
+		Input: TxHashPointer{
+			BlockNumber: 1,
+			Hash:        HashSum(inputTransaction),
+		},
+		Outputs: make([]TxOutput, 1),
+	}
+	tbody.Outputs[0] = TxOutput{
+		Amount:    a,
+		Recipient: newWallet().Public(),
+	}
+
+	tr, _ := tbody.Sign(s, crand.Reader)
 
 	if !bc.ValidTransaction(tr) {
 		t.Fail()
@@ -55,12 +72,18 @@ func TestValidTransactionPass(t *testing.T) {
 }
 
 func TestTransactionRespend(t *testing.T) {
-	// test whether the inputs were already spent between the block in which
-	// they were created and the end of the block chain.
+	bc, _ := newValidBlockChainFixture()
+	trC := bc.Blocks[1].Transactions[0]
+	b := newOutputBlock([]*Transaction{trC}, bc.Blocks[1])
+	bc.AppendBlock(b, newWallet().Public())
+
+	if bc.ValidTransaction(trC) {
+		t.Fail()
+	}
 }
 
 func TestValidBlockTransactionInvalid(t *testing.T) {
-	bc := newValidBlockChainFixture()
+	bc, _ := newValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
 	tr.Outputs[0].Amount = 5
 
@@ -70,7 +93,7 @@ func TestValidBlockTransactionInvalid(t *testing.T) {
 }
 
 func TestValidBlockNumberWrong(t *testing.T) {
-	bc := newValidBlockChainFixture()
+	bc, _ := newValidBlockChainFixture()
 	bc.Blocks[1].BlockNumber = 2
 
 	if bc.ValidBlock(bc.Blocks[1]) {
@@ -79,7 +102,7 @@ func TestValidBlockNumberWrong(t *testing.T) {
 }
 
 func TestValidBlockHashWrong(t *testing.T) {
-	bc := newValidBlockChainFixture()
+	bc, _ := newValidBlockChainFixture()
 	bc.Blocks[0].BlockHeader.LastBlock = newHash()
 
 	if bc.ValidBlock(bc.Blocks[1]) {
@@ -88,8 +111,29 @@ func TestValidBlockHashWrong(t *testing.T) {
 }
 
 func TestValidBlock(t *testing.T) {
-	bc := newValidBlockChainFixture()
-	if !bc.ValidBlock(bc.Blocks[1]) {
+	bc, s := newValidBlockChainFixture()
+	inputBlock := bc.Blocks[1]
+	inputTransaction := inputBlock.Transactions[0]
+	a := inputTransaction.Outputs[0].Amount
+
+	// Create a legit block that does *not* appear in bc.
+	tbody := TxBody{
+		Sender: s.Public(),
+		Input: TxHashPointer{
+			BlockNumber: 1,
+			Hash:        HashSum(inputTransaction),
+		},
+		Outputs: make([]TxOutput, 1),
+	}
+	tbody.Outputs[0] = TxOutput{
+		Amount:    a,
+		Recipient: newWallet().Public(),
+	}
+
+	tr, _ := tbody.Sign(s, crand.Reader)
+	newBlock := newOutputBlock([]*Transaction{tr}, inputBlock)
+
+	if !bc.ValidBlock(newBlock) {
 		t.Fail()
 	}
 }

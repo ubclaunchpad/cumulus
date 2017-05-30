@@ -123,7 +123,7 @@ func newTransactionValue(s, r Wallet, a uint64) (*Transaction, error) {
 	return tbody.Sign(s, crand.Reader)
 }
 
-func newValidBlockChainFixture() *BlockChain {
+func newValidBlockChainFixture() (*BlockChain, Wallet) {
 	original := newWallet()
 	sender := newWallet()
 	recipient := newWallet()
@@ -148,5 +148,5 @@ func newValidBlockChainFixture() *BlockChain {
 	return &BlockChain{
 		Blocks: []*Block{inputBlock, outputBlock},
 		Head:   newHash(),
-	}
+	}, recipient
 }
