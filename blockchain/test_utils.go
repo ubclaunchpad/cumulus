@@ -123,6 +123,7 @@ func newTransactionValue(s, r Wallet, a uint64) (*Transaction, error) {
 	return tbody.Sign(s, crand.Reader)
 }
 
+// newValidBlockChainFixture creates a valid blockchain of two blocks.
 func newValidBlockChainFixture() (*BlockChain, Wallet) {
 	original := newWallet()
 	sender := newWallet()
@@ -149,4 +150,31 @@ func newValidBlockChainFixture() (*BlockChain, Wallet) {
 		Blocks: []*Block{inputBlock, outputBlock},
 		Head:   newHash(),
 	}, recipient
+}
+
+// newValidChainAndBlock creates a valid BlockChain and a Block that is valid
+// with respect to the BlockChain.
+func newValidChainAndBlock() (*BlockChain, *Block) {
+	bc, s := newValidBlockChainFixture()
+	inputBlock := bc.Blocks[1]
+	inputTransaction := inputBlock.Transactions[0]
+	a := inputTransaction.Outputs[0].Amount
+
+	// Create a legit block that does *not* appear in bc.
+	tbody := TxBody{
+		Sender: s.Public(),
+		Input: TxHashPointer{
+			BlockNumber: 1,
+			Hash:        HashSum(inputTransaction),
+		},
+		Outputs: make([]TxOutput, 1),
+	}
+	tbody.Outputs[0] = TxOutput{
+		Amount:    a,
+		Recipient: newWallet().Public(),
+	}
+
+	tr, _ := tbody.Sign(s, crand.Reader)
+	newBlock := newOutputBlock([]*Transaction{tr}, inputBlock)
+	return bc, newBlock
 }

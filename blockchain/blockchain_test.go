@@ -102,38 +102,18 @@ func TestValidBlockNumberWrong(t *testing.T) {
 }
 
 func TestValidBlockHashWrong(t *testing.T) {
-	bc, _ := newValidBlockChainFixture()
-	bc.Blocks[0].BlockHeader.LastBlock = newHash()
+	bc, b := newValidChainAndBlock()
+	b.BlockHeader.LastBlock = newHash()
 
-	if bc.ValidBlock(bc.Blocks[1]) {
+	if bc.ValidBlock(b) {
 		t.Fail()
 	}
 }
 
 func TestValidBlock(t *testing.T) {
-	bc, s := newValidBlockChainFixture()
-	inputBlock := bc.Blocks[1]
-	inputTransaction := inputBlock.Transactions[0]
-	a := inputTransaction.Outputs[0].Amount
+	bc, b := newValidChainAndBlock()
 
-	// Create a legit block that does *not* appear in bc.
-	tbody := TxBody{
-		Sender: s.Public(),
-		Input: TxHashPointer{
-			BlockNumber: 1,
-			Hash:        HashSum(inputTransaction),
-		},
-		Outputs: make([]TxOutput, 1),
-	}
-	tbody.Outputs[0] = TxOutput{
-		Amount:    a,
-		Recipient: newWallet().Public(),
-	}
-
-	tr, _ := tbody.Sign(s, crand.Reader)
-	newBlock := newOutputBlock([]*Transaction{tr}, inputBlock)
-
-	if !bc.ValidBlock(newBlock) {
+	if !bc.ValidBlock(b) {
 		t.Fail()
 	}
 }
