@@ -29,7 +29,7 @@ func TestNewListener(t *testing.T) {
 		case <-time.After(time.Second * 3):
 			t.FailNow()
 		}
-		if *received != *response {
+		if received.ID != response.ID || received.Error != response.Error {
 			t.FailNow()
 		}
 		if received.Resource.(map[string]int)["hello"] != 1 ||

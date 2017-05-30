@@ -28,8 +28,9 @@ func New(s net.Stream) *Stream {
 func (s *Stream) NewListener(id string) chan *message.Response {
 	s.lock.Lock()
 	s.listeners[id] = make(chan *message.Response)
+	lchan := s.listeners[id]
 	s.lock.Unlock()
-	return s.listeners[id]
+	return lchan
 }
 
 // RemoveListener synchronously removes a listener from this peer's listeners map
