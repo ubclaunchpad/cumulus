@@ -58,7 +58,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 		return false
 	}
 
-	// Check that output to sender in I is equal to outputs in T
+	// Check that output to sender in input is equal to outputs in t
 	var inAmount uint64
 	for _, output := range input.Outputs {
 		if output.Recipient == t.Sender {
@@ -73,13 +73,20 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
 		return false
 	}
 
-	// Verify signature of T
+	// Verify signature of t
 	hash := HashSum(t.TxBody)
 	if !ecdsa.Verify(t.Sender.Key(), hash.Marshal(), t.Sig.R, t.Sig.S) {
 		return false
 	}
 
-	// Validate chain from input block to last block.
+	// Test if identical transaction already exists in chain.
+	endChain := uint32(len(bc.Blocks))
+	for i := t.Input.BlockNumber; i < endChain; i++ {
+		if exists, _ := bc.Blocks[i].ContainsTransaction(t); exists {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -104,4 +111,12 @@ func (bc *BlockChain) ValidBlock(b *Block) bool {
 	}
 
 	return true
+}
+
+// AppendBlock adds a block to the end of the block chain.
+func (bc *BlockChain) AppendBlock(b *Block, miner Address) {
+	b.BlockNumber = uint32(len(bc.Blocks))
+	b.LastBlock = HashSum(bc.Blocks[b.BlockNumber-1])
+	b.Miner = miner
+	bc.Blocks = append(bc.Blocks, b)
 }
