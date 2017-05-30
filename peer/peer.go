@@ -211,11 +211,11 @@ func (p *Peer) Respond(req *message.Request, s stream.Stream) {
 		break
 	case message.ResourceBlock:
 	case message.ResourceTransaction:
-		response.Error = message.NewError(message.NotImplemented,
+		response.Error = message.NewProtocolError(message.NotImplemented,
 			"Functionality not implemented on this peer")
 		break
 	default:
-		response.Error = message.NewError(message.InvalidResourceType,
+		response.Error = message.NewProtocolError(message.InvalidResourceType,
 			"Invalid resource type")
 	}
 

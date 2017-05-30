@@ -127,7 +127,7 @@ func TestPush(t *testing.T) {
 
 func TestError(t *testing.T) {
 	msg := "Not Implemented"
-	err := NewError(NotImplemented, msg)
+	err := NewProtocolError(NotImplemented, msg)
 
 	if err.Error() != msg {
 		t.Fail()

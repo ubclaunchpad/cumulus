@@ -51,19 +51,19 @@ func init() {
 	gob.Register(&Push{})
 }
 
-// Error is an error that occured during a request.
-type Error struct {
+// ProtocolError is an error that occured during a request.
+type ProtocolError struct {
 	Code    ErrorCode
 	Message string
 }
 
-// NewError returns a new error struct.
-func NewError(code ErrorCode, msg string) *Error {
-	return &Error{code, msg}
+// NewProtocolError returns a new error struct.
+func NewProtocolError(code ErrorCode, msg string) *ProtocolError {
+	return &ProtocolError{code, msg}
 }
 
 // Error returns the error message; to implement `error`.
-func (e *Error) Error() string {
+func (e *ProtocolError) Error() string {
 	return e.Message
 }
 
@@ -94,7 +94,7 @@ func (r *Request) Type() Type {
 // resource (if no error occurred).
 type Response struct {
 	ID       string
-	Error    *Error
+	Error    *ProtocolError
 	Resource interface{}
 }
 
