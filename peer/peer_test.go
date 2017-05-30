@@ -58,7 +58,7 @@ func TestNewInvalidIP(t *testing.T) {
 
 func TestExtractPeerInfoValidMultiAddr(t *testing.T) {
 	peerma := "/ip4/127.0.0.1/tcp/8765/ipfs/QmQdfp9Ug4MoLRsBToDPN2aQhg2jPtmmA8UidQUTXGjZcy"
-	pid, ma, err := ExtractPeerInfo(peerma)
+	pid, ma, err := extractPeerInfo(peerma)
 
 	if err != nil {
 		t.Fail()
@@ -75,7 +75,7 @@ func TestExtractPeerInfoValidMultiAddr(t *testing.T) {
 
 func TestExtractPeerInfoInvalidIP(t *testing.T) {
 	peerma := "/ip4/203.532.211.5/tcp/8765/ipfs/Qmb89FuJ8UG3dpgUqEYu9eUqK474uP3mx32WnQ7kePXp8N"
-	_, _, err := ExtractPeerInfo(peerma)
+	_, _, err := extractPeerInfo(peerma)
 
 	if err == nil {
 		t.Fail()

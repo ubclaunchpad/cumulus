@@ -2,14 +2,16 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/message"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
 func main() {
 	log.Info("Starting Cumulus Peer")
+	message.RegisterGobTypes()
 
 	// Get and parse command line arguments
 	// targetPeer is a Multiaddr representing the target peer to connect to
@@ -46,19 +48,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Send a message to the peer
-	_, err = stream.Write([]byte("Hello, world!"))
+	// Request peer info
+	request := message.Request{
+		ID:           uuid.New().String(),
+		ResourceType: message.ResourcePeerInfo,
+		Params:       nil,
+	}
+	response, err := host.Request(request, stream)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Error("Error writing message to stream")
+		return
 	}
 
-	// Read the reply from the peer
-	reply, err := ioutil.ReadAll(stream)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Debugf("Peer %s read reply: %s", host.ID(), string(reply))
-
+	host.HandleMessage(*message.NewResponseMessage("", nil, response), stream)
 	host.Close()
 }
