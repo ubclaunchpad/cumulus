@@ -46,25 +46,8 @@ func TestValidTransactionSignatureFail(t *testing.T) {
 }
 
 func TestValidTransactionPass(t *testing.T) {
-	bc, s := newValidBlockChainFixture()
-	inputTransaction := bc.Blocks[1].Transactions[0]
-	a := inputTransaction.Outputs[0].Amount
-
-	// Create a legit transaction that does *not* appear in bc.
-	tbody := TxBody{
-		Sender: s.Public(),
-		Input: TxHashPointer{
-			BlockNumber: 1,
-			Hash:        HashSum(inputTransaction),
-		},
-		Outputs: make([]TxOutput, 1),
-	}
-	tbody.Outputs[0] = TxOutput{
-		Amount:    a,
-		Recipient: newWallet().Public(),
-	}
-
-	tr, _ := tbody.Sign(s, crand.Reader)
+	bc, b := newValidChainAndBlock()
+	tr := b.Transactions[0]
 
 	if !bc.ValidTransaction(tr) {
 		t.Fail()
