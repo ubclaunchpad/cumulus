@@ -118,7 +118,7 @@ func (p *Peer) Receive(s net.Stream) {
 		// Subnet is full, advertise other available peers and then close
 		// the stream
 		log.WithError(err).Debug("Peer subnet full. Advertising peers...")
-		msg := message.Push{
+		msg := &message.Push{
 			ResourceType: message.ResourcePeerInfo,
 			Resource:     p.subnet.Multiaddrs(),
 		}
@@ -153,6 +153,7 @@ func (p *Peer) Connect(sma string) (*stream.Stream, error) {
 	err = s.SetDeadline(time.Now().Add(Timeout))
 	if err != nil {
 		log.WithError(err).Error("Failed to set read deadline on stream")
+		return nil, err
 	}
 
 	// Make a stream.Stream out of a net.Stream (sorry)
@@ -160,6 +161,7 @@ func (p *Peer) Connect(sma string) (*stream.Stream, error) {
 	err = p.subnet.AddPeer(sma, peerstream)
 	if err != nil {
 		s.Close()
+		return nil, err
 	}
 
 	go p.Listen(sma, peerstream)

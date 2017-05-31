@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
 	"github.com/ubclaunchpad/cumulus/message"
-	sn "github.com/ubclaunchpad/cumulus/subnet"
+	"github.com/ubclaunchpad/cumulus/subnet"
 )
 
 func TestMain(t *testing.T) {
@@ -133,43 +133,78 @@ func TestReceiveInvalidAddress(t *testing.T) {
 	}
 }
 
-func TestSubnetFull(t *testing.T) {
-	testPeer, err := New("127.0.0.1", 8080)
+func TestConnectWithSubnetFull(t *testing.T) {
+	testPeer, err := New(DefaultIP, DefaultPort)
 	if err != nil {
 		t.Fail()
 	}
-	testPeer.SetStreamHandler(CumulusProtocol, testPeer.Receive)
-	peers := make([]*Peer, sn.DefaultMaxPeers)
+	peers := make([]*Peer, subnet.DefaultMaxPeers)
 
-	for i := 1; i < sn.DefaultMaxPeers; i++ {
-		peers[i], err = New("127.0.0.1", 8080+i)
+	for i := 0; i < subnet.DefaultMaxPeers; i++ {
+		peers[i], err = New(DefaultIP, 8080+i)
 		if err != nil {
-			fmt.Println("Failed trying to create a new test peer")
-			t.Fail()
+			t.FailNow()
 		}
 		peers[i].SetStreamHandler(CumulusProtocol, peers[i].Receive)
 		ma, maErr := NewMultiaddr(peers[i].Addrs()[0], peers[i].ID())
 		if maErr != nil {
-			t.Fail()
+			t.FailNow()
 		}
 		_, err = testPeer.Connect(ma.String())
 		if err != nil {
-			fmt.Println("Failed trying to connect to a test peer")
-			fmt.Println(ma.String())
-			t.Fail()
+			t.FailNow()
 		}
 	}
 
-	lastPeer, err := New("127.0.0.1", 8081+sn.DefaultMaxPeers)
+	lastPeer, err := New(DefaultIP, 8081+subnet.DefaultMaxPeers)
 	if err != nil {
-		fmt.Println("Failed trying to create the last test peer")
-		t.Fail()
+		t.FailNow()
 	}
 	_, err = testPeer.Connect(lastPeer.Addrs()[0].String())
 	if err == nil {
-		fmt.Println("Failed trying to connect to the last test peer")
-		t.Fail()
+		t.FailNow()
 	}
+}
+
+func TestReceiveWithSubnetFull(t *testing.T) {
+	targetPeer, err := New(DefaultIP, DefaultPort)
+	if err != nil {
+		t.FailNow()
+	}
+	targetPeer.SetStreamHandler(CumulusProtocol, targetPeer.Receive)
+	ma, err := NewMultiaddr(targetPeer.Addrs()[0], targetPeer.ID())
+	if err != nil {
+		t.FailNow()
+	}
+
+	for i := 0; i < subnet.DefaultMaxPeers; i++ {
+		p, err := New(DefaultIP, 8080+i)
+		if err != nil {
+			t.FailNow()
+		}
+		_, err = p.Connect(ma.String())
+		if err != nil {
+			t.FailNow()
+		}
+	}
+
+	lastPeer, err := New(DefaultIP, 8080+subnet.DefaultMaxPeers)
+	if err != nil {
+		t.FailNow()
+	}
+
+	stream, err := lastPeer.Connect(ma.String())
+	if err != nil {
+		t.FailNow()
+	}
+
+	msg, err := message.Read(stream)
+	if err != nil ||
+		msg.Type() != message.MessagePush ||
+		msg.(*message.Push).ResourceType != message.ResourcePeerInfo {
+		t.FailNow()
+	}
+
 }
 
 func TestRequest(t *testing.T) {
