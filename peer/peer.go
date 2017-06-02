@@ -118,7 +118,7 @@ func (p *Peer) Receive(s net.Stream) {
 		// Subnet is full, advertise other available peers and then close
 		// the stream
 		log.WithError(err).Debug("Peer subnet full. Advertising peers...")
-		msg := &message.Push{
+		msg := message.Push{
 			ResourceType: message.ResourcePeerInfo,
 			Resource:     p.subnet.Multiaddrs(),
 		}
