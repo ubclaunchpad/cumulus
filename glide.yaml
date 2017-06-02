@@ -11,3 +11,5 @@ import:
   - p2p/host/basic
 - package: github.com/multiformats/go-multiaddr
 - package: github.com/Sirupsen/logrus
+- package: github.com/spf13/cobra
+- package: github.com/spf13/pflag

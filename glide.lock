@@ -1,5 +1,5 @@
-hash: 474d608bbb499683dec7db95f6a10f5df61bd5d447651e04567c0d10b816cfe3
-updated: 2017-05-13T15:17:47.793598435-07:00
+hash: 3388c035b24262851de0c2c30f885e6605676f598fe4dacb3ee75d25d77d9c96
+updated: 2017-06-01T21:18:40.56743026-07:00
 imports:
 - name: github.com/agl/ed25519
   version: 5312a61534124124185d41f09206b9fef1d88403
@@ -139,6 +139,8 @@ imports:
   version: acfabf31db8f45a9174f54a0d48ea4d15627af4d
 - name: github.com/spaolacci/murmur3
   version: 0d12bf811670bf6a1a63828dfbd003eded177fce
+- name: github.com/spf13/cobra
+  version: 8d4ce3549a0bf0e3569df3aae7423b7743cd05a9
 - name: github.com/whyrusleeping/go-logging
   version: 0a5b4a6decf577ce8293eca85ec733d7ab92d742
 - name: github.com/whyrusleeping/go-metrics
