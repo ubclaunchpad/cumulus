@@ -1,5 +1,5 @@
-hash: 3388c035b24262851de0c2c30f885e6605676f598fe4dacb3ee75d25d77d9c96
-updated: 2017-06-01T21:18:40.56743026-07:00
+hash: 416d5c866bf090f534cd568c92cf41d6cedb8ac5245a33e4074000ce61e72f3b
+updated: 2017-06-03T10:30:04.32905091-07:00
 imports:
 - name: github.com/agl/ed25519
   version: 5312a61534124124185d41f09206b9fef1d88403
@@ -20,6 +20,8 @@ imports:
   - spdy
 - name: github.com/fd/go-nat
   version: dcaf50131e4810440bed2cbb6f7f32c4f4cc95dd
+- name: github.com/fsnotify/fsnotify
+  version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/gogo/protobuf
   version: 30433562cfbf487fe1df7cd26c7bab168d2f14d0
   subpackages:
@@ -29,6 +31,17 @@ imports:
   version: 80a92cca79a8041496ccc9dd773fcb52a57ec6f9
 - name: github.com/gxed/GoEndian
   version: 0f5c6873267e5abf306ffcdfcfa4bf77517ef4a7
+- name: github.com/hashicorp/hcl
+  version: 392dba7d905ed5d04a5794ba89f558b27e2ba1ca
+  subpackages:
+  - hcl/ast
+  - hcl/parser
+  - hcl/token
+  - json/parser
+  - hcl/scanner
+  - hcl/strconv
+  - json/scanner
+  - json/token
 - name: github.com/hashicorp/yamux
   version: d1caa6c97c9fc1cc9e83bbe34d0603f9ff0ce8bd
 - name: github.com/huin/goupnp
@@ -40,6 +53,8 @@ imports:
   - scpd
   - soap
   - ssdp
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/ipfs/go-ipfs-util
   version: f25fcc891281327394bb48000ef0970d11baff2b
 - name: github.com/ipfs/go-log
@@ -125,6 +140,10 @@ imports:
   version: 0b4003a6faf41b1dfeb766799eed376301e168e7
 - name: github.com/libp2p/go-tcp-transport
   version: 9be1dfb53993f98f70abd55dba6175d83961d330
+- name: github.com/magiconair/properties
+  version: 51463bfca2576e06c62a8504b5c0f06d61312647
+- name: github.com/mitchellh/mapstructure
+  version: d0303fe809921458f417bcf828397a65db30a7e4
 - name: github.com/multiformats/go-multiaddr
   version: 33741da7b3f5773a599d4a03c333704fc560ef34
 - name: github.com/multiformats/go-multiaddr-net
@@ -133,14 +152,30 @@ imports:
   version: 7aa9f26a231c6f34f4e9fad52bf580fd36627285
 - name: github.com/multiformats/go-multistream
   version: b8f1996688ab586031517919b49b1967fca8d5d9
+- name: github.com/pelletier/go-buffruneio
+  version: c37440a7cf42ac63b919c752ca73a85067e05992
+- name: github.com/pelletier/go-toml
+  version: fe7536c3dee2596cdd23ee9976a17c22bdaae286
 - name: github.com/satori/go.uuid
   version: 5bf94b69c6b68ee1b541973bb8e1144db23a194b
 - name: github.com/Sirupsen/logrus
   version: acfabf31db8f45a9174f54a0d48ea4d15627af4d
 - name: github.com/spaolacci/murmur3
   version: 0d12bf811670bf6a1a63828dfbd003eded177fce
+- name: github.com/spf13/afero
+  version: 9be650865eab0c12963d8753212f4f9c66cdcf12
+  subpackages:
+  - mem
+- name: github.com/spf13/cast
+  version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
   version: 8d4ce3549a0bf0e3569df3aae7423b7743cd05a9
+- name: github.com/spf13/jwalterweatherman
+  version: 0efa5202c04663c757d84f90f5219c1250baf94f
+- name: github.com/spf13/pflag
+  version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+- name: github.com/spf13/viper
+  version: 0967fc9aceab2ce9da34061253ac10fb99bba5b2
 - name: github.com/whyrusleeping/go-logging
   version: 0a5b4a6decf577ce8293eca85ec733d7ab92d742
 - name: github.com/whyrusleeping/go-metrics
@@ -183,10 +218,11 @@ imports:
 - name: golang.org/x/text
   version: 19e51611da83d6be54ddafce4a4af510cb3e9ea4
   subpackages:
+  - transform
+  - unicode/norm
   - encoding
   - encoding/charmap
   - encoding/htmlindex
-  - transform
   - encoding/internal/identifier
   - encoding/internal
   - encoding/japanese
@@ -198,6 +234,8 @@ imports:
   - internal/utf8internal
   - runes
   - internal/tag
+- name: gopkg.in/yaml.v2
+  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
 - name: leb.io/hashland
   version: e13accbe55f7fa03c73c74ace4cca4c425e47260
   subpackages:
