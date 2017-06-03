@@ -36,7 +36,7 @@ const (
 // Peer is a cumulus Peer composed of a host
 type Peer struct {
 	host.Host
-	subnet subnet.Subnet
+	Subnet subnet.Subnet
 }
 
 // New creates a Cumulus host with the given IP addr and TCP port.
@@ -81,7 +81,7 @@ func New(ip string, port int) (*Peer, error) {
 	host := bhost.New(network)
 	peer := &Peer{
 		Host:   host,
-		subnet: sn,
+		Subnet: sn,
 	}
 
 	// Build host multiaddress
@@ -113,29 +113,30 @@ func (p *Peer) Receive(s net.Stream) {
 	peerstream := *stream.New(s)
 
 	// Add the remote peer to this peer's subnet
-	err = p.subnet.AddPeer(ma.String(), peerstream)
+	err = p.Subnet.AddPeer(ma.String(), peerstream)
 	if err != nil {
 		// Subnet is full, advertise other available peers and then close
 		// the stream
-		log.WithError(err).Debug("Peer subnet full. Advertising peers...")
-		msg := &message.Push{
+		log.WithError(err).Info("Peer subnet full. Advertising peers...")
+		msg := message.Push{
 			ResourceType: message.ResourcePeerInfo,
-			Resource:     p.subnet.Multiaddrs(),
+			Resource:     p.Subnet.Multiaddrs(),
 		}
 		msgErr := msg.Write(s)
 		if msgErr != nil {
 			log.WithError(err).Error("Failed to send ResourcePeerInfo")
 		}
+
 		s.Close()
 		return
 	}
-	go p.Listen(ma.String(), peerstream)
+	go p.listen(ma.String(), peerstream)
 }
 
 // Connect adds the given multiaddress to p's Peerstore and opens a stream
 // with the peer at that multiaddress if the multiaddress is valid, otherwise
-// returns error. On success the stream and corresponding multiaddress are
-// added to this peer's subnet.
+// returns error. This also spawns a listener that will receive and handle
+// messages received over the stream with the peer we connected to.
 func (p *Peer) Connect(sma string) (*stream.Stream, error) {
 	pid, targetAddr, err := extractPeerInfo(sma)
 	if err != nil {
@@ -158,21 +159,21 @@ func (p *Peer) Connect(sma string) (*stream.Stream, error) {
 
 	// Make a stream.Stream out of a net.Stream (sorry)
 	peerstream := *stream.New(s)
-	err = p.subnet.AddPeer(sma, peerstream)
+	err = p.Subnet.AddPeer(sma, peerstream)
 	if err != nil {
 		s.Close()
 		return nil, err
 	}
 
-	go p.Listen(sma, peerstream)
+	go p.listen(sma, peerstream)
 	return &peerstream, nil
 }
 
 // Broadcast sends message to all peers this peer is currently connected to
 func (p *Peer) Broadcast(m message.Message) error {
 	var err error
-	for _, ma := range p.subnet.Multiaddrs() {
-		err = m.Write(p.subnet.Stream(ma))
+	for _, ma := range p.Subnet.Multiaddrs() {
+		err = m.Write(p.Subnet.Stream(ma))
 		if err != nil {
 			log.WithError(err).Error("Failed to send broadcast message to peer")
 		}
@@ -182,7 +183,7 @@ func (p *Peer) Broadcast(m message.Message) error {
 
 // Request sends a request to a remote peer over the given stream.
 // Returns response if a response was received, otherwise returns error.
-// You should typically run this function in a goroutine
+// You should typically run this function as a goroutine
 func (p *Peer) Request(req message.Request, s stream.Stream) (*message.Response, error) {
 	// Set up a listen channel to listen for the response (remove when done)
 	lchan := s.NewListener(req.ID)
@@ -203,13 +204,13 @@ func (p *Peer) Request(req message.Request, s stream.Stream) (*message.Response,
 	}
 }
 
-// Respond responds to a request from another peer
-func (p *Peer) Respond(req *message.Request, s stream.Stream) {
+// respond responds to a request from another peer
+func (p *Peer) respond(req *message.Request, s stream.Stream) {
 	response := message.Response{ID: req.ID}
 
 	switch req.ResourceType {
 	case message.ResourcePeerInfo:
-		response.Resource = p.subnet.Multiaddrs()
+		response.Resource = p.Subnet.Multiaddrs()
 		break
 	case message.ResourceBlock:
 	case message.ResourceTransaction:
@@ -227,6 +228,24 @@ func (p *Peer) Respond(req *message.Request, s stream.Stream) {
 	} else {
 		msgJSON, _ := json.Marshal(response)
 		log.Infof("Sending response: \n%s", string(msgJSON))
+	}
+}
+
+// handlePushMessage responds appropriately to the given push message received
+// by this peer.
+func (p *Peer) handlePushMessage(msg *message.Push) {
+	switch msg.ResourceType {
+	case message.ResourcePeerInfo:
+		mAddrs := msg.Resource.([]string)
+		for i := 0; i < len(mAddrs) && !p.Subnet.Full(); i++ {
+			p.Connect(mAddrs[i])
+		}
+		break
+	case message.ResourceBlock:
+	case message.ResourceTransaction:
+		log.Warn("Push message handling cannot yet handle Blocka or Transaction resources")
+	default:
+		// Invalid resource type.
 	}
 }
 
@@ -251,7 +270,7 @@ func (p *Peer) handleMessage(m message.Message, s stream.Stream) {
 	switch m.Type() {
 	case message.MessageRequest:
 		// Respond to the request by sending request resource
-		p.Respond(m.(*message.Request), s)
+		p.respond(m.(*message.Request), s)
 		break
 	case message.MessageResponse:
 		// Pass the response to the goroutine that requested it
@@ -264,20 +283,20 @@ func (p *Peer) handleMessage(m message.Message, s stream.Stream) {
 		break
 	case message.MessagePush:
 		// Handle data from push message
-		log.Error("Message push handling not yet implemented")
+		p.handlePushMessage(m.(*message.Push))
 		break
 	default:
 		// Invalid message type, ignore
-		log.Errorln("Received message with invalid type")
+		log.Debug("Received message with invalid type")
 	}
 }
 
 // Listen listens for messages over the stream and responds to them, closing
 // the given stream and removing the remote peer from this peer's subnet when
 // done. This should be run as a goroutine.
-func (p *Peer) Listen(sma string, s stream.Stream) {
+func (p *Peer) listen(sma string, s stream.Stream) {
 	defer s.Close()
-	defer p.subnet.RemovePeer(sma)
+	defer p.Subnet.RemovePeer(sma)
 	for {
 		err := s.SetDeadline(time.Now().Add(Timeout))
 		if err != nil {
@@ -286,7 +305,7 @@ func (p *Peer) Listen(sma string, s stream.Stream) {
 		}
 		msg, err := message.Read(s)
 		if err != nil {
-			log.WithError(err).Error("Error reading from the stream")
+			log.WithError(err).Error("Error reading from stream")
 			return
 		}
 		log.Debug("Listener received message")

@@ -17,7 +17,7 @@ func main() {
 	// when joining the Cumulus Network.
 	// port is the port to communicate over (defaults to peer.DefaultPort).
 	// ip is the public IP address of the this host.
-	targetPeer := flag.String("t", "", "target peer to connect to")
+	targetPeer := flag.String("t", "", "Target peer to connect to")
 	port := flag.Int("p", peer.DefaultPort, "TCP port to use for this host")
 	ip := flag.String("i", peer.DefaultIP, "IP address to use for this host")
 	debug := flag.Bool("d", false, "Enable debug logging")
@@ -57,5 +57,6 @@ func main() {
 		log.WithError(err).Error("Error writing message to stream")
 		return
 	}
+
 	host.Close()
 }

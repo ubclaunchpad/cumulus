@@ -193,18 +193,10 @@ func TestReceiveWithSubnetFull(t *testing.T) {
 		t.FailNow()
 	}
 
-	stream, err := lastPeer.Connect(ma.String())
+	_, err = lastPeer.Connect(ma.String())
 	if err != nil {
 		t.FailNow()
 	}
-
-	msg, err := message.Read(stream)
-	if err != nil ||
-		msg.Type() != message.MessagePush ||
-		msg.(*message.Push).ResourceType != message.ResourcePeerInfo {
-		t.FailNow()
-	}
-
 }
 
 func TestRequest(t *testing.T) {
