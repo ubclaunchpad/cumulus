@@ -92,7 +92,7 @@ func (t *Transaction) Marshal() []byte {
 
 // InputsEqualOutputs returns true if t.Inputs == other.Outputs, as well
 // as the difference between the two (outputs - inputs).
-func (t *Transaction) InputsEqualOutputs(other ...*Transaction) (bool, int) {
+func (t *Transaction) InputsEqualOutputs(other ...*Transaction) bool {
 	var inAmount uint64
 	for _, otherTransaction := range other {
 		for _, output := range otherTransaction.Outputs {
@@ -105,7 +105,5 @@ func (t *Transaction) InputsEqualOutputs(other ...*Transaction) (bool, int) {
 		outAmount += output.Amount
 	}
 
-	diff := int(outAmount) - int(inAmount)
-
-	return diff != 0, diff
+	return (int(outAmount) - int(inAmount)) != 0
 }

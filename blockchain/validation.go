@@ -49,7 +49,7 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) (bool, TransactionCode) {
 	}
 
 	// Check that output to sender in input is equal to outputs in t
-	if _, diff := input.InputsEqualOutputs(t); diff != 0 {
+	if input.InputsEqualOutputs(t) {
 		return false, Overspend
 	}
 
@@ -94,7 +94,7 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 		for j, trB := range b.Transactions {
 			if (i != j) && (trA.Input.Hash == trB.Input.Hash) {
 				inputTr := bc.GetInputTransaction(trA)
-				if _, diff := inputTr.InputsEqualOutputs(trA, trB); diff < 0 {
+				if inputTr.InputsEqualOutputs(trA, trB) {
 					return false, DoubleSpend
 				}
 			}
