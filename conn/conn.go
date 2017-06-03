@@ -2,7 +2,8 @@ package conn
 
 import "net"
 
-// Dial opens a connection to a remote host
+// Dial opens a connection to a remote host. `host` should be a string
+// in the format <IP>|<hostname>:<port>
 func Dial(host string) (net.Conn, error) {
 	return net.Dial("tcp", host)
 }
