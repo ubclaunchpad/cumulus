@@ -1,7 +1,7 @@
 package blockchain
 
 import (
-	crand "crypto/rand"
+	"crypto/rand"
 	"fmt"
 	"testing"
 )
@@ -42,7 +42,7 @@ func TestValidTransactionSignatureFail(t *testing.T) {
 	tr := bc.Blocks[1].Transactions[0]
 
 	fakeSender := newWallet()
-	tr, _ = tr.TxBody.Sign(fakeSender, crand.Reader)
+	tr, _ = tr.TxBody.Sign(fakeSender, rand.Reader)
 	bc.Blocks[1].Transactions[0] = tr
 
 	valid, code := bc.ValidTransaction(tr)
