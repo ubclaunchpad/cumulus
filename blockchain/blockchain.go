@@ -61,3 +61,14 @@ func (bc *BlockChain) GetInputTransaction(t *Transaction) *Transaction {
 	}
 	return b.Transactions[t.Input.Index]
 }
+
+// ContainsTransaction returns true if the BlockChain contains the transaction
+// in a block between start and stop as indexes.
+func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (bool, uint32, uint32) {
+	for i := start; i < stop; i++ {
+		if exists, j := bc.Blocks[i].ContainsTransaction(t); exists {
+			return true, i, j
+		}
+	}
+	return false, 0, 0
+}

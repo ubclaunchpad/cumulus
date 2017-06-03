@@ -60,11 +60,10 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) (bool, TransactionCode) {
 	}
 
 	// Test if identical transaction already exists in chain.
-	endChain := uint32(len(bc.Blocks))
-	for i := t.Input.BlockNumber; i < endChain; i++ {
-		if exists, _ := bc.Blocks[i].ContainsTransaction(t); exists {
-			return false, Respend
-		}
+	end := uint32(len(bc.Blocks))
+	start := t.Input.BlockNumber
+	if exists, _, _ := bc.ContainsTransaction(t, start, end); exists {
+		return false, Respend
 	}
 
 	return true, ValidTransaction
