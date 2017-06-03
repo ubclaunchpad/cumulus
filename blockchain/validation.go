@@ -11,31 +11,31 @@ type BlockCode uint32
 
 const (
 	// ValidTransaction is returned when transaction is valid.
-	ValidTransaction TransactionCode = 0
+	ValidTransaction TransactionCode = iota
 	// NoInputTransaction is returned when transaction has no valid input transaction.
-	NoInputTransaction TransactionCode = 1
+	NoInputTransaction TransactionCode = iota
 	// Overspend is returned when transaction outputs exceed transaction inputs.
-	Overspend TransactionCode = 2
+	Overspend TransactionCode = iota
 	// BadSig is returned when the signature verification fails.
-	BadSig TransactionCode = 3
+	BadSig TransactionCode = iota
 	// Respend is returned when inputs have been spent elsewhere in the chain.
-	Respend TransactionCode = 4
+	Respend TransactionCode = iota
 )
 
 const (
 	// ValidBlock is returned when the block is valid.
-	ValidBlock BlockCode = 0
+	ValidBlock BlockCode = iota
 	// BadTransaction is returned when the block contains an invalid
 	// transaction.
-	BadTransaction BlockCode = 1
+	BadTransaction BlockCode = iota
 	// BadBlockNumber is returned when block number is not one greater than
 	// previous block.
-	BadBlockNumber BlockCode = 2
+	BadBlockNumber BlockCode = iota
 	// BadHash is returned when the block contains incorrect hash.
-	BadHash BlockCode = 3
+	BadHash BlockCode = iota
 	// DoubleSpend is returned when two transactions in the block share inputs,
 	// but outputs > inputs.
-	DoubleSpend BlockCode = 4
+	DoubleSpend BlockCode = iota
 )
 
 // ValidTransaction tests whether a transaction valid.
