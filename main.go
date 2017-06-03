@@ -2,9 +2,10 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/message"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
@@ -16,7 +17,7 @@ func main() {
 	// when joining the Cumulus Network.
 	// port is the port to communicate over (defaults to peer.DefaultPort).
 	// ip is the public IP address of the this host.
-	targetPeer := flag.String("t", "", "target peer to connect to")
+	targetPeer := flag.String("t", "", "Target peer to connect to")
 	port := flag.Int("p", peer.DefaultPort, "TCP port to use for this host")
 	ip := flag.String("i", peer.DefaultIP, "IP address to use for this host")
 	debug := flag.Bool("d", false, "Enable debug logging")
@@ -46,19 +47,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Send a message to the peer
-	_, err = stream.Write([]byte("Hello, world!"))
-	if err != nil {
-		log.Fatal(err)
+	// Request peer info
+	request := message.Request{
+		ID:           uuid.New().String(),
+		ResourceType: message.ResourcePeerInfo,
 	}
-
-	// Read the reply from the peer
-	reply, err := ioutil.ReadAll(stream)
+	_, err = host.Request(request, *stream)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Error("Error writing message to stream")
+		return
 	}
-
-	log.Debugf("Peer %s read reply: %s", host.ID(), string(reply))
 
 	host.Close()
 }
