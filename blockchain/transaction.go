@@ -105,5 +105,5 @@ func (t *Transaction) InputsEqualOutputs(other ...*Transaction) bool {
 		outAmount += output.Amount
 	}
 
-	return (int(outAmount) - int(inAmount)) != 0
+	return (int(outAmount) - int(inAmount)) == 0
 }
