@@ -60,6 +60,18 @@ type Peer struct {
 	lock       sync.RWMutex
 }
 
+// New returns a new Peer
+func New(c net.Conn, ps *Peerstore) *Peer {
+	return &Peer{
+		ID:         uuid.New(),
+		Connection: c,
+		Peerstore:  ps,
+		resChans:   make(map[string]chan *message.Response),
+		reqChan:    make(chan *message.Request),
+		pushChan:   make(chan *message.Push),
+	}
+}
+
 // Dispatch listens on this peer's Connection and passes received messages
 // to the appropriate message handlers.
 func (p *Peer) Dispatch() {

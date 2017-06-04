@@ -49,12 +49,8 @@ func newTxBody() TxBody {
 func newTransaction() *Transaction {
 	sender := newWallet()
 	tbody := newTxBody()
-	digest := HashSum(tbody)
-	sig, _ := sender.Sign(digest, crand.Reader)
-	return &Transaction{
-		TxBody: tbody,
-		Sig:    sig,
-	}
+	t, _ := tbody.Sign(sender, crand.Reader)
+	return t
 }
 
 func newBlockHeader() BlockHeader {
@@ -87,4 +83,98 @@ func newBlockChain() *BlockChain {
 	}
 	bc.Head = HashSum(bc.Blocks[nBlocks-1])
 	return &bc
+}
+
+func newInputBlock(t []*Transaction) *Block {
+	return &Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: 0,
+			LastBlock:   newHash(),
+			Miner:       newWallet().Public(),
+		},
+		Transactions: t,
+	}
+}
+
+func newOutputBlock(t []*Transaction, input *Block) *Block {
+	return &Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: input.BlockNumber + 1,
+			LastBlock:   HashSum(input),
+			Miner:       newWallet().Public(),
+		},
+		Transactions: t,
+	}
+}
+
+func newTransactionValue(s, r Wallet, a uint64) (*Transaction, error) {
+	tbody := TxBody{
+		Sender: s.Public(),
+		Input: TxHashPointer{
+			BlockNumber: 0,
+			Hash:        newHash(),
+		},
+		Outputs: make([]TxOutput, 1),
+	}
+	tbody.Outputs[0] = TxOutput{
+		Amount:    a,
+		Recipient: r.Public(),
+	}
+	return tbody.Sign(s, crand.Reader)
+}
+
+// newValidBlockChainFixture creates a valid blockchain of two blocks.
+func newValidBlockChainFixture() (*BlockChain, Wallet) {
+	original := newWallet()
+	sender := newWallet()
+	recipient := newWallet()
+
+	trA, _ := newTransactionValue(original, sender, 2)
+	trA.Outputs = append(trA.Outputs, TxOutput{
+		Amount:    2,
+		Recipient: sender.Public(),
+	})
+
+	trB, _ := newTransactionValue(sender, recipient, 4)
+	trB.Input.Hash = HashSum(trA)
+
+	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
+
+	inputTransactions := []*Transaction{trA}
+	outputTransactions := []*Transaction{trB}
+
+	inputBlock := newInputBlock(inputTransactions)
+	outputBlock := newOutputBlock(outputTransactions, inputBlock)
+
+	return &BlockChain{
+		Blocks: []*Block{inputBlock, outputBlock},
+		Head:   newHash(),
+	}, recipient
+}
+
+// newValidChainAndBlock creates a valid BlockChain and a Block that is valid
+// with respect to the BlockChain.
+func newValidChainAndBlock() (*BlockChain, *Block) {
+	bc, s := newValidBlockChainFixture()
+	inputBlock := bc.Blocks[1]
+	inputTransaction := inputBlock.Transactions[0]
+	a := inputTransaction.Outputs[0].Amount
+
+	// Create a legit block that does *not* appear in bc.
+	tbody := TxBody{
+		Sender: s.Public(),
+		Input: TxHashPointer{
+			BlockNumber: 1,
+			Hash:        HashSum(inputTransaction),
+		},
+		Outputs: make([]TxOutput, 1),
+	}
+	tbody.Outputs[0] = TxOutput{
+		Amount:    a,
+		Recipient: newWallet().Public(),
+	}
+
+	tr, _ := tbody.Sign(s, crand.Reader)
+	newBlock := newOutputBlock([]*Transaction{tr}, inputBlock)
+	return bc, newBlock
 }

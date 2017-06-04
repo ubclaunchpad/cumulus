@@ -1,9 +1,7 @@
 package main
 
-import (
-	log "github.com/Sirupsen/logrus"
-)
+import "github.com/ubclaunchpad/cumulus/cmd"
 
 func main() {
-	log.Info("Starting Cumulus Peer")
+	cmd.Execute()
 }
