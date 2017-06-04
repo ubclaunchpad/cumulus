@@ -16,6 +16,7 @@ const (
 type TxHashPointer struct {
 	BlockNumber uint32
 	Hash        Hash
+	Index       uint32
 }
 
 // Marshal converts a TxHashPointer to a byte slice
@@ -87,4 +88,22 @@ func (t *Transaction) Marshal() []byte {
 	buf = append(buf, t.TxBody.Marshal()...)
 	buf = append(buf, t.Sig.Marshal()...)
 	return buf
+}
+
+// InputsEqualOutputs returns true if t.Inputs == other.Outputs, as well
+// as the difference between the two (outputs - inputs).
+func (t *Transaction) InputsEqualOutputs(other ...*Transaction) bool {
+	var inAmount uint64
+	for _, otherTransaction := range other {
+		for _, output := range otherTransaction.Outputs {
+			inAmount += output.Amount
+		}
+	}
+
+	var outAmount uint64
+	for _, output := range t.Outputs {
+		outAmount += output.Amount
+	}
+
+	return (int(outAmount) - int(inAmount)) != 0
 }

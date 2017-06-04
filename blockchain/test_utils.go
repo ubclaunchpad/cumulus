@@ -22,6 +22,7 @@ func newTxHashPointer() TxHashPointer {
 	return TxHashPointer{
 		BlockNumber: mrand.Uint32(),
 		Hash:        newHash(),
+		Index:       mrand.Uint32(),
 	}
 }
 
@@ -107,12 +108,13 @@ func newOutputBlock(t []*Transaction, input *Block) *Block {
 	}
 }
 
-func newTransactionValue(s, r Wallet, a uint64) (*Transaction, error) {
+func newTransactionValue(s, r Wallet, a uint64, i uint32) (*Transaction, error) {
 	tbody := TxBody{
 		Sender: s.Public(),
 		Input: TxHashPointer{
 			BlockNumber: 0,
 			Hash:        newHash(),
+			Index:       i,
 		},
 		Outputs: make([]TxOutput, 1),
 	}
@@ -129,13 +131,13 @@ func newValidBlockChainFixture() (*BlockChain, Wallet) {
 	sender := newWallet()
 	recipient := newWallet()
 
-	trA, _ := newTransactionValue(original, sender, 2)
+	trA, _ := newTransactionValue(original, sender, 2, 1)
 	trA.Outputs = append(trA.Outputs, TxOutput{
 		Amount:    2,
 		Recipient: sender.Public(),
 	})
 
-	trB, _ := newTransactionValue(sender, recipient, 4)
+	trB, _ := newTransactionValue(sender, recipient, 4, 0)
 	trB.Input.Hash = HashSum(trA)
 
 	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
@@ -166,6 +168,7 @@ func newValidChainAndBlock() (*BlockChain, *Block) {
 		Input: TxHashPointer{
 			BlockNumber: 1,
 			Hash:        HashSum(inputTransaction),
+			Index:       0,
 		},
 		Outputs: make([]TxOutput, 1),
 	}
