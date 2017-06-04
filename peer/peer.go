@@ -1,347 +1,204 @@
 package peer
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
+	"net"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/libp2p/go-libp2p-crypto"
-	"github.com/libp2p/go-libp2p-host"
-	net "github.com/libp2p/go-libp2p-net"
-	lpeer "github.com/libp2p/go-libp2p-peer"
-	"github.com/libp2p/go-libp2p-peerstore"
-	"github.com/libp2p/go-libp2p-swarm"
-	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	multiaddr "github.com/multiformats/go-multiaddr"
+	"github.com/google/uuid"
 	"github.com/ubclaunchpad/cumulus/message"
-	"github.com/ubclaunchpad/cumulus/stream"
-	"github.com/ubclaunchpad/cumulus/subnet"
 )
 
 const (
 	// DefaultPort is the TCP port hosts will communicate over if none is
 	// provided
-	DefaultPort = 8765
-	// CumulusProtocol is the name of the protocol peers communicate over
-	CumulusProtocol = "/cumulus/0.0.1"
+	DefaultPort = 8000
 	// DefaultIP is the IP address new hosts will use if none if provided
 	DefaultIP = "127.0.0.1"
 	// Timeout is the time after which reads from a stream will timeout
 	Timeout = time.Second * 30
 )
 
-// Peer is a cumulus Peer composed of a host
+// Peerstore is a thread-safe container for all the peers we are currently
+// connected to.
+type Peerstore struct {
+	Peers map[string]*Peer
+	lock  sync.RWMutex
+}
+
+// AddPeer synchronously adds the given peer to the peerstore
+func (ps *Peerstore) AddPeer(p *Peer) {
+	ps.lock.Lock()
+	ps.Peers[p.ID.String()] = p
+	ps.lock.Unlock()
+}
+
+// RemovePeer synchronously removes the given peer from the peerstore
+func (ps *Peerstore) RemovePeer(p *Peer) {
+	ps.lock.Lock()
+	delete(ps.Peers, p.ID.String())
+	ps.lock.Unlock()
+}
+
+// Peer synchronously retreives the peer with the given id from the peerstore
+func (ps *Peerstore) Peer(id string) *Peer {
+	ps.lock.RLock()
+	p := ps.Peers[id]
+	ps.lock.RUnlock()
+	return p
+}
+
+// Peer represents a remote peer we are connected to
 type Peer struct {
-	host.Host
-	Subnet subnet.Subnet
+	ID         uuid.UUID
+	Connection net.Conn
+	Peerstore  *Peerstore
+	resChans   map[string]chan *message.Response
+	reqChan    chan *message.Request
+	pushChan   chan *message.Push
+	lock       sync.RWMutex
 }
 
-// New creates a Cumulus host with the given IP addr and TCP port.
-// This may throw an error if we fail to create a key pair, a pid, or a new
-// multiaddress.
-func New(ip string, port int) (*Peer, error) {
-	// Generate a key pair for this host. We will only use the pudlic key to
-	// obtain a valid host ID.
-	// Cannot throw error with given arguments
-	priv, pub, _ := crypto.GenerateKeyPair(crypto.RSA, 2048)
+// Dispatch listens on this peer's Connection and passes received messages
+// to the appropriate message handlers.
+func (p *Peer) Dispatch() {
+	p.Connection.SetDeadline(time.Now().Add(Timeout))
 
-	// Obtain Peer ID from public key.
-	// Cannot throw error with given argument
-	pid, _ := lpeer.IDFromPublicKey(pub)
-
-	// Create a multiaddress (IP address and TCP port for this peer).
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
-	if err != nil {
-		return nil, err
-	}
-
-	// Create Peerstore and add host's keys to it (avoids annoying err)
-	ps := peerstore.NewPeerstore()
-	ps.AddPubKey(pid, pub)
-	ps.AddPrivKey(pid, priv)
-
-	// Create swarm (this is the interface to the libP2P Network) using the
-	// multiaddress, peerID, and peerStore we just created.
-	network, err := swarm.NewNetwork(
-		context.Background(),
-		[]multiaddr.Multiaddr{addr},
-		pid,
-		ps,
-		nil)
-	if err != nil {
-		return nil, err
-	}
-
-	sn := *subnet.New(subnet.DefaultMaxPeers)
-
-	// Actually create the host and peer with the network we just set up.
-	host := bhost.New(network)
-	peer := &Peer{
-		Host:   host,
-		Subnet: sn,
-	}
-
-	// Build host multiaddress
-	hostAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ipfs/%s",
-		host.ID().Pretty()))
-
-	// Now we can build a full multiaddress to reach this host
-	// by encapsulating both addresses:
-	fullAddr := addr.Encapsulate(hostAddr)
-	log.Info("I am ", fullAddr)
-
-	// Add this host's address to its peerstore (avoid's net/identi error)
-	ps.AddAddr(pid, fullAddr, peerstore.PermanentAddrTTL)
-	return peer, nil
-}
-
-// Receive is the function that gets called when a remote peer
-// opens a new stream with this peer.
-// This should be passed as the second argument to SetStreamHandler() after this
-// peer is initialized.
-func (p *Peer) Receive(s net.Stream) {
-	// Get remote peer's full multiaddress
-	ma, err := NewMultiaddr(s.Conn().RemoteMultiaddr(), s.Conn().RemotePeer())
-	if err != nil {
-		log.WithError(err).Error("Failed to obtain valid remote peer multiaddress")
-		return
-	}
-
-	peerstream := *stream.New(s)
-
-	// Add the remote peer to this peer's subnet
-	err = p.Subnet.AddPeer(ma.String(), peerstream)
-	if err != nil {
-		// Subnet is full, advertise other available peers and then close
-		// the stream
-		log.WithError(err).Info("Peer subnet full. Advertising peers...")
-		msg := message.Push{
-			ResourceType: message.ResourcePeerInfo,
-			Resource:     p.Subnet.Multiaddrs(),
-		}
-		msgErr := msg.Write(s)
-		if msgErr != nil {
-			log.WithError(err).Error("Failed to send ResourcePeerInfo")
-		}
-
-		s.Close()
-		return
-	}
-	go p.listen(ma.String(), peerstream)
-}
-
-// Connect adds the given multiaddress to p's Peerstore and opens a stream
-// with the peer at that multiaddress if the multiaddress is valid, otherwise
-// returns error. This also spawns a listener that will receive and handle
-// messages received over the stream with the peer we connected to.
-func (p *Peer) Connect(sma string) (*stream.Stream, error) {
-	pid, targetAddr, err := extractPeerInfo(sma)
-	if err != nil {
-		return nil, err
-	}
-
-	// Store the peer's address in this host's PeerStore
-	p.Peerstore().AddAddr(pid, targetAddr, peerstore.PermanentAddrTTL)
-
-	// Open a stream with the peer
-	s, err := p.NewStream(context.Background(), pid, CumulusProtocol)
-	if err != nil {
-		return nil, err
-	}
-	err = s.SetDeadline(time.Now().Add(Timeout))
-	if err != nil {
-		log.WithError(err).Error("Failed to set read deadline on stream")
-		return nil, err
-	}
-
-	// Make a stream.Stream out of a net.Stream (sorry)
-	peerstream := *stream.New(s)
-	err = p.Subnet.AddPeer(sma, peerstream)
-	if err != nil {
-		s.Close()
-		return nil, err
-	}
-
-	go p.listen(sma, peerstream)
-	return &peerstream, nil
-}
-
-// Broadcast sends message to all peers this peer is currently connected to
-func (p *Peer) Broadcast(m message.Message) error {
-	var err error
-	for _, ma := range p.Subnet.Multiaddrs() {
-		err = m.Write(p.Subnet.Stream(ma))
-		if err != nil {
-			log.WithError(err).Error("Failed to send broadcast message to peer")
-		}
-	}
-	return err
-}
-
-// Request sends a request to a remote peer over the given stream.
-// Returns response if a response was received, otherwise returns error.
-// You should typically run this function as a goroutine
-func (p *Peer) Request(req message.Request, s stream.Stream) (*message.Response, error) {
-	// Set up a listen channel to listen for the response (remove when done)
-	lchan := s.NewListener(req.ID)
-	defer s.RemoveListener(req.ID)
-
-	// Send request
-	err := req.Write(s)
-	if err != nil {
-		return nil, err
-	}
-
-	// Receive response or timeout
-	select {
-	case res := <-lchan:
-		return res, nil
-	case <-time.After(Timeout):
-		return nil, errors.New("Timed out waiting for response")
-	}
-}
-
-// respond responds to a request from another peer
-func (p *Peer) respond(req *message.Request, s stream.Stream) {
-	response := message.Response{ID: req.ID}
-
-	switch req.ResourceType {
-	case message.ResourcePeerInfo:
-		response.Resource = p.Subnet.Multiaddrs()
-		break
-	case message.ResourceBlock:
-	case message.ResourceTransaction:
-		response.Error = message.NewProtocolError(message.NotImplemented,
-			"Functionality not implemented on this peer")
-		break
-	default:
-		response.Error = message.NewProtocolError(message.InvalidResourceType,
-			"Invalid resource type")
-	}
-
-	err := response.Write(s)
-	if err != nil {
-		log.WithError(err).Error("Failed to send reponse")
-	} else {
-		msgJSON, _ := json.Marshal(response)
-		log.Infof("Sending response: \n%s", string(msgJSON))
-	}
-}
-
-// handlePushMessage responds appropriately to the given push message received
-// by this peer.
-func (p *Peer) handlePushMessage(msg *message.Push) {
-	switch msg.ResourceType {
-	case message.ResourcePeerInfo:
-		mAddrs := msg.Resource.([]string)
-		for i := 0; i < len(mAddrs) && !p.Subnet.Full(); i++ {
-			p.Connect(mAddrs[i])
-		}
-		break
-	case message.ResourceBlock:
-	case message.ResourceTransaction:
-		log.Warn("Push message handling cannot yet handle Blocka or Transaction resources")
-	default:
-		// Invalid resource type.
-	}
-}
-
-// NewMultiaddr creates a Multiaddress from the given Multiaddress (of the form
-// /ip4/<ip address>/tcp/<TCP port>) and the peer id (a hash) and turn them
-// into one Multiaddress. Will return error if Multiaddress is invalid.
-func NewMultiaddr(iAddr multiaddr.Multiaddr, pid lpeer.ID) (multiaddr.Multiaddr, error) {
-	strAddr := iAddr.String()
-	strID := pid.Pretty()
-	strMA := fmt.Sprintf("%s/ipfs/%s", strAddr, strID)
-	mAddr, err := multiaddr.NewMultiaddr(strMA)
-	return mAddr, err
-}
-
-// HandleMessage responds to a received message
-func (p *Peer) handleMessage(m message.Message, s stream.Stream) {
-	msgJSON, err := json.Marshal(m)
-	if err == nil {
-		log.Infof("Received message: \n%s", string(msgJSON))
-	}
-
-	switch m.Type() {
-	case message.MessageRequest:
-		// Respond to the request by sending request resource
-		p.respond(m.(*message.Request), s)
-		break
-	case message.MessageResponse:
-		// Pass the response to the goroutine that requested it
-		res := m.(*message.Response)
-		lchan := s.Listener(res.ID)
-		if lchan != nil {
-			log.Debug("Found listener channel for response")
-			lchan <- res
-		}
-		break
-	case message.MessagePush:
-		// Handle data from push message
-		p.handlePushMessage(m.(*message.Push))
-		break
-	default:
-		// Invalid message type, ignore
-		log.Debug("Received message with invalid type")
-	}
-}
-
-// Listen listens for messages over the stream and responds to them, closing
-// the given stream and removing the remote peer from this peer's subnet when
-// done. This should be run as a goroutine.
-func (p *Peer) listen(sma string, s stream.Stream) {
-	defer s.Close()
-	defer p.Subnet.RemovePeer(sma)
 	for {
-		err := s.SetDeadline(time.Now().Add(Timeout))
+		msg, err := message.Read(p.Connection)
 		if err != nil {
-			log.WithError(err).Error("Failed to set read deadline on stream")
-			return
+			log.WithError(err).Error("Dispatcher fialed to read message")
+			continue
 		}
-		msg, err := message.Read(s)
-		if err != nil {
-			log.WithError(err).Error("Error reading from stream")
-			return
+
+		switch msg.Type() {
+		case message.MessageRequest:
+			p.reqChan <- msg.(*message.Request)
+			break
+		case message.MessageResponse:
+			id := msg.(*message.Response).ID
+			resChan := p.addResponseChan(id)
+			if resChan != nil {
+				resChan <- msg.(*message.Response)
+			} else {
+				log.Error("Dispatcher could not find channel for response %s",
+					msg.(*message.Response).ID)
+			}
+			p.removeResponseChan(id)
+			break
+		case message.MessagePush:
+			p.pushChan <- msg.(*message.Push)
+			break
+		default:
+			// Invalid messgae type. Ignore
+			log.Debug("Dispatcher received message with invalid type")
 		}
-		log.Debug("Listener received message")
-		go p.handleMessage(msg, s)
 	}
 }
 
-// ExtractPeerInfo extracts the peer ID and multiaddress from the
-// given multiaddress.
-// Returns peer ID (esentially 46 character hash created by the peer)
-// and the peer's multiaddress in the form /ip4/<peer IP>/tcp/<CumulusPort>.
-func extractPeerInfo(sma string) (lpeer.ID, multiaddr.Multiaddr, error) {
-	log.Debug("Extracting peer info from ", sma)
+// HandleRequests waits on this peer's request channel for incoming requests
+// from the Dispatcher, responding to each request appropriately.
+func (p *Peer) HandleRequests() {
+	var req *message.Request
+	for {
+		select {
+		case req = <-p.reqChan:
+			break
+		case <-time.After(Timeout):
+			continue
+		}
 
-	ipfsaddr, err := multiaddr.NewMultiaddr(sma)
-	if err != nil {
-		return "-", nil, err
+		res := message.Response{ID: req.ID}
+
+		switch req.ResourceType {
+		case message.ResourcePeerInfo:
+		case message.ResourceBlock:
+		case message.ResourceTransaction:
+			res.Error = message.NewProtocolError(message.NotImplemented,
+				"PeerInfo, Block, and Transaction requests are not yet implemented on this peer")
+		default:
+			res.Error = message.NewProtocolError(message.InvalidResourceType,
+				"Invalid resource type")
+		}
+
+		err := res.Write(p.Connection)
+		if err != nil {
+			log.WithError(err).Error("RequestHandler failed to send response")
+		}
+	}
+}
+
+// HandlePushes waits on this peer's request channel for incoming requests
+// from the Dispatcher, responding to each request appropriately.
+func (p *Peer) HandlePushes() {
+	var push *message.Push
+	for {
+		select {
+		case push = <-p.pushChan:
+			break
+		case <-time.After(Timeout):
+			continue
+		}
+
+		switch push.ResourceType {
+		case message.ResourcePeerInfo:
+		case message.ResourceBlock:
+		case message.ResourceTransaction:
+		default:
+			// Invalid resource type. Ignore
+		}
+	}
+}
+
+// AwaitResponse waits on a response channel for a response message sent by the
+// Dispatcher. When a response arrives it is handled appropriately.
+func (p *Peer) AwaitResponse(req message.Request, c chan *message.Response) {
+	select {
+	case res := <-c:
+		// TODO: do something with the response
+		log.Debugf("Received response %s", res.ID)
+		break
+	case <-time.After(Timeout):
+		break
 	}
 
-	// Cannot throw error when passed P_IPFS
-	pid, err := ipfsaddr.ValueForProtocol(multiaddr.P_IPFS)
+	p.removeResponseChan(req.ID)
+}
+
+// Request sends the given request over this peer's Connection and spawns a
+// response listener with AwaitResponse. Returns error if request could not be
+// written.
+func (p *Peer) Request(req message.Request) error {
+	resChan := p.addResponseChan(req.ID)
+	err := req.Write(p.Connection)
 	if err != nil {
-		return "-", nil, err
+		p.removeResponseChan(req.ID)
+		return err
 	}
 
-	// Cannot return error if no error was returned in ValueForProtocol
-	peerid, _ := lpeer.IDB58Decode(pid)
+	go p.AwaitResponse(req, resChan)
+	return nil
+}
 
-	// Decapsulate the /ipfs/<peerID> part from the target
-	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
-	targetPeerAddr, err := multiaddr.NewMultiaddr(
-		fmt.Sprintf("/ipfs/%s", lpeer.IDB58Encode(peerid)))
-	if err != nil {
-		return "-", nil, err
-	}
+func (p *Peer) addResponseChan(id string) chan *message.Response {
+	resChan := make(chan *message.Response)
+	p.lock.Lock()
+	p.resChans[id] = resChan
+	p.lock.Unlock()
+	return resChan
+}
 
-	trgtAddr := ipfsaddr.Decapsulate(targetPeerAddr)
-	return peerid, trgtAddr, nil
+func (p *Peer) removeResponseChan(id string) {
+	p.lock.Lock()
+	delete(p.resChans, id)
+	p.lock.Unlock()
+}
+
+func (p *Peer) responseChan(id string) chan *message.Response {
+	var resChan chan *message.Response
+	p.lock.RLock()
+	resChan = p.resChans[id]
+	p.lock.RUnlock()
+	return resChan
 }
