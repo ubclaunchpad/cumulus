@@ -25,7 +25,7 @@ var runCmd = &cobra.Command{
 	},
 }
 
-var ps = &peer.Peerstore{Peers: make(map[string]*peer.Peer)}
+var ps = peer.NewPeerStore()
 
 func init() {
 	RootCmd.AddCommand(runCmd)
@@ -59,9 +59,9 @@ func run(port int, ip, target string, verbose bool) {
 
 func handleConnection(c net.Conn) {
 	p := peer.New(c, ps)
-	ps.AddPeer(p)
+	ps.Add(p)
 
 	go p.Dispatch()
-	go p.HandlePushes()
-	go p.HandleRequests()
+	go p.PushHandler()
+	go p.RequestHandler()
 }
