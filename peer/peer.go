@@ -127,10 +127,10 @@ func New(c net.Conn, ps *PeerStore) *Peer {
 	}
 }
 
-// HandleConnection is called when a new connection is opened with us by a
+// ConnectionHandler is called when a new connection is opened with us by a
 // remote peer. It will create a dispatcher and message handlers to handle
 // sending and reveiving messages over the new connection.
-func HandleConnection(c net.Conn) {
+func ConnectionHandler(c net.Conn) {
 	p := New(c, PStore)
 	PStore.Add(p)
 
@@ -238,9 +238,9 @@ func (p *Peer) PushHandler() {
 	}
 }
 
-// HandleResponse waits on a response channel for a response message sent by the
+// AwaitResponse waits on a response channel for a response message sent by the
 // Dispatcher. When a response arrives it is handled appropriately.
-func (p *Peer) HandleResponse(req message.Request, c chan *message.Response) {
+func (p *Peer) AwaitResponse(req message.Request, c chan *message.Response) {
 	defer p.resChans.Remove(req.ID)
 	select {
 	case res := <-c:
@@ -263,6 +263,6 @@ func (p *Peer) Request(req message.Request) error {
 		return err
 	}
 
-	go p.HandleResponse(req, resChan)
+	go p.AwaitResponse(req, resChan)
 	return nil
 }
