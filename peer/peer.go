@@ -21,78 +21,107 @@ const (
 	Timeout = time.Second * 30
 )
 
-// PStore stores information about every peer we are connected to.
-var PStore = &Peerstore{Peers: make([]*Peer, 0)}
+// PStore stores information about every peer we are connected to. All peers we
+// connect to should have a reference to this peerstore so they can populate it.
+var PStore = &PeerStore{peers: make(map[string]*Peer, 0)}
 
-// Peerstore is a thread-safe container for all the peers we are currently
+// PeerStore is a thread-safe container for all the peers we are currently
 // connected to.
-type Peerstore struct {
-	Peers []*Peer
+type PeerStore struct {
+	peers map[string]*Peer
 	lock  sync.RWMutex
 }
 
-// AddPeer synchronously adds the given peer to the peerstore
-func (ps *Peerstore) AddPeer(p *Peer) {
-	ps.lock.Lock()
-	ps.Peers = append(ps.Peers, p)
-	ps.lock.Unlock()
-}
-
-// RemovePeer synchronously removes the given peer from the peerstore
-func (ps *Peerstore) RemovePeer(id string) {
-	ps.lock.Lock()
-	for i := 0; i < len(ps.Peers); i++ {
-		if ps.Peers[i].ID.String() == id {
-			ps.Peers = append(ps.Peers[:i], ps.Peers[i+1:]...)
-		}
+// NewPeerStore returns an initialized peerstore.
+func NewPeerStore() *PeerStore {
+	return &PeerStore{
+		peers: make(map[string]*Peer, 0),
+		lock:  sync.RWMutex{},
 	}
-	ps.lock.Unlock()
 }
 
-// Peer synchronously retreives the peer with the given id from the peerstore
-func (ps *Peerstore) Peer(id string) *Peer {
-	var peer *Peer
+// Add synchronously adds the given peer to the peerstore
+func (ps *PeerStore) Add(p *Peer) {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	ps.peers[p.ID.String()] = p
+}
+
+// Remove synchronously removes the given peer from the peerstore
+func (ps *PeerStore) Remove(id string) {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	delete(ps.peers, id)
+}
+
+// Get synchronously retreives the peer with the given id from the peerstore
+func (ps *PeerStore) Get(id string) *Peer {
 	ps.lock.RLock()
-	for i := 0; i < len(ps.Peers); i++ {
-		if ps.Peers[i].ID.String() == id {
-			peer = ps.Peers[i]
-			break
-		}
-	}
-	ps.lock.RUnlock()
-	return peer
+	defer ps.lock.RUnlock()
+	return ps.peers[id]
 }
 
 // Addrs returns the list of addresses of the peers in the peerstore in the form
 // <IP addr>:<port>
-func (ps *Peerstore) Addrs() []string {
+func (ps *PeerStore) Addrs() []string {
 	ps.lock.RLock()
-	addrs := make([]string, len(ps.Peers), len(ps.Peers))
-	for i := 0; i < len(ps.Peers); i++ {
-		addrs[i] = ps.Peers[i].Connection.RemoteAddr().String()
+	defer ps.lock.RUnlock()
+	addrs := make([]string, len(ps.peers), len(ps.peers))
+	for _, p := range ps.peers {
+		addrs = append(addrs, p.Connection.RemoteAddr().String())
 	}
-	ps.lock.RUnlock()
 	return addrs
 }
 
-// Peer represents a remote peer we are connected to
+// ChanStore is a threadsafe container for response channels.
+type ChanStore struct {
+	chans map[string]chan *message.Response
+	lock  sync.RWMutex
+}
+
+// Add synchronously adds a channel with the given id to the store.
+func (cs *ChanStore) Add(id string, channel chan *message.Response) {
+	cs.lock.Lock()
+	defer cs.lock.Lock()
+	cs.chans[id] = channel
+}
+
+// Remove synchronously removes the channel with the given ID.
+func (cs *ChanStore) Remove(id string) {
+	cs.lock.Lock()
+	defer cs.lock.Unlock()
+	delete(cs.chans, id)
+}
+
+// Get retrieves the channel with the given ID.
+func (cs *ChanStore) Get(id string) chan *message.Response {
+	cs.lock.RLock()
+	defer cs.lock.RUnlock()
+	return cs.chans[id]
+}
+
+// Peer represents a remote peer we are connected to.
 type Peer struct {
 	ID         uuid.UUID
 	Connection net.Conn
-	Peerstore  *Peerstore
-	resChans   map[string]chan *message.Response
+	Store      *PeerStore
+	resChans   *ChanStore
 	reqChan    chan *message.Request
 	pushChan   chan *message.Push
 	lock       sync.RWMutex
 }
 
 // New returns a new Peer
-func New(c net.Conn, ps *Peerstore) *Peer {
+func New(c net.Conn, ps *PeerStore) *Peer {
+	cs := &ChanStore{
+		chans: make(map[string]chan *message.Response),
+		lock:  sync.RWMutex{},
+	}
 	return &Peer{
 		ID:         uuid.New(),
 		Connection: c,
-		Peerstore:  ps,
-		resChans:   make(map[string]chan *message.Response),
+		Store:      ps,
+		resChans:   cs,
 		reqChan:    make(chan *message.Request),
 		pushChan:   make(chan *message.Push),
 	}
@@ -103,11 +132,11 @@ func New(c net.Conn, ps *Peerstore) *Peer {
 // sending and reveiving messages over the new connection.
 func HandleConnection(c net.Conn) {
 	p := New(c, PStore)
-	PStore.AddPeer(p)
+	PStore.Add(p)
 
 	go p.Dispatch()
-	go p.HandlePushes()
-	go p.HandleRequests()
+	go p.PushHandler()
+	go p.RequestHandler()
 }
 
 // Dispatch listens on this peer's Connection and passes received messages
@@ -118,28 +147,24 @@ func (p *Peer) Dispatch() {
 	for {
 		msg, err := message.Read(p.Connection)
 		if err != nil {
-			log.WithError(err).Error("Dispatcher fialed to read message")
+			log.WithError(err).Error("Dispatcher failed to read message")
 			continue
 		}
 
 		switch msg.Type() {
 		case message.MessageRequest:
 			p.reqChan <- msg.(*message.Request)
-			break
 		case message.MessageResponse:
-			id := msg.(*message.Response).ID
-			resChan := p.addResponseChan(id)
+			res := msg.(*message.Response)
+			resChan := p.resChans.Get(res.ID)
 			if resChan != nil {
 				resChan <- msg.(*message.Response)
 			} else {
-				log.Errorf("Dispatcher could not find channel for response %s",
-					msg.(*message.Response).ID)
+				log.Errorf("Dispatcher could not find channel for response %s", res.ID)
 			}
-			p.removeResponseChan(id)
-			break
+			p.resChans.Remove(res.ID)
 		case message.MessagePush:
 			p.pushChan <- msg.(*message.Push)
-			break
 		default:
 			// Invalid messgae type. Ignore
 			log.Debug("Dispatcher received message with invalid type")
@@ -147,9 +172,9 @@ func (p *Peer) Dispatch() {
 	}
 }
 
-// HandleRequests waits on this peer's request channel for incoming requests
+// RequestHandler waits on this peer's request channel for incoming requests
 // from the Dispatcher, responding to each request appropriately.
-func (p *Peer) HandleRequests() {
+func (p *Peer) RequestHandler() {
 	var req *message.Request
 	for {
 		select {
@@ -163,10 +188,9 @@ func (p *Peer) HandleRequests() {
 
 		switch req.ResourceType {
 		case message.ResourcePeerInfo:
-			res.Resource = p.Peerstore.Addrs()
+			res.Resource = p.Store.Addrs()
 			break
-		case message.ResourceBlock:
-		case message.ResourceTransaction:
+		case message.ResourceBlock, message.ResourceTransaction:
 			res.Error = message.NewProtocolError(message.NotImplemented,
 				"Block and Transaction requests are not yet implemented on this peer")
 		default:
@@ -181,9 +205,9 @@ func (p *Peer) HandleRequests() {
 	}
 }
 
-// HandlePushes waits on this peer's request channel for incoming requests
+// PushHandler waits on this peer's request channel for incoming requests
 // from the Dispatcher, responding to each request appropriately.
-func (p *Peer) HandlePushes() {
+func (p *Peer) PushHandler() {
 	var push *message.Push
 	for {
 		select {
@@ -198,11 +222,11 @@ func (p *Peer) HandlePushes() {
 			for _, addr := range push.Resource.([]string) {
 				conn.Listen(addr, func(c net.Conn) {
 					p := New(c, PStore)
-					PStore.AddPeer(p)
+					p.Store.Add(p)
 
 					go p.Dispatch()
-					go p.HandlePushes()
-					go p.HandleRequests()
+					go p.PushHandler()
+					go p.RequestHandler()
 				})
 			}
 			break
@@ -214,54 +238,31 @@ func (p *Peer) HandlePushes() {
 	}
 }
 
-// AwaitResponse waits on a response channel for a response message sent by the
+// HandleResponse waits on a response channel for a response message sent by the
 // Dispatcher. When a response arrives it is handled appropriately.
-func (p *Peer) AwaitResponse(req message.Request, c chan *message.Response) {
+func (p *Peer) HandleResponse(req message.Request, c chan *message.Response) {
+	defer p.resChans.Remove(req.ID)
 	select {
 	case res := <-c:
 		// TODO: do something with the response
 		log.Debugf("Received response %s", res.ID)
-		break
 	case <-time.After(Timeout):
 		break
 	}
-
-	p.removeResponseChan(req.ID)
 }
 
 // Request sends the given request over this peer's Connection and spawns a
 // response listener with AwaitResponse. Returns error if request could not be
 // written.
 func (p *Peer) Request(req message.Request) error {
-	resChan := p.addResponseChan(req.ID)
+	resChan := make(chan *message.Response)
+	p.resChans.Add(req.ID, resChan)
 	err := req.Write(p.Connection)
 	if err != nil {
-		p.removeResponseChan(req.ID)
+		p.resChans.Remove(req.ID)
 		return err
 	}
 
-	go p.AwaitResponse(req, resChan)
+	go p.HandleResponse(req, resChan)
 	return nil
-}
-
-func (p *Peer) addResponseChan(id string) chan *message.Response {
-	resChan := make(chan *message.Response)
-	p.lock.Lock()
-	p.resChans[id] = resChan
-	p.lock.Unlock()
-	return resChan
-}
-
-func (p *Peer) removeResponseChan(id string) {
-	p.lock.Lock()
-	delete(p.resChans, id)
-	p.lock.Unlock()
-}
-
-func (p *Peer) responseChan(id string) chan *message.Response {
-	var resChan chan *message.Response
-	p.lock.RLock()
-	resChan = p.resChans[id]
-	p.lock.RUnlock()
-	return resChan
 }
