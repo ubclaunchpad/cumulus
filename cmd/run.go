@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"net"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -24,8 +23,6 @@ var runCmd = &cobra.Command{
 		run(port, ip, target, verbose)
 	},
 }
-
-var ps = &peer.Peerstore{Peers: make(map[string]*peer.Peer)}
 
 func init() {
 	RootCmd.AddCommand(runCmd)
@@ -51,17 +48,8 @@ func run(port int, ip, target string, verbose bool) {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	err := conn.Listen(fmt.Sprintf("%s:%d", ip, port), handleConnection)
+	err := conn.Listen(fmt.Sprintf("%s:%d", ip, port), peer.HandleConnection)
 	if err != nil {
 		log.WithError(err).Errorf("Failed to listen on %s:%d", ip, port)
 	}
-}
-
-func handleConnection(c net.Conn) {
-	p := peer.New(c, ps)
-	ps.AddPeer(p)
-
-	go p.Dispatch()
-	go p.HandlePushes()
-	go p.HandleRequests()
 }

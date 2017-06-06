@@ -7,6 +7,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/message"
 )
 
@@ -20,33 +21,58 @@ const (
 	Timeout = time.Second * 30
 )
 
+// PStore stores information about every peer we are connected to.
+var PStore = &Peerstore{Peers: make([]*Peer, 0)}
+
 // Peerstore is a thread-safe container for all the peers we are currently
 // connected to.
 type Peerstore struct {
-	Peers map[string]*Peer
+	Peers []*Peer
 	lock  sync.RWMutex
 }
 
 // AddPeer synchronously adds the given peer to the peerstore
 func (ps *Peerstore) AddPeer(p *Peer) {
 	ps.lock.Lock()
-	ps.Peers[p.ID.String()] = p
+	ps.Peers = append(ps.Peers, p)
 	ps.lock.Unlock()
 }
 
 // RemovePeer synchronously removes the given peer from the peerstore
-func (ps *Peerstore) RemovePeer(p *Peer) {
+func (ps *Peerstore) RemovePeer(id string) {
 	ps.lock.Lock()
-	delete(ps.Peers, p.ID.String())
+	for i := 0; i < len(ps.Peers); i++ {
+		if ps.Peers[i].ID.String() == id {
+			ps.Peers = append(ps.Peers[:i], ps.Peers[i+1:]...)
+		}
+	}
 	ps.lock.Unlock()
 }
 
 // Peer synchronously retreives the peer with the given id from the peerstore
 func (ps *Peerstore) Peer(id string) *Peer {
+	var peer *Peer
 	ps.lock.RLock()
-	p := ps.Peers[id]
+	for i := 0; i < len(ps.Peers); i++ {
+		if ps.Peers[i].ID.String() == id {
+			peer = ps.Peers[i]
+			break
+		}
+	}
 	ps.lock.RUnlock()
-	return p
+	return peer
+}
+
+// Addrs returns the list of addresses of the peers in the peerstore in the form
+// <IP addr>:<port>
+func (ps *Peerstore) Addrs() []string {
+	ps.lock.RLock()
+	addrs := make([]string, len(ps.Peers), len(ps.Peers))
+	for i := 0; i < len(ps.Peers); i++ {
+		addrs[i] = ps.Peers[i].Connection.RemoteAddr().String()
+	}
+	ps.lock.RUnlock()
+	return addrs
 }
 
 // Peer represents a remote peer we are connected to
@@ -72,6 +98,18 @@ func New(c net.Conn, ps *Peerstore) *Peer {
 	}
 }
 
+// HandleConnection is called when a new connection is opened with us by a
+// remote peer. It will create a dispatcher and message handlers to handle
+// sending and reveiving messages over the new connection.
+func HandleConnection(c net.Conn) {
+	p := New(c, PStore)
+	PStore.AddPeer(p)
+
+	go p.Dispatch()
+	go p.HandlePushes()
+	go p.HandleRequests()
+}
+
 // Dispatch listens on this peer's Connection and passes received messages
 // to the appropriate message handlers.
 func (p *Peer) Dispatch() {
@@ -94,7 +132,7 @@ func (p *Peer) Dispatch() {
 			if resChan != nil {
 				resChan <- msg.(*message.Response)
 			} else {
-				log.Error("Dispatcher could not find channel for response %s",
+				log.Errorf("Dispatcher could not find channel for response %s",
 					msg.(*message.Response).ID)
 			}
 			p.removeResponseChan(id)
@@ -125,10 +163,12 @@ func (p *Peer) HandleRequests() {
 
 		switch req.ResourceType {
 		case message.ResourcePeerInfo:
+			res.Resource = p.Peerstore.Addrs()
+			break
 		case message.ResourceBlock:
 		case message.ResourceTransaction:
 			res.Error = message.NewProtocolError(message.NotImplemented,
-				"PeerInfo, Block, and Transaction requests are not yet implemented on this peer")
+				"Block and Transaction requests are not yet implemented on this peer")
 		default:
 			res.Error = message.NewProtocolError(message.InvalidResourceType,
 				"Invalid resource type")
@@ -155,6 +195,17 @@ func (p *Peer) HandlePushes() {
 
 		switch push.ResourceType {
 		case message.ResourcePeerInfo:
+			for _, addr := range push.Resource.([]string) {
+				conn.Listen(addr, func(c net.Conn) {
+					p := New(c, PStore)
+					PStore.AddPeer(p)
+
+					go p.Dispatch()
+					go p.HandlePushes()
+					go p.HandleRequests()
+				})
+			}
+			break
 		case message.ResourceBlock:
 		case message.ResourceTransaction:
 		default:
