@@ -48,8 +48,27 @@ func run(port int, ip, target string, verbose bool) {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	err := conn.Listen(fmt.Sprintf("%s:%d", ip, port), peer.HandleConnection)
-	if err != nil {
-		log.WithError(err).Errorf("Failed to listen on %s:%d", ip, port)
+	// Set up listener. This is run as a goroutine because Listen blocks forever
+	log.Infof("Starting listener on %s:%d", ip, port)
+	go func() {
+		err := conn.Listen(fmt.Sprintf("%s:%d", ip, port), peer.ConnectionHandler)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to listen on %s:%d", ip, port)
+		}
+	}()
+
+	// Connect to remote peer if target provided
+	if target != "" {
+		log.Infof("Dialing target %s", target)
+		c, err := conn.Dial(target)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to dial target %s", target)
+			return
+		}
+		peer.ConnectionHandler(c)
 	}
+
+	// Hang forever. All the work from here on is handled in goroutines. We need
+	// this to hang to keep them alive.
+	select {}
 }

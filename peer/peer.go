@@ -137,6 +137,8 @@ func ConnectionHandler(c net.Conn) {
 	go p.Dispatch()
 	go p.PushHandler()
 	go p.RequestHandler()
+
+	log.Infof("Connected to %s", p.Connection.RemoteAddr().String())
 }
 
 // Dispatch listens on this peer's Connection and passes received messages
@@ -154,6 +156,7 @@ func (p *Peer) Dispatch() {
 		switch msg.Type() {
 		case message.MessageRequest:
 			p.reqChan <- msg.(*message.Request)
+			break
 		case message.MessageResponse:
 			res := msg.(*message.Response)
 			resChan := p.resChans.Get(res.ID)
@@ -163,8 +166,10 @@ func (p *Peer) Dispatch() {
 				log.Errorf("Dispatcher could not find channel for response %s", res.ID)
 			}
 			p.resChans.Remove(res.ID)
+			break
 		case message.MessagePush:
 			p.pushChan <- msg.(*message.Push)
+			break
 		default:
 			// Invalid messgae type. Ignore
 			log.Debug("Dispatcher received message with invalid type")
@@ -193,6 +198,7 @@ func (p *Peer) RequestHandler() {
 		case message.ResourceBlock, message.ResourceTransaction:
 			res.Error = message.NewProtocolError(message.NotImplemented,
 				"Block and Transaction requests are not yet implemented on this peer")
+			break
 		default:
 			res.Error = message.NewProtocolError(message.InvalidResourceType,
 				"Invalid resource type")
@@ -220,14 +226,12 @@ func (p *Peer) PushHandler() {
 		switch push.ResourceType {
 		case message.ResourcePeerInfo:
 			for _, addr := range push.Resource.([]string) {
-				conn.Listen(addr, func(c net.Conn) {
-					p := New(c, PStore)
-					p.Store.Add(p)
-
-					go p.Dispatch()
-					go p.PushHandler()
-					go p.RequestHandler()
-				})
+				c, err := conn.Dial(addr)
+				if err != nil {
+					log.WithError(err).Errorf("PushHandler fialed to dial peer %s", addr)
+				} else {
+					ConnectionHandler(c)
+				}
 			}
 			break
 		case message.ResourceBlock:
