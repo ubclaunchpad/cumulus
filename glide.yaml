@@ -1,15 +1,7 @@
 package: github.com/ubclaunchpad/cumulus
 import:
-- package: github.com/libp2p/go-libp2p-crypto
-- package: github.com/libp2p/go-libp2p-host
-- package: github.com/libp2p/go-libp2p-net
-- package: github.com/libp2p/go-libp2p-peer
-- package: github.com/libp2p/go-libp2p-peerstore
-- package: github.com/libp2p/go-libp2p-swarm
-- package: github.com/libp2p/go-libp2p
-  subpackages:
-  - p2p/host/basic
-- package: github.com/multiformats/go-multiaddr
 - package: github.com/Sirupsen/logrus
+- package: github.com/google/uuid
+  version: ~0.2.0
 - package: github.com/spf13/cobra
 - package: github.com/spf13/pflag

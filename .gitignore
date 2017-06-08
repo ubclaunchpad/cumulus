@@ -29,3 +29,6 @@ _testmain.go
 
 # Glide dependencies
 vendor
+
+# Text Editors and IDEs
+.vscode
