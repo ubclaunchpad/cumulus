@@ -129,7 +129,7 @@ func New(c net.Conn, ps *PeerStore) *Peer {
 
 // ConnectionHandler is called when a new connection is opened with us by a
 // remote peer. It will create a dispatcher and message handlers to handle
-// sending and reveiving messages over the new connection.
+// sending and retrieving messages over the new connection.
 func ConnectionHandler(c net.Conn) {
 	p := New(c, PStore)
 	PStore.Add(p)
@@ -153,11 +153,11 @@ func (p *Peer) Dispatch() {
 			continue
 		}
 
-		switch message.Type() {
-		case msg.MessageRequest:
+		switch message.(type) {
+		case *msg.Request:
 			p.reqChan <- message.(*msg.Request)
 			break
-		case msg.MessageResponse:
+		case *msg.Response:
 			res := message.(*msg.Response)
 			resChan := p.resChans.Get(res.ID)
 			if resChan != nil {
@@ -167,7 +167,7 @@ func (p *Peer) Dispatch() {
 			}
 			p.resChans.Remove(res.ID)
 			break
-		case msg.MessagePush:
+		case *msg.Push:
 			p.pushChan <- message.(*msg.Push)
 			break
 		default:

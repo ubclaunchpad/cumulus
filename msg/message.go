@@ -6,21 +6,10 @@ import (
 )
 
 type (
-	// Type specifies the type of a message.
-	Type int
 	// ResourceType specifies the type of a resource in a message.
 	ResourceType int
 	// ErrorCode is a code associated with an error
 	ErrorCode int
-)
-
-const (
-	// MessageRequest messages ask a peer for a resource.
-	MessageRequest Type = iota
-	// MessageResponse messages repond to a request message with an error or a resource.
-	MessageResponse
-	// MessagePush messages proactively send a resource to a peer.
-	MessagePush
 )
 
 const (
@@ -39,7 +28,7 @@ const (
 	// NotImplemented occurs when a message or request is received whos response
 	// requires functionality that does not yet exist.
 	NotImplemented = 501
-	// SubnetFull occurs when a stream is opened with a peer who's Subnet is
+	// SubnetFull occurs when a stream is opened with a peer whose Subnet is
 	// already full.
 	SubnetFull = 503
 )
@@ -70,7 +59,6 @@ func (e *ProtocolError) Error() string {
 // Message is a container for messages, containing a type and either a Request,
 // Response, or Push in the payload.
 type Message interface {
-	Type() Type
 	Write(io.Writer) error
 }
 
@@ -84,11 +72,6 @@ type Request struct {
 	Params       map[string]interface{}
 }
 
-// Type returns the message type
-func (r *Request) Type() Type {
-	return MessageRequest
-}
-
 // Response is a container for a response payload, containing the unique request
 // ID of the request prompting it, an Error (if one occurred), and the requested
 // resource (if no error occurred).
@@ -98,21 +81,11 @@ type Response struct {
 	Resource interface{}
 }
 
-// Type returns the message type
-func (r *Response) Type() Type {
-	return MessageResponse
-}
-
 // Push is a container for a push payload, containing a resource proactively sent
 // to us by another peer.
 type Push struct {
 	ResourceType ResourceType
 	Resource     interface{}
-}
-
-// Type returns the message type
-func (p *Push) Type() Type {
-	return MessagePush
 }
 
 // Write encodes and writes the Message into the given Writer.

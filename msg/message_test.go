@@ -28,10 +28,6 @@ func TestRequest(t *testing.T) {
 		t.Fail()
 	}
 
-	if out.Type() != MessageRequest {
-		t.Fail()
-	}
-
 	outReq, ok := out.(*Request)
 	if !ok {
 		t.Fail()
@@ -60,10 +56,6 @@ func TestResponse(t *testing.T) {
 	out, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
-		t.Fail()
-	}
-
-	if out.Type() != MessageResponse {
 		t.Fail()
 	}
 
@@ -103,10 +95,6 @@ func TestPush(t *testing.T) {
 	out, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
-		t.Fail()
-	}
-
-	if out.Type() != MessagePush {
 		t.Fail()
 	}
 
