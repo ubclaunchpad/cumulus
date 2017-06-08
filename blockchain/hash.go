@@ -16,10 +16,19 @@ const (
 	LessThan int = -1
 	// EqualTo is the value to the CompareTo function returns if h1 is equal to h2
 	EqualTo int = 0
-	// MaxDifficulty is the maximum difficulty value represented as a hex string
-	MaxDifficulty = "00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
-	// MaxHash is the maximum hash value represented as a hex string
-	MaxHash = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+	// MaxDifficultyHex is the maximum difficulty value represented as a hex string
+	MaxDifficultyHex = "00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+	// MaxHashHex is the maximum hash value represented as a hex string
+	MaxHashHex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+)
+
+var (
+	// MaxDifficulty is the maximum difficulty value
+	MaxDifficulty = HexStringToHash(MaxDifficultyHex)
+	// MaxHash is the maximum hash value
+	MaxHash = HexStringToHash(MaxHashHex)
+	// MinHash is the minimum hash value
+	MinHash = HexStringToHash("0")
 )
 
 // Hash represents a 256-bit hash of a block or transaction
@@ -44,16 +53,16 @@ func HashSum(m Marshaller) Hash {
 	return sha256.Sum256(m.Marshal())
 }
 
-// CompareTo compares two hashes, it returns 1 if the first hash is larger than the second, -1 if if it is smaller, and 0 if they are equal
-func CompareTo(h1 Hash, h2 Hash) int {
+// CompareTo compares two hashes, it returns true if the operation of the first hash on the second hash specified by the comparator is true, and false otherwise
+func CompareTo(h1 Hash, h2 Hash, comparator int) bool {
 	for i := HashLen - 1; i >= 0; i-- {
 		if h1[i] > h2[i] {
-			return 1
+			return 1 == comparator
 		} else if h1[i] < h2[i] {
-			return -1
+			return -1 == comparator
 		}
 	}
-	return 0
+	return 0 == comparator
 }
 
 // ReverseHash reverses the endianess of a hash
@@ -96,11 +105,9 @@ func HexStringToHash(s string) Hash {
 // HashToCompact converts a hash to a compact number
 func HashToCompact(h Hash) uint32 {
 	// Return 0 if hash is equal to 0
-	if CompareTo(h, HexStringToHash("0")) == EqualTo {
+	if CompareTo(h, MinHash, EqualTo) {
 		return 0
 	}
-
-	// TODO: Handle Max Value
 
 	var compact []byte
 	compact = make([]byte, 4)
@@ -147,15 +154,22 @@ func HashToCompact(h Hash) uint32 {
 // CompactToHash converts a compact number to a hash
 func CompactToHash(c uint32) Hash {
 	if c == 0 {
-		return HexStringToHash("0")
+		return MinHash
 	}
 
-	// TODO: Handle Max Value
+	maxCompactNumber := HashToCompact(MaxDifficulty)
+	if c > maxCompactNumber {
+		// TODO: Handle Error
+	}
 
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, c)
 
 	size := int(buf[0])
+	if size > HashLen {
+		// TODO: Handle Error
+	}
+
 	var h Hash
 	for i, j := size-1, 1; j <= 3; i, j = i-1, j+1 {
 		if j <= size {
