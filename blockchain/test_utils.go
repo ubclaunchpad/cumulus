@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	mrand "math/rand"
+	"strconv"
 )
 
 func newHash() Hash {
@@ -177,4 +178,16 @@ func newValidChainAndBlock() (*BlockChain, *Block) {
 	tr, _ := tbody.Sign(s, crand.Reader)
 	newBlock := newOutputBlock([]*Transaction{tr}, inputBlock)
 	return bc, newBlock
+}
+
+// BaseConverter converts a decimal number to a number of a specified base, in hex
+func BaseConverter(a uint32, b uint32) string {
+	if a < b {
+		s := strconv.FormatUint(uint64(a), 16)
+		if len(s) == 1 {
+			return "0" + s
+		}
+		return s
+	}
+	return BaseConverter(a/b, b) + strconv.FormatUint(uint64(a%b), 16)
 }
