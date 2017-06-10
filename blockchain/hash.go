@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"log"
 )
@@ -100,82 +99,4 @@ func HexStringToHash(s string) Hash {
 	}
 
 	return hash
-}
-
-// HashToCompact converts a hash to a compact number
-func HashToCompact(h Hash) uint32 {
-	// Return 0 if hash is equal to 0
-	if CompareTo(h, MinHash, EqualTo) {
-		return 0
-	}
-
-	var compact []byte
-	compact = make([]byte, 4)
-
-	// Find MSB
-	var msb int
-	for msb = HashLen - 1; msb >= 0 && h[msb] == 0; msb-- {
-	}
-
-	// Set MSB of compact number to the size of the number
-	size := msb + 1
-
-	// Prepend 0 if msb is less than 0x7f
-	if h[msb] > 0x7f {
-		size++
-		compact[1] = 0
-		compact[2] = h[msb]
-		if msb-1 < 0 {
-			compact[3] = 0
-		} else {
-			compact[3] = h[msb-1]
-		}
-	} else {
-		compact[1] = h[msb]
-
-		if msb-1 < 0 {
-			compact[2] = 0
-		} else {
-			compact[2] = h[msb-1]
-		}
-
-		if msb-2 < 0 {
-			compact[3] = 0
-		} else {
-			compact[3] = h[msb-2]
-		}
-	}
-
-	compact[0] = byte(size)
-
-	return binary.BigEndian.Uint32(compact)
-}
-
-// CompactToHash converts a compact number to a hash
-func CompactToHash(c uint32) Hash {
-	if c == 0 {
-		return MinHash
-	}
-
-	maxCompactNumber := HashToCompact(MaxDifficulty)
-	if c > maxCompactNumber {
-		// TODO: Handle Error
-	}
-
-	buf := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf, c)
-
-	size := int(buf[0])
-	if size > HashLen {
-		// TODO: Handle Error
-	}
-
-	var h Hash
-	for i, j := size-1, 1; j <= 3; i, j = i-1, j+1 {
-		if j <= size {
-			h[i] = buf[j]
-		}
-	}
-
-	return h
 }
