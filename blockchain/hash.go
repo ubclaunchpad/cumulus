@@ -16,7 +16,7 @@ const (
 	// EqualTo is the value to the CompareTo function returns if h1 is equal to h2
 	EqualTo int = 0
 	// MaxDifficultyHex is the maximum difficulty value represented as a hex string
-	MaxDifficultyHex = "00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+	MaxDifficultyHex = "000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 	// MaxHashHex is the maximum hash value represented as a hex string
 	MaxHashHex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 )
