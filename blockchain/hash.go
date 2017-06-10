@@ -9,16 +9,20 @@ import (
 const (
 	// HashLen is the length in bytes of a hash.
 	HashLen = 32
+	// MaxDifficultyHex is the maximum difficulty value represented as a hex string
+	MaxDifficultyHex = "000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+	// MaxHashHex is the maximum hash value represented as a hex string
+	MaxHashHex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+)
+
+// CompareTo comparator constants
+const (
 	// GreaterThan is the value to the CompareTo function returns if h1 is greater than h2
 	GreaterThan int = 1
 	// LessThan is the value to the CompareTo function returns if h1 is less than h2
 	LessThan int = -1
 	// EqualTo is the value to the CompareTo function returns if h1 is equal to h2
 	EqualTo int = 0
-	// MaxDifficultyHex is the maximum difficulty value represented as a hex string
-	MaxDifficultyHex = "000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
-	// MaxHashHex is the maximum hash value represented as a hex string
-	MaxHashHex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 )
 
 var (
@@ -62,15 +66,6 @@ func CompareTo(h1 Hash, h2 Hash, comparator int) bool {
 		}
 	}
 	return 0 == comparator
-}
-
-// ReverseHash reverses the endianess of a hash
-func ReverseHash(h Hash) Hash {
-	var reverse Hash
-	for i, j := 0, HashLen-1; i < j; i, j = i+1, j-1 {
-		reverse[i], reverse[j] = h[j], h[i]
-	}
-	return reverse
 }
 
 // HexStringToHash converts a big endian hex string to a hash
