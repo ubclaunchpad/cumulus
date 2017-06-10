@@ -3,22 +3,24 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"math"
+	"time"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 const (
 	// MiningHeaderLen is the length of the MiningHeader struct in bytes
-	MiningHeaderLen = (1 * (32 / 8)) + (3 * HashLen)
-	// MaxUint32 is the max value for the uint32 type
-	MaxUint32 uint32 = 4294967295
+	MiningHeaderLen = (3 * HashLen) + (1 * (32 / 8)) + (1 * (64 / 8))
 )
 
 // MiningHeader contains the metadata required for mining
 type MiningHeader struct {
 	LastBlock Hash
 	RootHash  Hash
-	// Target is the current target stored in compact format
-	Target Hash
-	Nonce  uint32
+	Target    Hash
+	Time      uint32
+	Nonce     uint64
 }
 
 // Marshal converts a Mining Header to a byte slice
@@ -27,7 +29,8 @@ func (mh *MiningHeader) Marshal() []byte {
 	buf = append(buf, mh.LastBlock.Marshal()...)
 	buf = append(buf, mh.RootHash.Marshal()...)
 	buf = append(buf, mh.Target.Marshal()...)
-	AppendUint32ToSlice(&buf, mh.Nonce)
+	AppendUint32ToSlice(&buf, mh.Time)
+	AppendUint64ToSlice(&buf, mh.Nonce)
 	return buf
 }
 
@@ -36,6 +39,7 @@ func (mh *MiningHeader) SetMiningHeader(lastBlock Hash, rootHash Hash, target Ha
 	mh.LastBlock = lastBlock
 	mh.RootHash = rootHash
 	mh.Target = target
+	mh.Time = uint32(time.Now().Unix())
 	mh.Nonce = 0
 }
 
@@ -62,9 +66,10 @@ func (mh *MiningHeader) Mine() bool {
 	}
 
 	for mh.VerifyProofOfWork() == false {
-		if mh.Nonce == MaxUint32 {
-			return false
+		if mh.Nonce == math.MaxUint64 {
+			mh.Nonce = 0
 		}
+		mh.Time = uint32(time.Now().Unix())
 		mh.Nonce++
 	}
 	return true
@@ -72,7 +77,12 @@ func (mh *MiningHeader) Mine() bool {
 
 // VerifyMiningHeader confirms that the mining header is properly set
 func (mh *MiningHeader) VerifyMiningHeader() bool {
+	if mh.Time == 0 || mh.Time > uint32(time.Now().Unix()) {
+		log.Error("Invalid time in mining header")
+		return false
+	}
 	if CompareTo(mh.Target, MinHash, EqualTo) || CompareTo(mh.Target, MaxDifficulty, GreaterThan) {
+		log.Error("Invalid target in mining header")
 		return false
 	}
 	return true
@@ -82,5 +92,12 @@ func (mh *MiningHeader) VerifyMiningHeader() bool {
 func AppendUint32ToSlice(s *[]byte, num uint32) {
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, num)
+	*s = append(*s, buf...)
+}
+
+// AppendUint64ToSlice converts a uint64 to a byte slice and appends it to a byte slice
+func AppendUint64ToSlice(s *[]byte, num uint64) {
+	buf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, num)
 	*s = append(*s, buf...)
 }
