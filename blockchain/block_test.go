@@ -17,3 +17,11 @@ func TestEncodeDecodeBlock(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestContainsTransaction(t *testing.T) {
+	b := newBlock()
+
+	if exists, _ := b.ContainsTransaction(b.Transactions[0]); !exists {
+		t.Fail()
+	}
+}
