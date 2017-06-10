@@ -3,7 +3,7 @@ package blockchain
 import "testing"
 
 func TestGetAndPutTransaction(t *testing.T) {
-	p := NewPool(newWallet().Public())
+	p := NewPool()
 
 	if p.Len() != 0 {
 		t.Fail()
@@ -30,7 +30,7 @@ func TestGetAndPutTransaction(t *testing.T) {
 
 func TestUpdatePool(t *testing.T) {
 	b := newBlock()
-	p := NewPool(newWallet().Public())
+	p := NewPool()
 	for _, tr := range b.Transactions {
 		p.PutTransaction(tr)
 		if len(p.GetTransactions(tr.Input.Hash)) == 0 {
@@ -49,7 +49,7 @@ func TestUpdatePool(t *testing.T) {
 
 func TestGetNewBlock(t *testing.T) {
 	b := newBlock()
-	p := NewPool(newWallet().Public())
+	p := NewPool()
 	for _, tr := range b.Transactions {
 		p.PutTransaction(tr)
 	}

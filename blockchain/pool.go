@@ -7,7 +7,7 @@ type Pool struct {
 }
 
 // NewPool initializes a new pool.
-func NewPool(miner Address) *Pool {
+func NewPool() *Pool {
 	return nil
 }
 
@@ -16,7 +16,7 @@ func (p *Pool) Len() int {
 	return 0
 }
 
-// GetTransaction returns the transctions with input transaction Hash h.
+// GetTransactions returns the transctions with input transaction Hash h.
 func (p *Pool) GetTransactions(h Hash) []*Transaction {
 	return nil
 }
