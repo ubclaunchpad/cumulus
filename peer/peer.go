@@ -7,7 +7,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
-	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -184,7 +183,6 @@ func (p *Peer) RequestHandler() {
 	for {
 		select {
 		case req = <-p.reqChan:
-			break
 		case <-time.After(Timeout):
 			continue
 		}
@@ -194,11 +192,9 @@ func (p *Peer) RequestHandler() {
 		switch req.ResourceType {
 		case msg.ResourcePeerInfo:
 			res.Resource = p.Store.Addrs()
-			break
 		case msg.ResourceBlock, msg.ResourceTransaction:
 			res.Error = msg.NewProtocolError(msg.NotImplemented,
 				"Block and Transaction requests are not yet implemented on this peer")
-			break
 		default:
 			res.Error = msg.NewProtocolError(msg.InvalidResourceType,
 				"Invalid resource type")
@@ -224,16 +220,6 @@ func (p *Peer) PushHandler() {
 		}
 
 		switch push.ResourceType {
-		case msg.ResourcePeerInfo:
-			for _, addr := range push.Resource.([]string) {
-				c, err := conn.Dial(addr)
-				if err != nil {
-					log.WithError(err).Errorf("PushHandler fialed to dial peer %s", addr)
-				} else {
-					ConnectionHandler(c)
-				}
-			}
-			break
 		case msg.ResourceBlock:
 		case msg.ResourceTransaction:
 		default:
