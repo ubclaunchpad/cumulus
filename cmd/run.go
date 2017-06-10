@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
@@ -47,39 +48,27 @@ func run(port int, ip, target string, verbose bool) {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	// Set up a new host on the Cumulus network
-	host, err := peer.New(ip, port)
-	if err != nil {
-		log.Fatal(err)
+	// Set up listener. This is run as a goroutine because Listen blocks forever
+	log.Infof("Starting listener on %s:%d", ip, port)
+	go func() {
+		err := conn.Listen(fmt.Sprintf("%s:%d", ip, port), peer.ConnectionHandler)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to listen on %s:%d", ip, port)
+		}
+	}()
+
+	// Connect to remote peer if target provided
+	if target != "" {
+		log.Infof("Dialing target %s", target)
+		c, err := conn.Dial(target)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to dial target %s", target)
+			return
+		}
+		peer.ConnectionHandler(c)
 	}
 
-	// Set the host StreamHandler for the Cumulus Protocol and use
-	// BasicStreamHandler as its StreamHandler.
-	host.SetStreamHandler(peer.CumulusProtocol, host.Receive)
-	if target == "" {
-		// No target was specified, wait for incoming connections
-		log.Info("No target provided. Listening for incoming connections...")
-		select {} // Hang until someone connects to us
-	}
-
-	stream, err := host.Connect(target)
-	if err != nil {
-		log.WithError(err).Fatal("Error connecting to target: ", target)
-	}
-
-	// Send a message to the peer
-	_, err = stream.Write([]byte("Hello, world!"))
-	if err != nil {
-		log.WithError(err).Fatal("Error sending a message to the peer")
-	}
-
-	// Read the reply from the peer
-	reply, err := ioutil.ReadAll(stream)
-	if err != nil {
-		log.WithError(err).Fatal("Error reading a message from the peer")
-	}
-
-	log.Debugf("Peer %s read reply: %s", host.ID(), string(reply))
-
-	host.Close()
+	// Hang forever. All the work from here on is handled in goroutines. We need
+	// this to hang to keep them alive.
+	select {}
 }

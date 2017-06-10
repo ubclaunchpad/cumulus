@@ -1,6 +1,8 @@
 package conn
 
-import "net"
+import (
+	"net"
+)
 
 // Dial opens a connection to a remote host. `host` should be a string
 // in the format <IP>|<hostname>:<port>
