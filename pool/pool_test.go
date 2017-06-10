@@ -53,8 +53,8 @@ func TestGetNewBlock(t *testing.T) {
 	for _, tr := range b.Transactions {
 		p.PutTransaction(tr)
 	}
-	newBlk, success := p.GetNewBlock()
-	if !success {
+	newBlk, err := p.GetNewBlock()
+	if err != nil {
 		t.Fail()
 	}
 	for _, tr := range newBlk.Transactions {

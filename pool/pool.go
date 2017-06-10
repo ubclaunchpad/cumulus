@@ -1,14 +1,21 @@
 package blockchain
 
+import (
+	"errors"
+
+	"github.com/cevaris/ordered_map"
+)
+
 // Pool is a set of valid Transactions.
 type Pool struct {
-	Miner        Address
-	Transactions map[Hash][]*Transaction
+	Transactions ordered_map.OrderedMap
 }
 
 // NewPool initializes a new pool.
 func NewPool() *Pool {
-	return nil
+	return &Pool{
+		Transactions: *ordered_map.NewOrderedMap(),
+	}
 }
 
 // Len returns the number of transactions in the Pool.
@@ -41,8 +48,8 @@ func (p *Pool) UpdatePool(b *Block) bool {
 }
 
 // GetNewBlock returns a new Block from the highest priority Transactions in
-// the Pool, as well as a boolean indicating whether there were any
+// the Pool, as well as a error indicating whether there were any
 // Transactions to create a Block.
-func (p *Pool) GetNewBlock() (*Block, bool) {
-	return newBlock(), false
+func (p *Pool) GetNewBlock() (*Block, error) {
+	return newBlock(), errors.New("No transactions in pool.")
 }
