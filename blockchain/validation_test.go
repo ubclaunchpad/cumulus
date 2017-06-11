@@ -7,7 +7,7 @@ import (
 )
 
 func TestValidTransactionNoInputTransaction(t *testing.T) {
-	tr, _ := newTransactionValue(newWallet(), newWallet(), 1, 0)
+	tr, _ := newTransactionValue(NewWallet(), NewWallet(), 1, 0)
 	bc, _ := newValidBlockChainFixture()
 
 	valid, code := bc.ValidTransaction(tr)
@@ -41,7 +41,7 @@ func TestValidTransactionSignatureFail(t *testing.T) {
 	bc, _ := newValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
 
-	fakeSender := newWallet()
+	fakeSender := NewWallet()
 	tr, _ = tr.TxBody.Sign(fakeSender, rand.Reader)
 	bc.Blocks[1].Transactions[0] = tr
 
@@ -72,7 +72,7 @@ func TestTransactionRespend(t *testing.T) {
 	bc, _ := newValidBlockChainFixture()
 	trC := bc.Blocks[1].Transactions[0]
 	b := newOutputBlock([]*Transaction{trC}, bc.Blocks[1])
-	bc.AppendBlock(b, newWallet().Public())
+	bc.AppendBlock(b, NewWallet().Public())
 
 	valid, code := bc.ValidTransaction(trC)
 

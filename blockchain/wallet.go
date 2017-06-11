@@ -3,6 +3,7 @@ package blockchain
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	crand "crypto/rand"
 	"io"
 	"math/big"
 )
@@ -84,4 +85,11 @@ func (s *Signature) Marshal() []byte {
 	buf = append(buf, s.R.Bytes()...)
 	buf = append(buf, s.S.Bytes()...)
 	return buf
+}
+
+// NewWallet produces a new Wallet that can sign transactionsand has a
+// public Address.
+func NewWallet() Wallet {
+	priv, _ := ecdsa.GenerateKey(curve, crand.Reader)
+	return (*wallet)(priv)
 }

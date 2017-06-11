@@ -1,20 +1,17 @@
-package blockchain
+package pool
 
 import "testing"
 
 func TestGetAndPutTransaction(t *testing.T) {
-	p := NewPool()
-
+	p := New()
 	if p.Len() != 0 {
 		t.Fail()
 	}
-
 	tr := newTransaction()
 
 	if p.PutTransaction(tr) {
 		t.Fail()
 	}
-
 	if p.Len() != 1 {
 		t.Fail()
 	}
@@ -22,18 +19,17 @@ func TestGetAndPutTransaction(t *testing.T) {
 	if p.RemoveTransaction(tr) {
 		t.Fail()
 	}
-
 	if p.Len() != 0 {
 		t.Fail()
 	}
 }
 
 func TestUpdatePool(t *testing.T) {
+	p := New()
 	b := newBlock()
-	p := NewPool()
 	for _, tr := range b.Transactions {
 		p.PutTransaction(tr)
-		if len(p.GetTransactions(tr.Input.Hash)) == 0 {
+		if len(p.GetTransaction(tr.Input.Hash)) == 0 {
 			t.Fail()
 		}
 	}
@@ -49,7 +45,7 @@ func TestUpdatePool(t *testing.T) {
 
 func TestGetNewBlock(t *testing.T) {
 	b := newBlock()
-	p := NewPool()
+	p := New()
 	for _, tr := range b.Transactions {
 		p.PutTransaction(tr)
 	}

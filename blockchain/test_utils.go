@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"crypto/ecdsa"
 	crand "crypto/rand"
 	"crypto/sha256"
 	mrand "math/rand"
@@ -11,11 +10,6 @@ func newHash() Hash {
 	message := make([]byte, 256)
 	crand.Read(message)
 	return sha256.Sum256(message)
-}
-
-func newWallet() Wallet {
-	priv, _ := ecdsa.GenerateKey(curve, crand.Reader)
-	return (*wallet)(priv)
 }
 
 func newTxHashPointer() TxHashPointer {
@@ -29,7 +23,7 @@ func newTxHashPointer() TxHashPointer {
 func newTxOutput() TxOutput {
 	return TxOutput{
 		Amount:    uint64(mrand.Int63()),
-		Recipient: newWallet().Public(),
+		Recipient: NewWallet().Public(),
 	}
 }
 
@@ -37,7 +31,7 @@ func newTxBody() TxBody {
 	// Uniform distribution on [1, 4]
 	nOutputs := mrand.Intn(4) + 1
 	body := TxBody{
-		Sender:  newWallet().Public(),
+		Sender:  NewWallet().Public(),
 		Input:   newTxHashPointer(),
 		Outputs: make([]TxOutput, nOutputs),
 	}
@@ -48,7 +42,7 @@ func newTxBody() TxBody {
 }
 
 func newTransaction() *Transaction {
-	sender := newWallet()
+	sender := NewWallet()
 	tbody := newTxBody()
 	t, _ := tbody.Sign(sender, crand.Reader)
 	return t
@@ -58,7 +52,7 @@ func newBlockHeader() BlockHeader {
 	return BlockHeader{
 		BlockNumber: mrand.Uint32(),
 		LastBlock:   newHash(),
-		Miner:       newWallet().Public(),
+		Miner:       NewWallet().Public(),
 	}
 }
 
@@ -91,7 +85,7 @@ func newInputBlock(t []*Transaction) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: 0,
 			LastBlock:   newHash(),
-			Miner:       newWallet().Public(),
+			Miner:       NewWallet().Public(),
 		},
 		Transactions: t,
 	}
@@ -102,7 +96,7 @@ func newOutputBlock(t []*Transaction, input *Block) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: input.BlockNumber + 1,
 			LastBlock:   HashSum(input),
-			Miner:       newWallet().Public(),
+			Miner:       NewWallet().Public(),
 		},
 		Transactions: t,
 	}
@@ -127,9 +121,9 @@ func newTransactionValue(s, r Wallet, a uint64, i uint32) (*Transaction, error) 
 
 // newValidBlockChainFixture creates a valid blockchain of two blocks.
 func newValidBlockChainFixture() (*BlockChain, Wallet) {
-	original := newWallet()
-	sender := newWallet()
-	recipient := newWallet()
+	original := NewWallet()
+	sender := NewWallet()
+	recipient := NewWallet()
 
 	trA, _ := newTransactionValue(original, sender, 2, 1)
 	trA.Outputs = append(trA.Outputs, TxOutput{
@@ -174,7 +168,7 @@ func newValidChainAndBlock() (*BlockChain, *Block) {
 	}
 	tbody.Outputs[0] = TxOutput{
 		Amount:    a,
-		Recipient: newWallet().Public(),
+		Recipient: NewWallet().Public(),
 	}
 
 	tr, _ := tbody.Sign(s, crand.Reader)
