@@ -1,13 +1,13 @@
 package peer
 
 import (
+	"io"
 	"net"
 	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
-	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -19,6 +19,9 @@ const (
 	DefaultIP = "127.0.0.1"
 	// Timeout is the time after which reads from a stream will timeout
 	Timeout = time.Second * 30
+	// messageWaitTime is the amount of time the dispatcher should wait before
+	// attempting to read from the connection again when no data was received
+	messageWaitTime = time.Second * 5
 )
 
 // PStore stores information about every peer we are connected to. All peers we
@@ -73,57 +76,31 @@ func (ps *PeerStore) Addrs() []string {
 	return addrs
 }
 
-// ChanStore is a threadsafe container for response channels.
-type ChanStore struct {
-	chans map[string]chan *msg.Response
-	lock  sync.RWMutex
-}
-
-// Add synchronously adds a channel with the given id to the store.
-func (cs *ChanStore) Add(id string, channel chan *msg.Response) {
-	cs.lock.Lock()
-	defer cs.lock.Lock()
-	cs.chans[id] = channel
-}
-
-// Remove synchronously removes the channel with the given ID.
-func (cs *ChanStore) Remove(id string) {
-	cs.lock.Lock()
-	defer cs.lock.Unlock()
-	delete(cs.chans, id)
-}
-
-// Get retrieves the channel with the given ID.
-func (cs *ChanStore) Get(id string) chan *msg.Response {
-	cs.lock.RLock()
-	defer cs.lock.RUnlock()
-	return cs.chans[id]
-}
-
 // Peer represents a remote peer we are connected to.
 type Peer struct {
-	ID         uuid.UUID
-	Connection net.Conn
-	Store      *PeerStore
-	resChans   *ChanStore
-	reqChan    chan *msg.Request
-	pushChan   chan *msg.Push
-	lock       sync.RWMutex
+	ID               uuid.UUID
+	Connection       net.Conn
+	Store            *PeerStore
+	responseHandlers map[string]ResponseHandler
+	reqChan          chan *msg.Request
+	pushChan         chan *msg.Push
+	killChan         chan bool
+	lock             sync.RWMutex
 }
+
+// ResponseHandler is any function that handles a response to a request.
+type ResponseHandler func(*msg.Response)
 
 // New returns a new Peer
 func New(c net.Conn, ps *PeerStore) *Peer {
-	cs := &ChanStore{
-		chans: make(map[string]chan *msg.Response),
-		lock:  sync.RWMutex{},
-	}
 	return &Peer{
-		ID:         uuid.New(),
-		Connection: c,
-		Store:      ps,
-		resChans:   cs,
-		reqChan:    make(chan *msg.Request),
-		pushChan:   make(chan *msg.Push),
+		ID:               uuid.New(),
+		Connection:       c,
+		Store:            ps,
+		responseHandlers: make(map[string]ResponseHandler),
+		reqChan:          make(chan *msg.Request),
+		pushChan:         make(chan *msg.Push),
+		killChan:         make(chan bool),
 	}
 }
 
@@ -144,32 +121,44 @@ func ConnectionHandler(c net.Conn) {
 // Dispatch listens on this peer's Connection and passes received messages
 // to the appropriate message handlers.
 func (p *Peer) Dispatch() {
-	p.Connection.SetDeadline(time.Now().Add(Timeout))
+	// After 3 consecutive errors we kill this connection and its associated
+	// handlers using the killChan
+	errCount := 0
 
 	for {
 		message, err := msg.Read(p.Connection)
 		if err != nil {
-			log.WithError(err).Error("Dispatcher failed to read message")
+			if err == io.EOF {
+				// This just means the peer hasn't sent anything
+				select {
+				case <-time.After(messageWaitTime):
+				}
+			} else {
+				log.WithError(err).Error("Dispatcher failed to read message")
+				if errCount == 3 {
+					p.killChan <- true
+					p.Connection.Close()
+					return
+				}
+				errCount++
+			}
 			continue
 		}
+		errCount = 0
 
 		switch message.(type) {
 		case *msg.Request:
 			p.reqChan <- message.(*msg.Request)
-			break
 		case *msg.Response:
 			res := message.(*msg.Response)
-			resChan := p.resChans.Get(res.ID)
-			if resChan != nil {
-				resChan <- message.(*msg.Response)
-			} else {
-				log.Errorf("Dispatcher could not find channel for response %s", res.ID)
+			rh := p.getResponseHandler(res.ID)
+			if rh == nil {
+				log.Error("Dispatcher could not find response handler for response")
 			}
-			p.resChans.Remove(res.ID)
-			break
+			go rh(res)
+			p.removeResponseHandler(res.ID)
 		case *msg.Push:
 			p.pushChan <- message.(*msg.Push)
-			break
 		default:
 			// Invalid messgae type. Ignore
 			log.Debug("Dispatcher received message with invalid type")
@@ -184,9 +173,8 @@ func (p *Peer) RequestHandler() {
 	for {
 		select {
 		case req = <-p.reqChan:
-			break
-		case <-time.After(Timeout):
-			continue
+		case <-p.killChan:
+			return
 		}
 
 		res := msg.Response{ID: req.ID}
@@ -194,11 +182,9 @@ func (p *Peer) RequestHandler() {
 		switch req.ResourceType {
 		case msg.ResourcePeerInfo:
 			res.Resource = p.Store.Addrs()
-			break
 		case msg.ResourceBlock, msg.ResourceTransaction:
 			res.Error = msg.NewProtocolError(msg.NotImplemented,
 				"Block and Transaction requests are not yet implemented on this peer")
-			break
 		default:
 			res.Error = msg.NewProtocolError(msg.InvalidResourceType,
 				"Invalid resource type")
@@ -218,22 +204,11 @@ func (p *Peer) PushHandler() {
 	for {
 		select {
 		case push = <-p.pushChan:
-			break
-		case <-time.After(Timeout):
-			continue
+		case <-p.killChan:
+			return
 		}
 
 		switch push.ResourceType {
-		case msg.ResourcePeerInfo:
-			for _, addr := range push.Resource.([]string) {
-				c, err := conn.Dial(addr)
-				if err != nil {
-					log.WithError(err).Errorf("PushHandler fialed to dial peer %s", addr)
-				} else {
-					ConnectionHandler(c)
-				}
-			}
-			break
 		case msg.ResourceBlock:
 		case msg.ResourceTransaction:
 		default:
@@ -242,31 +217,32 @@ func (p *Peer) PushHandler() {
 	}
 }
 
-// AwaitResponse waits on a response channel for a response message sent by the
-// Dispatcher. When a response arrives it is handled appropriately.
-func (p *Peer) AwaitResponse(req msg.Request, c chan *msg.Response) {
-	defer p.resChans.Remove(req.ID)
-	select {
-	case res := <-c:
-		// TODO: do something with the response
-		log.Debugf("Received response %s", res.ID)
-	case <-time.After(Timeout):
-		break
-	}
-}
-
-// Request sends the given request over this peer's Connection and spawns a
-// response listener with AwaitResponse. Returns error if request could not be
-// written.
-func (p *Peer) Request(req msg.Request) error {
-	resChan := make(chan *msg.Response)
-	p.resChans.Add(req.ID, resChan)
+// Request sends the given request over this peer's Connection and registers the
+// given response hadnler to be called when the response arrives at the dispatcher.
+// Returns error if request could not be written.
+func (p *Peer) Request(req msg.Request, rh ResponseHandler) error {
+	p.addResponseHandler(req.ID, rh)
 	err := req.Write(p.Connection)
 	if err != nil {
-		p.resChans.Remove(req.ID)
 		return err
 	}
-
-	go p.AwaitResponse(req, resChan)
 	return nil
+}
+
+func (p *Peer) addResponseHandler(id string, rh ResponseHandler) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.responseHandlers[id] = rh
+}
+
+func (p *Peer) removeResponseHandler(id string) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	delete(p.responseHandlers, id)
+}
+
+func (p *Peer) getResponseHandler(id string) ResponseHandler {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.responseHandlers[id]
 }
