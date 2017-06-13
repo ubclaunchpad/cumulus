@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"crypto/ecdsa"
 	"encoding/gob"
 	"io"
 )
@@ -42,81 +41,34 @@ func DecodeBlockChain(r io.Reader) *BlockChain {
 	return &bc
 }
 
-// ValidTransaction checks whether a transaction is valid, assuming the
-// blockchain is valid.
-func (bc *BlockChain) ValidTransaction(t *Transaction) bool {
-
-	// Find the transaction input in the chain (by hash)
-	var input *Transaction
-	inputBlock := bc.Blocks[t.Input.BlockNumber]
-	for _, transaction := range inputBlock.Transactions {
-		if t.Input.Hash == HashSum(transaction) {
-			input = transaction
-		}
-	}
-	if input == nil {
-		return false
-	}
-
-	// Check that output to sender in input is equal to outputs in t
-	var inAmount uint64
-	for _, output := range input.Outputs {
-		if output.Recipient == t.Sender {
-			inAmount += output.Amount
-		}
-	}
-	var outAmount uint64
-	for _, output := range t.Outputs {
-		outAmount += output.Amount
-	}
-	if inAmount != outAmount {
-		return false
-	}
-
-	// Verify signature of t
-	hash := HashSum(t.TxBody)
-	if !ecdsa.Verify(t.Sender.Key(), hash.Marshal(), t.Sig.R, t.Sig.S) {
-		return false
-	}
-
-	// Test if identical transaction already exists in chain.
-	endChain := uint32(len(bc.Blocks))
-	for i := t.Input.BlockNumber; i < endChain; i++ {
-		if exists, _ := bc.Blocks[i].ContainsTransaction(t); exists {
-			return false
-		}
-	}
-
-	return true
-}
-
-// ValidBlock checks whether a block is valid
-func (bc *BlockChain) ValidBlock(b *Block) bool {
-	// Check that block number is one greater than last block
-	lastBlock := bc.Blocks[b.BlockNumber-1]
-	if lastBlock.BlockNumber != b.BlockNumber-1 {
-		return false
-	}
-
-	// Verify every Transaction in the block.
-	for _, t := range b.Transactions {
-		if !bc.ValidTransaction(t) {
-			return false
-		}
-	}
-
-	// Check that hash of last block is correct
-	if HashSum(lastBlock) != b.LastBlock {
-		return false
-	}
-
-	return true
-}
-
 // AppendBlock adds a block to the end of the block chain.
 func (bc *BlockChain) AppendBlock(b *Block, miner Address) {
 	b.BlockNumber = uint32(len(bc.Blocks))
 	b.LastBlock = HashSum(bc.Blocks[b.BlockNumber-1])
 	b.Miner = miner
 	bc.Blocks = append(bc.Blocks, b)
+}
+
+// GetInputTransaction returns the input Transaction to t. If the input does
+// not exist, then GetInputTransaction returns nil.
+func (bc *BlockChain) GetInputTransaction(t *Transaction) *Transaction {
+	if t.Input.BlockNumber > uint32(len(bc.Blocks)) {
+		return nil
+	}
+	b := bc.Blocks[t.Input.BlockNumber]
+	if t.Input.Index > uint32(len(b.Transactions)) {
+		return nil
+	}
+	return b.Transactions[t.Input.Index]
+}
+
+// ContainsTransaction returns true if the BlockChain contains the transaction
+// in a block between start and stop as indexes.
+func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (bool, uint32, uint32) {
+	for i := start; i < stop; i++ {
+		if exists, j := bc.Blocks[i].ContainsTransaction(t); exists {
+			return true, i, j
+		}
+	}
+	return false, 0, 0
 }

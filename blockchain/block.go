@@ -73,11 +73,11 @@ func DecodeBlock(r io.Reader) *Block {
 
 // ContainsTransaction returns true and the transaction itself if the Block
 // contains the transaction.
-func (b *Block) ContainsTransaction(t *Transaction) (bool, *Transaction) {
-	for _, tr := range b.Transactions {
+func (b *Block) ContainsTransaction(t *Transaction) (bool, uint32) {
+	for i, tr := range b.Transactions {
 		if HashSum(t) == HashSum(tr) {
-			return true, tr
+			return true, uint32(i)
 		}
 	}
-	return false, nil
+	return false, 0
 }
