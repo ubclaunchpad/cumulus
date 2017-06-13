@@ -1,4 +1,4 @@
-package blockchain
+package miner
 
 import (
 	"crypto/sha256"
@@ -7,18 +7,19 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	bc "github.com/ubclaunchpad/cumulus/blockchain"
 )
 
 const (
 	// MiningHeaderLen is the length of the MiningHeader struct in bytes
-	MiningHeaderLen = (3 * HashLen) + (1 * (32 / 8)) + (1 * (64 / 8))
+	MiningHeaderLen = (3 * bc.HashLen) + (1 * (32 / 8)) + (1 * (64 / 8))
 )
 
 // MiningHeader contains the metadata required for mining
 type MiningHeader struct {
-	LastBlock Hash
-	RootHash  Hash
-	Target    Hash
+	LastBlock bc.Hash
+	RootHash  bc.Hash
+	Target    bc.Hash
 	Time      uint32
 	Nonce     uint64
 }
@@ -29,13 +30,17 @@ func (mh *MiningHeader) Marshal() []byte {
 	buf = append(buf, mh.LastBlock.Marshal()...)
 	buf = append(buf, mh.RootHash.Marshal()...)
 	buf = append(buf, mh.Target.Marshal()...)
-	AppendUint32ToSlice(&buf, mh.Time)
-	AppendUint64ToSlice(&buf, mh.Nonce)
+	tempBufTime := make([]byte, 4)
+	binary.LittleEndian.PutUint32(tempBufTime, mh.Time)
+	buf = append(buf, tempBufTime...)
+	tempBufNonce := make([]byte, 8)
+	binary.LittleEndian.PutUint64(tempBufNonce, mh.Nonce)
+	buf = append(buf, tempBufNonce...)
 	return buf
 }
 
 // SetMiningHeader sets the mining header
-func (mh *MiningHeader) SetMiningHeader(lastBlock Hash, rootHash Hash, target Hash) {
+func (mh *MiningHeader) SetMiningHeader(lastBlock bc.Hash, rootHash bc.Hash, target bc.Hash) {
 	mh.LastBlock = lastBlock
 	mh.RootHash = rootHash
 	mh.Target = target
@@ -45,7 +50,7 @@ func (mh *MiningHeader) SetMiningHeader(lastBlock Hash, rootHash Hash, target Ha
 
 // VerifyProofOfWork computes the hash of the MiningHeader and returns true if the result is less than the target
 func (mh *MiningHeader) VerifyProofOfWork() bool {
-	if CompareTo(mh.DoubleHashSum(), mh.Target, LessThan) {
+	if bc.CompareTo(mh.DoubleHashSum(), mh.Target, bc.LessThan) {
 		return true
 	}
 
@@ -53,7 +58,7 @@ func (mh *MiningHeader) VerifyProofOfWork() bool {
 }
 
 // DoubleHashSum computes the hash 256 of the marshalled mining header twice
-func (mh *MiningHeader) DoubleHashSum() Hash {
+func (mh *MiningHeader) DoubleHashSum() bc.Hash {
 	hash := sha256.Sum256(mh.Marshal())
 	hash = sha256.Sum256(hash[:])
 	return hash
@@ -61,11 +66,11 @@ func (mh *MiningHeader) DoubleHashSum() Hash {
 
 // Mine continuously increases the nonce and tries to verify the proof of work until the puzzle is solved
 func (mh *MiningHeader) Mine() bool {
-	if mh.VerifyMiningHeader() == false {
+	if !mh.VerifyMiningHeader() {
 		return false
 	}
 
-	for mh.VerifyProofOfWork() == false {
+	for !mh.VerifyProofOfWork() {
 		if mh.Nonce == math.MaxUint64 {
 			mh.Nonce = 0
 		}
@@ -81,23 +86,9 @@ func (mh *MiningHeader) VerifyMiningHeader() bool {
 		log.Error("Invalid time in mining header")
 		return false
 	}
-	if CompareTo(mh.Target, MinHash, EqualTo) || CompareTo(mh.Target, MaxDifficulty, GreaterThan) {
+	if bc.CompareTo(mh.Target, bc.MinHash, bc.EqualTo) || bc.CompareTo(mh.Target, bc.MaxDifficulty, bc.GreaterThan) {
 		log.Error("Invalid target in mining header")
 		return false
 	}
 	return true
-}
-
-// AppendUint32ToSlice converts a uint32 to a byte slice and appends it to a byte slice
-func AppendUint32ToSlice(s *[]byte, num uint32) {
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, num)
-	*s = append(*s, buf...)
-}
-
-// AppendUint64ToSlice converts a uint64 to a byte slice and appends it to a byte slice
-func AppendUint64ToSlice(s *[]byte, num uint64) {
-	buf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(buf, num)
-	*s = append(*s, buf...)
 }
