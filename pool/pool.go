@@ -21,36 +21,37 @@ func New() *Pool {
 
 // Len returns the number of transactions in the Pool.
 func (p *Pool) Len() int {
-	return 0
+	return p.Transactions.Len()
 }
 
-// GetTransaction returns the transctions with input transaction Hash h.
-func (p *Pool) GetTransaction(h blockchain.Hash) []*blockchain.Transaction {
-	return nil
+// Get returns the transctions with input transaction Hash h.
+func (p *Pool) Get(h blockchain.Hash) (interface{}, bool) {
+	return p.Transactions.Get(h)
 }
 
-// PutTransaction inserts a transaction into the pool, returning
+// Set inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
-func (p *Pool) PutTransaction(t *blockchain.Transaction) bool {
-	return false
+func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) {
+	if ok, _ := bc.ValidTransaction(t); ok {
+		p.Transactions.Set(t.Input.Hash, t)
+	}
 }
 
-// RemoveTransaction removes a transaction from the Pool, returning
-// true if the Transaction existed in the pool.
-func (p *Pool) RemoveTransaction(t *blockchain.Transaction) bool {
-	return false
+// Delete removes a transaction from the Pool.
+func (p *Pool) Delete(t *blockchain.Transaction) {
+	p.Transactions.Delete(t.Input.Hash)
 }
 
-// UpdatePool updates the Pool by removing the Transactions found in the
+// Update updates the Pool by removing the Transactions found in the
 // Block. If the Block is found invalid, then false is returned and no
 // Transactions are removed from the Pool.
-func (p *Pool) UpdatePool(b *blockchain.Block) bool {
+func (p *Pool) Update(b *blockchain.Block) bool {
 	return false
 }
 
-// GetNewBlock returns a new Block from the highest priority Transactions in
+// GetBlock returns a new Block from the highest priority Transactions in
 // the Pool, as well as a error indicating whether there were any
 // Transactions to create a Block.
-func (p *Pool) GetNewBlock() (*blockchain.Block, error) {
+func (p *Pool) GetBlock() (*blockchain.Block, error) {
 	return newBlock(), errors.New("no transactions in pool")
 }

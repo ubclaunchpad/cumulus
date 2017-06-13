@@ -73,3 +73,14 @@ func newBlock() *blockchain.Block {
 	}
 	return &b
 }
+
+func newBlockChain() *blockchain.BlockChain {
+	// Uniform distribution on [10, 50]
+	nBlocks := mrand.Intn(40) + 10
+	bc := blockchain.BlockChain{Blocks: make([]*blockchain.Block, nBlocks)}
+	for i := 0; i < nBlocks; i++ {
+		bc.Blocks[i] = newBlock()
+	}
+	bc.Head = blockchain.HashSum(bc.Blocks[nBlocks-1])
+	return &bc
+}
