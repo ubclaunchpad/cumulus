@@ -71,9 +71,15 @@ func (bc *BlockChain) ValidTransaction(t *Transaction) (bool, TransactionCode) {
 
 // ValidBlock checks whether a block is valid.
 func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
+	// Check that block number between 0 and max blocks.
+	ix := b.BlockNumber - 1
+	if int(ix) > len(bc.Blocks)-1 || ix <= 0 {
+		return false, BadBlockNumber
+	}
+
 	// Check that block number is one greater than last block
-	lastBlock := bc.Blocks[b.BlockNumber-1]
-	if lastBlock.BlockNumber != b.BlockNumber-1 {
+	lastBlock := bc.Blocks[ix]
+	if lastBlock.BlockNumber != ix {
 		return false, BadBlockNumber
 	}
 
