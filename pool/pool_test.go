@@ -37,19 +37,28 @@ func TestGetAndSetTransaction(t *testing.T) {
 
 func TestUpdatePool(t *testing.T) {
 	p := New()
-	bc := blockchain.NewBlockChain()
-	b := blockchain.NewBlock()
-	for _, tr := range b.Transactions {
-		p.Set(tr, bc)
-		if _, ok := p.Get(tr.Input.Hash); ok {
-			t.Fail()
-		}
-	}
-	if p.Len() != len(b.Transactions) {
+	bc, legitBlk := blockchain.NewValidChainAndBlock()
+	badBlock := blockchain.NewBlock()
+	if p.Update(badBlock, bc) {
 		t.Fail()
 	}
 
-	p.Update(b)
+	for _, tr := range legitBlk.Transactions {
+		p.Set(tr, bc)
+		if _, ok := p.Get(tr.Input.Hash); !ok {
+			t.Fail()
+		}
+	}
+	if p.Len() == 0 {
+		t.Fail()
+	}
+	if p.Len() != len(legitBlk.Transactions) {
+		t.Fail()
+	}
+
+	if !p.Update(legitBlk, bc) {
+		t.Fail()
+	}
 	if p.Len() != 0 {
 		t.Fail()
 	}

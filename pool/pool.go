@@ -47,8 +47,14 @@ func (p *Pool) Delete(t *blockchain.Transaction) {
 // Update updates the Pool by removing the Transactions found in the
 // Block. If the Block is found invalid, then false is returned and no
 // Transactions are removed from the Pool.
-func (p *Pool) Update(b *blockchain.Block) bool {
-	return false
+func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
+	if ok, _ := bc.ValidBlock(b); !ok {
+		return false
+	}
+	for _, t := range b.Transactions {
+		p.Delete(t)
+	}
+	return true
 }
 
 // GetBlock returns a new Block from the highest priority Transactions in
