@@ -95,3 +95,12 @@ func HexStringToHash(s string) Hash {
 
 	return hash
 }
+
+// HashToHexString converts a hash to a hex string
+func HashToHexString(h Hash) string {
+	var hash Hash
+	for i := 0; i < HashLen; i++ {
+		hash[i] = h[HashLen-1-i]
+	}
+	return hex.EncodeToString(hash[:])
+}
