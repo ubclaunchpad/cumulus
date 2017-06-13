@@ -1,17 +1,31 @@
 package pool
 
-import "testing"
+import (
+	"testing"
 
-func TestGetAndPutTransaction(t *testing.T) {
+	"github.com/ubclaunchpad/cumulus/blockchain"
+)
+
+func TestGetAndSetTransaction(t *testing.T) {
 	p := New()
-	bc := newBlockChain()
+	bc, b := blockchain.NewValidChainAndBlock()
 	if p.Len() != 0 {
 		t.Fail()
 	}
-	tr := newTransaction()
-	p.Set(tr, bc)
+	tr := b.Transactions[0]
+	if !p.Set(tr, bc) {
+		t.Fail()
+	}
 
 	if p.Len() != 1 {
+		t.Fail()
+	}
+
+	r, ok := p.Get(tr.Input.Hash)
+	if !ok {
+		t.Fail()
+	}
+	if r != tr {
 		t.Fail()
 	}
 
@@ -23,8 +37,8 @@ func TestGetAndPutTransaction(t *testing.T) {
 
 func TestUpdatePool(t *testing.T) {
 	p := New()
-	bc := newBlockChain()
-	b := newBlock()
+	bc := blockchain.NewBlockChain()
+	b := blockchain.NewBlock()
 	for _, tr := range b.Transactions {
 		p.Set(tr, bc)
 		if _, ok := p.Get(tr.Input.Hash); ok {
@@ -42,8 +56,8 @@ func TestUpdatePool(t *testing.T) {
 }
 
 func TestGetNewBlock(t *testing.T) {
-	b := newBlock()
-	bc := newBlockChain()
+	b := blockchain.NewBlock()
+	bc := blockchain.NewBlockChain()
 	p := New()
 	for _, tr := range b.Transactions {
 		p.Set(tr, bc)

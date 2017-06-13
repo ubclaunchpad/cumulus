@@ -24,17 +24,19 @@ func (p *Pool) Len() int {
 	return p.Transactions.Len()
 }
 
-// Get returns the transctions with input transaction Hash h.
+// Get returns the transction with input transaction Hash h.
 func (p *Pool) Get(h blockchain.Hash) (interface{}, bool) {
 	return p.Transactions.Get(h)
 }
 
 // Set inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
-func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) {
-	if ok, _ := bc.ValidTransaction(t); ok {
+func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
+	ok, _ := bc.ValidTransaction(t)
+	if ok {
 		p.Transactions.Set(t.Input.Hash, t)
 	}
+	return ok
 }
 
 // Delete removes a transaction from the Pool.
@@ -53,5 +55,5 @@ func (p *Pool) Update(b *blockchain.Block) bool {
 // the Pool, as well as a error indicating whether there were any
 // Transactions to create a Block.
 func (p *Pool) GetBlock() (*blockchain.Block, error) {
-	return newBlock(), errors.New("no transactions in pool")
+	return blockchain.NewBlock(), errors.New("no transactions in pool")
 }
