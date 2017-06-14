@@ -3,16 +3,17 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"log"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 const (
 	// HashLen is the length in bytes of a hash.
 	HashLen = 32
 	// MaxDifficultyHex is the maximum difficulty value represented as a hex string
-	MaxDifficultyHex = "000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+	MaxDifficultyHex = "0x000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 	// MaxHashHex is the maximum hash value represented as a hex string
-	MaxHashHex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+	MaxHashHex = "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 )
 
 // CompareTo comparator constants
@@ -27,11 +28,11 @@ const (
 
 var (
 	// MaxDifficulty is the maximum difficulty value
-	MaxDifficulty = HexStringToHash(MaxDifficultyHex)
+	MaxDifficulty = (new(Hash).ParseString(MaxDifficultyHex))
 	// MaxHash is the maximum hash value
-	MaxHash = HexStringToHash(MaxHashHex)
+	MaxHash = new(Hash).ParseString(MaxHashHex)
 	// MinHash is the minimum hash value
-	MinHash = HexStringToHash("0")
+	MinHash = new(Hash).ParseString("0x00")
 )
 
 // Hash represents a 256-bit hash of a block or transaction
@@ -57,19 +58,30 @@ func HashSum(m Marshaller) Hash {
 }
 
 // CompareTo compares two hashes, it returns true if the operation of the first hash on the second hash specified by the comparator is true, and false otherwise
-func CompareTo(h1 Hash, h2 Hash, comparator int) bool {
+func (h *Hash) CompareTo(h2 Hash, comparator int) bool {
 	for i := HashLen - 1; i >= 0; i-- {
-		if h1[i] > h2[i] {
-			return 1 == comparator
-		} else if h1[i] < h2[i] {
-			return -1 == comparator
+		if h[i] > h2[i] {
+			return GreaterThan == comparator
+		} else if h[i] < h2[i] {
+			return LessThan == comparator
 		}
 	}
-	return 0 == comparator
+	return EqualTo == comparator
 }
 
-// HexStringToHash converts a big endian hex string to a hash
-func HexStringToHash(s string) Hash {
+// ParseString sets the hash to the the value represented by a hexadecimal string, and returns the hash
+func (h *Hash) ParseString(s string) *Hash {
+	if len(s) == 0 || len(s) == 1 || s[:2] != "0x" {
+		log.Error("Invalid hexadecimal string, must begin with 0x")
+		return nil
+	}
+
+	s = s[2:]
+	if len(s) > HashLen*2 {
+		log.Error("Hexadeximal string is too large")
+		return nil
+	}
+
 	if len(s)%2 != 0 {
 		s = "0" + s
 	}
@@ -85,22 +97,22 @@ func HexStringToHash(s string) Hash {
 	var bytes, e = hex.DecodeString(s)
 
 	if e != nil {
-		log.Fatal(e)
+		log.Error(e)
+		return nil
 	}
 
-	var hash Hash
 	for i := 0; i < HashLen; i++ {
-		hash[i] = bytes[HashLen-1-i]
+		h[i] = bytes[HashLen-1-i]
 	}
 
-	return hash
+	return h
 }
 
-// HashToHexString converts a hash to a hex string
-func HashToHexString(h Hash) string {
-	var hash Hash
+// HexString returns the hexadecimal representation of the hash
+func (h *Hash) HexString() string {
+	var hashBigEndian Hash
 	for i := 0; i < HashLen; i++ {
-		hash[i] = h[HashLen-1-i]
+		hashBigEndian[i] = h[HashLen-1-i]
 	}
-	return hex.EncodeToString(hash[:])
+	return "0x" + hex.EncodeToString(hashBigEndian[:])
 }
