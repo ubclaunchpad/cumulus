@@ -6,7 +6,7 @@ import (
 )
 
 func TestEncodeDecodeBlock(t *testing.T) {
-	b1 := newBlock()
+	b1 := NewBlock()
 
 	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
 
@@ -19,7 +19,7 @@ func TestEncodeDecodeBlock(t *testing.T) {
 }
 
 func TestContainsTransaction(t *testing.T) {
-	b := newBlock()
+	b := NewBlock()
 
 	if exists, _ := b.ContainsTransaction(b.Transactions[0]); !exists {
 		t.Fail()
