@@ -39,7 +39,7 @@ func (mh *MiningHeader) Marshal() []byte {
 	return buf
 }
 
-// SetMiningHeader sets the mining header
+// SetMiningHeader sets the mining header (sets the time to the current time)
 func (mh *MiningHeader) SetMiningHeader(lastBlock bc.Hash, rootHash bc.Hash, target bc.Hash) {
 	mh.LastBlock = lastBlock
 	mh.RootHash = rootHash
@@ -50,7 +50,7 @@ func (mh *MiningHeader) SetMiningHeader(lastBlock bc.Hash, rootHash bc.Hash, tar
 
 // VerifyProofOfWork computes the hash of the MiningHeader and returns true if the result is less than the target
 func (mh *MiningHeader) VerifyProofOfWork() bool {
-	if bc.CompareTo(mh.DoubleHashSum(), mh.Target, bc.LessThan) {
+	if mh.DoubleHashSum().CompareTo(mh.Target, bc.LessThan) {
 		return true
 	}
 
@@ -86,7 +86,7 @@ func (mh *MiningHeader) VerifyMiningHeader() bool {
 		log.Error("Invalid time in mining header")
 		return false
 	}
-	if bc.CompareTo(mh.Target, bc.MinHash, bc.EqualTo) || bc.CompareTo(mh.Target, bc.MaxDifficulty, bc.GreaterThan) {
+	if mh.Target.CompareTo(*bc.MinHash, bc.EqualTo) || mh.Target.CompareTo(*bc.MaxDifficulty, bc.GreaterThan) {
 		log.Error("Invalid target in mining header")
 		return false
 	}

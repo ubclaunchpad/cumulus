@@ -28,7 +28,7 @@ const (
 
 var (
 	// MaxDifficulty is the maximum difficulty value
-	MaxDifficulty = (new(Hash).ParseString(MaxDifficultyHex))
+	MaxDifficulty = new(Hash).ParseString(MaxDifficultyHex)
 	// MaxHash is the maximum hash value
 	MaxHash = new(Hash).ParseString(MaxHashHex)
 	// MinHash is the minimum hash value
@@ -58,7 +58,7 @@ func HashSum(m Marshaller) Hash {
 }
 
 // CompareTo compares two hashes, it returns true if the operation of the first hash on the second hash specified by the comparator is true, and false otherwise
-func (h *Hash) CompareTo(h2 Hash, comparator int) bool {
+func (h Hash) CompareTo(h2 Hash, comparator int) bool {
 	for i := HashLen - 1; i >= 0; i-- {
 		if h[i] > h2[i] {
 			return GreaterThan == comparator
@@ -109,7 +109,7 @@ func (h *Hash) ParseString(s string) *Hash {
 }
 
 // HexString returns the hexadecimal representation of the hash
-func (h *Hash) HexString() string {
+func (h Hash) HexString() string {
 	var hashBigEndian Hash
 	for i := 0; i < HashLen; i++ {
 		hashBigEndian[i] = h[HashLen-1-i]
