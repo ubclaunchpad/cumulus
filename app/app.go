@@ -42,4 +42,5 @@ func Run(cfg conf.Config) {
 	select {}
 	// Ask target for its peers
 	// Connect to these peers until we have enough peers
+	// Download the blockchain
 }
