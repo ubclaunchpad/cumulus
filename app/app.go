@@ -5,6 +5,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/peer"
@@ -13,6 +14,7 @@ import (
 var (
 	config *conf.Config
 	// TODO peer store once it's merged in
+	chain *blockchain.BlockChain
 )
 
 // Run sets up and starts a new Cumulus node with the
