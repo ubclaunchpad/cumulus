@@ -1,20 +1,28 @@
 package pool
 
-import "github.com/ubclaunchpad/cumulus/blockchain"
+import (
+	"time"
+
+	"github.com/ubclaunchpad/cumulus/blockchain"
+)
+
+// PooledTransaction is a Transaction with a timetamp.
+type PooledTransaction struct {
+	Transaction *blockchain.Transaction
+	Time        time.Time
+}
 
 // Pool is a set of valid Transactions.
 type Pool struct {
-	OrderMap        map[blockchain.Hash]int
-	OrderReverseMap map[int]blockchain.Hash
-	Transactions    map[blockchain.Hash]*blockchain.Transaction
+	Order        []*PooledTransaction
+	Transactions map[blockchain.Hash]*PooledTransaction
 }
 
 // New initializes a new pool.
 func New() *Pool {
 	return &Pool{
-		OrderMap:        map[blockchain.Hash]int{},
-		OrderReverseMap: map[int]blockchain.Hash{},
-		Transactions:    map[blockchain.Hash]*blockchain.Transaction{},
+		Order:        []*PooledTransaction{},
+		Transactions: map[blockchain.Hash]*PooledTransaction{},
 	}
 }
 
@@ -25,33 +33,62 @@ func (p *Pool) Len() int {
 
 // Get returns the transction with input transaction Hash h.
 func (p *Pool) Get(h blockchain.Hash) *blockchain.Transaction {
-	return p.Transactions[h]
+	return p.Transactions[h].Transaction
 }
 
 // GetN returns the Nth transaction in the pool.
 func (p *Pool) GetN(N int) *blockchain.Transaction {
-	return p.Transactions[p.OrderReverseMap[N]]
+	return p.Order[N].Transaction
+}
+
+// GetIndex returns the index of the transaction in the ordering.
+func (p *Pool) GetIndex(t *blockchain.Transaction) int {
+	return getIndex(p.Order, p.Transactions[t.Input.Hash].Time, 0, p.Len()-1)
+}
+
+// getIndex does a binary search for a PooledTransaction by timestamp.
+func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
+	mid := (low + high) / 2
+	if a[mid].Time == target {
+		return mid
+	} else if target.Before(a[mid].Time) {
+		return getIndex(a, target, low, mid-1)
+	} else {
+		return getIndex(a, target, mid+1, high)
+	}
 }
 
 // Set inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
 func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
-	ok, _ := bc.ValidTransaction(t)
-	if ok {
-		p.OrderMap[t.Input.Hash] = p.Len()
-		p.OrderReverseMap[p.Len()] = t.Input.Hash
-		p.Transactions[t.Input.Hash] = t
+	if ok, _ := bc.ValidTransaction(t); ok {
+		p.set(t)
+		return true
 	}
-	return ok
+	return false
+}
+
+// SetUnsafe adds a transaction to the pool without validation.
+func (p *Pool) SetUnsafe(t *blockchain.Transaction) {
+	p.set(t)
+}
+
+func (p *Pool) set(t *blockchain.Transaction) {
+	vt := &PooledTransaction{
+		Transaction: t,
+		Time:        time.Now(),
+	}
+	p.Order = append(p.Order, vt)
+	p.Transactions[t.Input.Hash] = vt
 }
 
 // Delete removes a transaction from the Pool.
 func (p *Pool) Delete(t *blockchain.Transaction) {
-	i := p.OrderMap[t.Input.Hash]
-	if i < p.Len() {
+	vt, ok := p.Transactions[t.Input.Hash]
+	if ok {
+		i := p.GetIndex(vt.Transaction)
+		p.Order = append(p.Order[0:i], p.Order[i:p.Len()-1]...)
 		delete(p.Transactions, t.Input.Hash)
-		delete(p.OrderMap, t.Input.Hash)
-		delete(p.OrderReverseMap, i)
 	}
 }
 

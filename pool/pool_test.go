@@ -32,6 +32,14 @@ func TestGetAndSetTransaction(t *testing.T) {
 	}
 }
 
+func TestSetBadTransaction(t *testing.T) {
+	p := New()
+	bc := blockchain.NewBlockChain()
+	if p.Set(blockchain.NewTransaction(), bc) {
+		t.FailNow()
+	}
+}
+
 func TestUpdatePool(t *testing.T) {
 	p := New()
 	bc, legitBlk := blockchain.NewValidChainAndBlock()
@@ -80,5 +88,23 @@ func TestGetNewBlockEmpty(t *testing.T) {
 	txns := p.GetTxns(305)
 	if len(txns) != 0 {
 		t.FailNow()
+	}
+}
+
+func TestGetIndex(t *testing.T) {
+	p := New()
+	numTxns := 1000
+	tr := blockchain.NewTransaction()
+	p.SetUnsafe(tr)
+	for i := 0; i < numTxns; i++ {
+		p.SetUnsafe(blockchain.NewTransaction())
+	}
+	if p.GetIndex(tr) != 0 {
+		t.FailNow()
+	}
+	for i := 0; i < numTxns; i++ {
+		if p.GetIndex(p.Order[i].Transaction) != i {
+			t.FailNow()
+		}
 	}
 }
