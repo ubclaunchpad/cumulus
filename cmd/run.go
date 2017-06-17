@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"fmt"
-
-	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/app"
+	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
@@ -17,10 +15,16 @@ var runCmd = &cobra.Command{
 	If a target is not provided, listen for incoming connections.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		port, _ := cmd.Flags().GetInt("port")
-		ip, _ := cmd.Flags().GetString("interface")
+		iface, _ := cmd.Flags().GetString("interface")
 		target, _ := cmd.Flags().GetString("target")
 		verbose, _ := cmd.Flags().GetBool("verbose")
-		run(port, ip, target, verbose)
+		config := conf.Config{
+			Interface: iface,
+			Port:      uint16(port),
+			Target:    target,
+			Verbose:   verbose,
+		}
+		app.Run(config)
 	},
 }
 
@@ -39,36 +43,4 @@ func init() {
 	runCmd.Flags().StringP("interface", "i", peer.DefaultIP, "IP address to listen on")
 	runCmd.Flags().StringP("target", "t", "", "Multiaddress of peer to connect to")
 	runCmd.Flags().BoolP("verbose", "v", false, "Enable verbose logging")
-}
-
-func run(port int, ip, target string, verbose bool) {
-	log.Info("Starting Cumulus Peer")
-
-	if verbose {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	// Set up listener. This is run as a goroutine because Listen blocks forever
-	log.Infof("Starting listener on %s:%d", ip, port)
-	go func() {
-		err := conn.Listen(fmt.Sprintf("%s:%d", ip, port), peer.ConnectionHandler)
-		if err != nil {
-			log.WithError(err).Fatalf("Failed to listen on %s:%d", ip, port)
-		}
-	}()
-
-	// Connect to remote peer if target provided
-	if target != "" {
-		log.Infof("Dialing target %s", target)
-		c, err := conn.Dial(target)
-		if err != nil {
-			log.WithError(err).Errorf("Failed to dial target %s", target)
-			return
-		}
-		peer.ConnectionHandler(c)
-	}
-
-	// Hang forever. All the work from here on is handled in goroutines. We need
-	// this to hang to keep them alive.
-	select {}
 }
