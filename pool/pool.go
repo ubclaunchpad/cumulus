@@ -12,7 +12,7 @@ type Pool struct {
 // New initializes a new pool.
 func New() *Pool {
 	return &Pool{
-		OrderMap:        make(map[blockchain.Hash]int, 0),
+		OrderMap:        map[blockchain.Hash]int{},
 		OrderReverseMap: map[int]blockchain.Hash{},
 		Transactions:    map[blockchain.Hash]*blockchain.Transaction{},
 	}

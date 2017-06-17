@@ -75,10 +75,10 @@ func TestGetTxns(t *testing.T) {
 	}
 }
 
-// func TestGetNewBlockEmpty(t *testing.T) {
-// 	p := New()
-// 	txns := p.GetTxns(305)
-// 	if txns != nil {
-// 		t.FailNow()
-// 	}
-// }
+func TestGetNewBlockEmpty(t *testing.T) {
+	p := New()
+	txns := p.GetTxns(305)
+	if txns != nil {
+		t.FailNow()
+	}
+}
