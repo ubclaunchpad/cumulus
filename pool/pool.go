@@ -31,7 +31,7 @@ func (p *Pool) Len() int {
 	return len(p.ValidTransactions)
 }
 
-// Get returns the transction with input transaction Hash h.
+// Get returns the tranasction with input transaction Hash h.
 func (p *Pool) Get(h blockchain.Hash) *blockchain.Transaction {
 	return p.ValidTransactions[h].Transaction
 }
@@ -89,7 +89,7 @@ func (p *Pool) Delete(t *blockchain.Transaction) {
 	vt, ok := p.ValidTransactions[t.Input.Hash]
 	if ok {
 		i := p.GetIndex(vt.Transaction)
-		p.Order = append(p.Order[0:i], p.Order[i:p.Len()-1]...)
+		p.Order = append(p.Order[0:i], p.Order[i+1:]...)
 		delete(p.ValidTransactions, t.Input.Hash)
 	}
 }
