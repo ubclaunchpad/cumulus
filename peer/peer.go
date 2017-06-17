@@ -1,174 +1,339 @@
 package peer
 
 import (
-	"bufio"
-	"context"
-	"fmt"
+	"io"
+	"net"
+	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
-	crypto "github.com/libp2p/go-libp2p-crypto"
-	host "github.com/libp2p/go-libp2p-host"
-	net "github.com/libp2p/go-libp2p-net"
-	lpeer "github.com/libp2p/go-libp2p-peer"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
-	swarm "github.com/libp2p/go-libp2p-swarm"
-	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/msg"
 )
 
 const (
 	// DefaultPort is the TCP port hosts will communicate over if none is
 	// provided
-	DefaultPort = 8765
-
-	// CumulusProtocol is the name of the protocol peers communicate over
-	CumulusProtocol = "/cumulus/0.0.1"
-
+	DefaultPort = 8000
 	// DefaultIP is the IP address new hosts will use if none if provided
 	DefaultIP = "127.0.0.1"
+	// MessageWaitTime is the amount of time the dispatcher should wait before
+	// attempting to read from the connection again when no data was received
+	MessageWaitTime = time.Second * 5
+	// MaxPeers is the maximum number of peers we can be connected to at a time
+	MaxPeers = 50
+	// PeerSearchWaitTime is the amount of time the maintainConnections goroutine
+	// will wait before checking if we can connect to more peers when is sees that
+	// our PeerStore is full.
+	PeerSearchWaitTime = time.Second * 30
 )
 
-// Peer is a cumulus Peer composed of a host
+var (
+	// PStore stores information about every peer we are connected to. All peers
+	// we connect to should have a reference to this peerstore so they can
+	// populate it.
+	PStore = &PeerStore{peers: make(map[string]*Peer, 0)}
+	// LocalAddr is the TCP address this host is listening on
+	LocalAddr             string
+	defaultRequestHandler RequestHandler
+	defaultPushHandler    PushHandler
+)
+
+// PeerStore is a thread-safe container for all the peers we are currently
+// connected to. It maps remote peer addresses to Peer objects.
+type PeerStore struct {
+	peers map[string]*Peer
+	lock  sync.RWMutex
+}
+
+// NewPeerStore returns an initialized peerstore.
+func NewPeerStore() *PeerStore {
+	return &PeerStore{
+		peers: make(map[string]*Peer, 0),
+		lock:  sync.RWMutex{},
+	}
+}
+
+// Add synchronously adds the given peer to the peerstore
+func (ps *PeerStore) Add(p *Peer) {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	ps.peers[p.Connection.RemoteAddr().String()] = p
+}
+
+// Remove synchronously removes the given peer from the peerstore
+func (ps *PeerStore) Remove(addr string) {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	delete(ps.peers, addr)
+}
+
+// RemoveRandom removes a random peer from the given PeerStore
+func (ps *PeerStore) RemoveRandom() {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	for _, p := range ps.peers {
+		delete(ps.peers, p.Connection.RemoteAddr().String())
+		break
+	}
+}
+
+// Get synchronously retreives the peer with the given id from the peerstore
+func (ps *PeerStore) Get(addr string) *Peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+	return ps.peers[addr]
+}
+
+// Addrs returns the list of addresses of the peers in the peerstore in the form
+// <IP addr>:<port>
+func (ps *PeerStore) Addrs() []string {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+	addrs := make([]string, 0)
+	for addr := range ps.peers {
+		addrs = append(addrs, addr)
+	}
+	return addrs
+}
+
+// Size synchornously returns the number of peers in the PeerStore
+func (ps *PeerStore) Size() int {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+	return len(ps.peers)
+}
+
+// Peer represents a remote peer we are connected to.
 type Peer struct {
-	host.Host
+	Connection       net.Conn
+	Store            *PeerStore
+	requestHandler   RequestHandler
+	pushHandler      PushHandler
+	responseHandlers map[string]ResponseHandler
+	lock             sync.RWMutex
 }
 
-// New creates a Cumulus host with the given IP addr and TCP port.
-// This may throw an error if we fail to create a key pair, a pid, or a new
-// multiaddress.
-func New(ip string, port int) (*Peer, error) {
-	// Generate a key pair for this host. We will only use the pudlic key to
-	// obtain a valid host ID.
-	// Cannot throw error with given arguments
-	priv, pub, _ := crypto.GenerateKeyPair(crypto.RSA, 2048)
+// ResponseHandler is any function that handles a response to a request.
+type ResponseHandler func(*msg.Response)
 
-	// Obtain Peer ID from public key.
-	// Cannot throw error with given argument
-	pid, _ := lpeer.IDFromPublicKey(pub)
+// PushHandler is any function that handles a push message.
+type PushHandler func(*msg.Push)
 
-	// Create a multiaddress (IP address and TCP port for this peer).
-	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
-	if err != nil {
-		return nil, err
-	}
+// RequestHandler is any function that returns a response to a request.
+type RequestHandler func(*msg.Request) msg.Response
 
-	// Create Peerstore and add host's keys to it (avoids annoying err)
-	ps := pstore.NewPeerstore()
-	ps.AddPubKey(pid, pub)
-	ps.AddPrivKey(pid, priv)
-
-	// Create swarm (this is the interface to the libP2P Network) using the
-	// multiaddress, peerID, and peerStore we just created.
-	netwrk, err := swarm.NewNetwork(
-		context.Background(),
-		[]ma.Multiaddr{addr},
-		pid,
-		ps,
-		nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Actually create the host and peer with the network we just set up.
-	host := bhost.New(netwrk)
-	peer := &Peer{Host: host}
-
-	// Build host multiaddress
-	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s",
-		host.ID().Pretty()))
-
-	// Now we can build a full multiaddress to reach this host
-	// by encapsulating both addresses:
-	fullAddr := addr.Encapsulate(hostAddr)
-	log.Info("I am ", fullAddr)
-
-	// Add this host's address to its peerstore (avoid's net/identi error)
-	ps.AddAddr(pid, fullAddr, pstore.PermanentAddrTTL)
-
-	return peer, nil
-}
-
-// Receive is the function that gets called when a remote peer
-// opens a new stream with the host that SetStreamHandler() is called on.
-// This should be passed as the second argument to SetStreamHandler().
-// We may want to implement another type of StreamHandler in the future.
-func (p *Peer) Receive(s net.Stream) {
-	log.Debug("Setting basic stream handler.")
-	p.doCumulus(s)
-}
-
-// Communicate with peers.
-// TODO: Update this to do something useful. For now it just reads from the
-// stream and writes back what it read.
-func (p *Peer) doCumulus(s net.Stream) {
-	buf := bufio.NewReader(s)
-	str, err := buf.ReadString('\n')
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	log.Debugf("Peer %s read: %s", p.ID(), str)
-
-	_, err = s.Write([]byte(str))
-	if err != nil {
-		log.Error(err)
+// New returns a new Peer
+func New(c net.Conn, ps *PeerStore) *Peer {
+	return &Peer{
+		Connection:       c,
+		Store:            ps,
+		requestHandler:   defaultRequestHandler,
+		pushHandler:      defaultPushHandler,
+		responseHandlers: make(map[string]ResponseHandler),
 	}
 }
 
-// ExtractPeerInfo extracts the peer ID and multiaddress from the
-// given multiaddress.
-// Returns peer ID (esentially 46 character hash created by the peer)
-// and the peer's multiaddress in the form /ip4/<peer IP>/tcp/<CumulusPort>.
-func ExtractPeerInfo(peerma string) (lpeer.ID, ma.Multiaddr, error) {
-	log.Debug("Extracting peer info from ", peerma)
-
-	ipfsaddr, err := ma.NewMultiaddr(peerma)
-	if err != nil {
-		return "-", nil, err
+// ConnectionHandler is called when a new connection is opened with us by a
+// remote peer. It will create a dispatcher and message handlers to handle
+// retrieving messages over the new connection and sending them to App.
+func ConnectionHandler(c net.Conn) {
+	// If we are already at MaxPeers, disconnect from a peer to connect to a new
+	// one. This way nobody gets choked out of the network because everybody
+	// happens to be fully connected.
+	if PStore.Size() >= MaxPeers {
+		PStore.RemoveRandom()
 	}
-
-	// Cannot throw error when passed P_IPFS
-	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
-	if err != nil {
-		return "-", nil, err
-	}
-
-	// Cannot return error if no error was returned in ValueForProtocol
-	peerid, _ := lpeer.IDB58Decode(pid)
-
-	// Decapsulate the /ipfs/<peerID> part from the target
-	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
-	targetPeerAddr, err := ma.NewMultiaddr(
-		fmt.Sprintf("/ipfs/%s", lpeer.IDB58Encode(peerid)))
-	if err != nil {
-		return "-", nil, err
-	}
-
-	trgtAddr := ipfsaddr.Decapsulate(targetPeerAddr)
-
-	return peerid, trgtAddr, nil
+	p := New(c, PStore)
+	p.Store.Add(p)
+	go p.Dispatch()
+	log.Infof("Connected to %s", p.Connection.RemoteAddr().String())
 }
 
-// Connect adds the given multiaddress to p's Peerstore and opens a stream
-// with the peer at that multiaddress if the multiaddress is valid, otherwise
-// returns error.
-func (p *Peer) Connect(peerma string) (net.Stream, error) {
-	peerid, targetAddr, err := ExtractPeerInfo(peerma)
-	if err != nil {
-		return nil, err
+// SetRequestHandler will add the given request handler to this peer. The
+// request handler must be set for this peer to handle received request messages
+// and is NOT set by default.
+func (p *Peer) SetRequestHandler(rh RequestHandler) {
+	p.requestHandler = rh
+}
+
+// SetPushHandler will add the given push handler to this peer. The push handler
+// must be set for this peer to handle received push messages and is NOT set by
+// default.
+func (p *Peer) SetPushHandler(ph PushHandler) {
+	p.pushHandler = ph
+}
+
+// SetDefaultRequestHandler will ensure that all new peers created who's
+// RequestHandlers have not been set will use the given request handler by default
+// until it is overridden by the call to SetRequestHandler().
+func SetDefaultRequestHandler(rh RequestHandler) {
+	defaultRequestHandler = rh
+}
+
+// SetDefaultPushHandler will ensure that all new peers created who's
+// PushHandlers have not been set will use the given request handler by default
+// until it is overridden by the call to SetPushHandler().
+func SetDefaultPushHandler(ph PushHandler) {
+	defaultPushHandler = ph
+}
+
+// Dispatch listens on this peer's Connection and passes received messages
+// to the appropriate message handlers.
+func (p *Peer) Dispatch() {
+	// After 3 consecutive errors we kill this connection and its associated
+	// handlers
+	errCount := 0
+
+	for {
+		message, err := msg.Read(p.Connection)
+		if err != nil {
+			if err == io.EOF {
+				// This just means the peer hasn't sent anything
+				select {
+				case <-time.After(MessageWaitTime):
+				}
+			} else {
+				log.WithError(err).Error("Dispatcher failed to read message")
+				if errCount == 3 {
+					p.Store.Remove(p.Connection.RemoteAddr().String())
+					p.Connection.Close()
+					return
+				}
+				errCount++
+			}
+			continue
+		}
+		errCount = 0
+
+		switch message.(type) {
+		case *msg.Request:
+			if p.requestHandler == nil {
+				log.Errorf("Request received but no request handler set for peer %s",
+					p.Connection.RemoteAddr().String())
+			} else {
+				response := p.requestHandler(message.(*msg.Request))
+				response.Write(p.Connection)
+			}
+		case *msg.Response:
+			res := message.(*msg.Response)
+			rh := p.getResponseHandler(res.ID)
+			if rh == nil {
+				log.Error("Dispatcher could not find response handler for response")
+			} else {
+				rh(res)
+				p.removeResponseHandler(res.ID)
+			}
+		case *msg.Push:
+			if p.pushHandler == nil {
+				log.Errorf("Push message received but no push handler set for peer %s",
+					p.Connection.RemoteAddr().String())
+			} else {
+				p.pushHandler(message.(*msg.Push))
+			}
+		default:
+			// Invalid messgae type. Ignore
+			log.Debug("Dispatcher received message with invalid type")
+		}
 	}
+}
 
-	// Store the peer's address in this host's PeerStore
-	p.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+// Request sends the given request over this peer's Connection and registers the
+// given response hadnler to be called when the response arrives at the dispatcher.
+// Returns error if request could not be written.
+func (p *Peer) Request(req msg.Request, rh ResponseHandler) error {
+	p.addResponseHandler(req.ID, rh)
+	err := req.Write(p.Connection)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-	log.Debug("Connected to Cumulus Peer:")
-	log.Debug("Peer ID:", peerid.Pretty())
-	log.Debug("Peer Address:", targetAddr)
+// Push sends a push message to this peer. Returns an error if the push message
+// could not be written.
+func (p *Peer) Push(push msg.Push) error {
+	return push.Write(p.Connection)
+}
 
-	// Open a stream with the peer
-	stream, err := p.NewStream(context.Background(), peerid,
-		CumulusProtocol)
+// Broadcast sends the given push message to all peers in the PeerStore at the
+// time this function is called. Note that if we fail to write the push message
+// to a peer the failure is ignored. Generally this is okay, because push
+// messages sent via Broadcast() should be propagated by other peers.
+func Broadcast(push msg.Push) {
+	PStore.lock.RLock()
+	defer PStore.lock.RUnlock()
+	for _, p := range PStore.peers {
+		p.Push(push)
+	}
+}
 
-	return stream, err
+// MaintainConnections will infinitely attempt to maintain as close to MaxPeers
+// connections as possible by requesting PeerInfo from peers in the PeerStore
+// and establishing connections with newly discovered peers.
+// NOTE: this should be called only once and should be run as a goroutine.
+func MaintainConnections() {
+	for {
+		peerAddrs := PStore.Addrs()
+		for i := 0; i < len(peerAddrs); i++ {
+			if PStore.Size() >= MaxPeers {
+				// Already connected to enough peers. Don't try connecting to
+				// any more for a while.
+				break
+			}
+			peerInfoRequest := msg.Request{
+				ID:           uuid.New().String(),
+				ResourceType: msg.ResourcePeerInfo,
+			}
+			p := PStore.Get(peerAddrs[i])
+			if p != nil && peerAddrs[i] != LocalAddr {
+				// Need to do this check in case the peer got removed
+				p.Request(peerInfoRequest, PeerInfoHandler)
+			}
+		}
+		// Looks like we hit peer.MaxPeers. Wait for a while before checking how many
+		// peers we are connected to. We don't want to spin.
+		select {
+		case <-time.After(PeerSearchWaitTime):
+		}
+	}
+}
+
+// PeerInfoHandler will handle the response to a PeerInfo request by attempting
+// to establish connections with all new peers in the given response Resource.
+func PeerInfoHandler(res *msg.Response) {
+	peers := res.Resource.([]string)
+	for i := 0; i < len(peers) && PStore.Size() < MaxPeers; i++ {
+		p := PStore.Get(peers[i])
+		if p != nil {
+			// We are already connected to this peer. Skip it.
+			continue
+		}
+		newConn, err := conn.Dial(peers[i])
+		if err != nil {
+			log.WithError(err).Errorf("Failed to dial peer %s", peers[i])
+			continue
+		}
+		ConnectionHandler(newConn)
+		log.Infof("Connected to %s", newConn.RemoteAddr().String())
+	}
+}
+
+func (p *Peer) addResponseHandler(id string, rh ResponseHandler) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.responseHandlers[id] = rh
+}
+
+func (p *Peer) removeResponseHandler(id string) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	delete(p.responseHandlers, id)
+}
+
+func (p *Peer) getResponseHandler(id string) ResponseHandler {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.responseHandlers[id]
 }
