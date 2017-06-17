@@ -14,26 +14,26 @@ type PooledTransaction struct {
 
 // Pool is a set of valid Transactions.
 type Pool struct {
-	Order        []*PooledTransaction
-	Transactions map[blockchain.Hash]*PooledTransaction
+	Order             []*PooledTransaction
+	ValidTransactions map[blockchain.Hash]*PooledTransaction
 }
 
 // New initializes a new pool.
 func New() *Pool {
 	return &Pool{
-		Order:        []*PooledTransaction{},
-		Transactions: map[blockchain.Hash]*PooledTransaction{},
+		Order:             []*PooledTransaction{},
+		ValidTransactions: map[blockchain.Hash]*PooledTransaction{},
 	}
 }
 
 // Len returns the number of transactions in the Pool.
 func (p *Pool) Len() int {
-	return len(p.Transactions)
+	return len(p.ValidTransactions)
 }
 
 // Get returns the transction with input transaction Hash h.
 func (p *Pool) Get(h blockchain.Hash) *blockchain.Transaction {
-	return p.Transactions[h].Transaction
+	return p.ValidTransactions[h].Transaction
 }
 
 // GetN returns the Nth transaction in the pool.
@@ -43,7 +43,8 @@ func (p *Pool) GetN(N int) *blockchain.Transaction {
 
 // GetIndex returns the index of the transaction in the ordering.
 func (p *Pool) GetIndex(t *blockchain.Transaction) int {
-	return getIndex(p.Order, p.Transactions[t.Input.Hash].Time, 0, p.Len()-1)
+	return getIndex(p.Order, p.ValidTransactions[t.Input.Hash].Time,
+		0, p.Len()-1)
 }
 
 // getIndex does a binary search for a PooledTransaction by timestamp.
@@ -79,16 +80,16 @@ func (p *Pool) set(t *blockchain.Transaction) {
 		Time:        time.Now(),
 	}
 	p.Order = append(p.Order, vt)
-	p.Transactions[t.Input.Hash] = vt
+	p.ValidTransactions[t.Input.Hash] = vt
 }
 
 // Delete removes a transaction from the Pool.
 func (p *Pool) Delete(t *blockchain.Transaction) {
-	vt, ok := p.Transactions[t.Input.Hash]
+	vt, ok := p.ValidTransactions[t.Input.Hash]
 	if ok {
 		i := p.GetIndex(vt.Transaction)
 		p.Order = append(p.Order[0:i], p.Order[i:p.Len()-1]...)
-		delete(p.Transactions, t.Input.Hash)
+		delete(p.ValidTransactions, t.Input.Hash)
 	}
 }
 
