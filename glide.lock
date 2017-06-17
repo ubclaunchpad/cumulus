@@ -1,5 +1,5 @@
-hash: 416d5c866bf090f534cd568c92cf41d6cedb8ac5245a33e4074000ce61e72f3b
-updated: 2017-06-03T10:30:04.32905091-07:00
+hash: 571062980ddb6856d436b6b3c2a4ecb04f707ba47191df668218e95bfcaecefd
+updated: 2017-06-15T20:36:23.944155965-07:00
 imports:
 - name: github.com/agl/ed25519
   version: 5312a61534124124185d41f09206b9fef1d88403
@@ -152,6 +152,12 @@ imports:
   version: 7aa9f26a231c6f34f4e9fad52bf580fd36627285
 - name: github.com/multiformats/go-multistream
   version: b8f1996688ab586031517919b49b1967fca8d5d9
+- name: github.com/onsi/ginkgo
+  version: 77a8c1e5c40d6bb6c5eb4dd4bdce9763564f6298
+  subpackages:
+  - ginkgo
+- name: github.com/onsi/gomega
+  version: 334b8f472b3af5d541c5642701c1e29e2126f486
 - name: github.com/pelletier/go-buffruneio
   version: c37440a7cf42ac63b919c752ca73a85067e05992
 - name: github.com/pelletier/go-toml
@@ -175,7 +181,7 @@ imports:
 - name: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
 - name: github.com/spf13/viper
-  version: 0967fc9aceab2ce9da34061253ac10fb99bba5b2
+  version: a1ecfa6a20bd4ef9e9caded262ee1b1b26847675
 - name: github.com/whyrusleeping/go-logging
   version: 0a5b4a6decf577ce8293eca85ec733d7ab92d742
 - name: github.com/whyrusleeping/go-metrics
