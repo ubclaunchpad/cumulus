@@ -64,7 +64,6 @@ func Run(cfg conf.Config) {
 	// peer is running
 	go peer.MaintainConnections()
 	select {}
-<<<<<<< HEAD
 }
 
 // RequestHandler is called every time a peer sends us a request message expect
@@ -95,9 +94,8 @@ func PushHandler(push *msg.Push) {
 	default:
 		// Invalid resource type. Ignore
 	}
-=======
+
 	// Ask target for its peers
 	// Connect to these peers until we have enough peers
 	// Download the blockchain
->>>>>>> 63-app-skeleton
 }
