@@ -156,9 +156,9 @@ func TestBlockDoubleSpend(t *testing.T) {
 	}
 }
 
-func TestValidBlockNegNumber(t *testing.T) {
+func TestValidBlockBigNumber(t *testing.T) {
 	bc, b := NewValidChainAndBlock()
-	b.BlockNumber = uint32(len(bc.Blocks))
+	b.BlockNumber = uint32(len(bc.Blocks)) + 1
 
 	valid, code := bc.ValidBlock(b)
 
