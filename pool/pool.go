@@ -106,9 +106,9 @@ func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
 	return true
 }
 
-// GetTxns returns the the largest of l or size of pool transactions.
-// It selects the highest priority transactions.
-func (p *Pool) GetTxns(l int) []*blockchain.Transaction {
+// PopTxns returns the the largest of l or size of pool transactions.
+// It selects the highest priority transactions, and removes them from the pool.
+func (p *Pool) PopTxns(l int) []*blockchain.Transaction {
 	if p.Len() == 0 {
 		return make([]*blockchain.Transaction, 0)
 	}
@@ -117,7 +117,9 @@ func (p *Pool) GetTxns(l int) []*blockchain.Transaction {
 	}
 	txns := make([]*blockchain.Transaction, l)
 	for i := 0; i < l; i++ {
-		txns[i] = p.GetN(i)
+		t := p.GetN(i)
+		txns[i] = t
+		p.Delete(t)
 	}
 	return txns
 }

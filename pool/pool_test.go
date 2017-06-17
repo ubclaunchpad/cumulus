@@ -75,17 +75,20 @@ func TestGetTxns(t *testing.T) {
 		}
 	}
 	nTxns := len(b.Transactions) + 12 // arbitrary.
-	txns := p.GetTxns(nTxns)
+	txns := p.PopTxns(nTxns)
 	for _, tr := range txns {
 		if ok, _ := b.ContainsTransaction(tr); !ok {
 			t.FailNow()
 		}
 	}
+	if p.Len() != 0 {
+		t.FailNow()
+	}
 }
 
 func TestGetNewBlockEmpty(t *testing.T) {
 	p := New()
-	txns := p.GetTxns(305)
+	txns := p.PopTxns(305)
 	if len(txns) != 0 {
 		t.FailNow()
 	}
