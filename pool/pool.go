@@ -74,6 +74,7 @@ func (p *Pool) SetUnsafe(t *blockchain.Transaction) {
 	p.set(t)
 }
 
+// Silently adds a transaction to the pool.
 func (p *Pool) set(t *blockchain.Transaction) {
 	vt := &PooledTransaction{
 		Transaction: t,
