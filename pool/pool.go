@@ -1,32 +1,36 @@
 package pool
 
-import (
-	"errors"
-
-	"github.com/cevaris/ordered_map"
-	"github.com/ubclaunchpad/cumulus/blockchain"
-)
+import "github.com/ubclaunchpad/cumulus/blockchain"
 
 // Pool is a set of valid Transactions.
 type Pool struct {
-	Transactions ordered_map.OrderedMap
+	OrderMap        map[blockchain.Hash]int
+	OrderReverseMap map[int]blockchain.Hash
+	Transactions    map[blockchain.Hash]*blockchain.Transaction
 }
 
 // New initializes a new pool.
 func New() *Pool {
 	return &Pool{
-		Transactions: *ordered_map.NewOrderedMap(),
+		OrderMap:        make(map[blockchain.Hash]int, 0),
+		OrderReverseMap: map[int]blockchain.Hash{},
+		Transactions:    map[blockchain.Hash]*blockchain.Transaction{},
 	}
 }
 
 // Len returns the number of transactions in the Pool.
 func (p *Pool) Len() int {
-	return p.Transactions.Len()
+	return len(p.Transactions)
 }
 
 // Get returns the transction with input transaction Hash h.
-func (p *Pool) Get(h blockchain.Hash) (interface{}, bool) {
-	return p.Transactions.Get(h)
+func (p *Pool) Get(h blockchain.Hash) *blockchain.Transaction {
+	return p.Transactions[h]
+}
+
+// GetN returns the Nth transaction in the pool.
+func (p *Pool) GetN(N int) *blockchain.Transaction {
+	return p.Transactions[p.OrderReverseMap[N]]
 }
 
 // Set inserts a transaction into the pool, returning
@@ -34,18 +38,25 @@ func (p *Pool) Get(h blockchain.Hash) (interface{}, bool) {
 func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
 	ok, _ := bc.ValidTransaction(t)
 	if ok {
-		p.Transactions.Set(t.Input.Hash, t)
+		p.OrderMap[t.Input.Hash] = p.Len()
+		p.OrderReverseMap[p.Len()] = t.Input.Hash
+		p.Transactions[t.Input.Hash] = t
 	}
 	return ok
 }
 
 // Delete removes a transaction from the Pool.
 func (p *Pool) Delete(t *blockchain.Transaction) {
-	p.Transactions.Delete(t.Input.Hash)
+	i := p.OrderMap[t.Input.Hash]
+	if i < p.Len() {
+		delete(p.Transactions, t.Input.Hash)
+		delete(p.OrderMap, t.Input.Hash)
+		delete(p.OrderReverseMap, i)
+	}
 }
 
 // Update updates the Pool by removing the Transactions found in the
-// Block. If the Block is found invalid, then false is returned and no
+// Block. If the Block is found invalid wrt bc, then false is returned and no
 // Transactions are removed from the Pool.
 func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
 	if ok, _ := bc.ValidBlock(b); !ok {
@@ -57,9 +68,20 @@ func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
 	return true
 }
 
-// GetBlock returns a new Block from the highest priority Transactions in
-// the Pool, as well as a error indicating whether there were any
-// Transactions to create a Block.
-func (p *Pool) GetBlock() (*blockchain.Block, error) {
-	return blockchain.NewBlock(), errors.New("no transactions in pool")
+// GetTxns returns the the largest of l or size of pool transactions.
+// It selects the highest priority transactions.
+func (p *Pool) GetTxns(l int) []*blockchain.Transaction {
+	var txns []*blockchain.Transaction
+	if p.Len() == 0 {
+		return txns
+	}
+	if p.Len() < l {
+		l = p.Len()
+	}
+	i := 0
+	for i < l {
+		txns = append(txns, p.GetN(i))
+		i++
+	}
+	return txns
 }
