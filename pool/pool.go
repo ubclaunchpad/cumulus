@@ -43,8 +43,8 @@ func (p *Pool) GetN(N int) *blockchain.Transaction {
 
 // GetIndex returns the index of the transaction in the ordering.
 func (p *Pool) GetIndex(t *blockchain.Transaction) int {
-	return getIndex(p.Order, p.ValidTransactions[t.Input.Hash].Time,
-		0, p.Len()-1)
+	target := p.ValidTransactions[t.Input.Hash].Time
+	return getIndex(p.Order, target, 0, p.Len()-1)
 }
 
 // getIndex does a binary search for a PooledTransaction by timestamp.
