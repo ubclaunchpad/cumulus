@@ -12,7 +12,7 @@ func TestMain(t *testing.T) {
 }
 
 func TestEncodeDecodeBlockChain(t *testing.T) {
-	b1 := newBlockChain()
+	b1 := NewBlockChain()
 
 	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
 

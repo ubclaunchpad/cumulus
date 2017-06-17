@@ -8,7 +8,7 @@ cumulus:
 	go build
 
 test:
-	go test $(PACKAGES)
+	go test $(PACKAGES) --cover
 
 deps:
 	glide install
