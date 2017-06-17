@@ -1,131 +1,283 @@
 package peer
 
 import (
-	"fmt"
+	"net"
 	"testing"
+	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/ubclaunchpad/cumulus/msg"
 )
 
-func TestMain(t *testing.T) {
-	// Disable logging for tests
-	log.SetLevel(log.FatalLevel)
+var (
+	addrs1 = []string{
+		"50.74.89.63", "80.74.170.128", "252.206.163.100", "106.237.154.62",
+		"23.37.91.218", "141.205.198.174", "243.116.40.121", "219.202.178.157",
+		"208.213.114.64", "99.130.197.2", "215.99.177.252", "253.191.123.93",
+		"118.98.13.210", "217.41.101.17", "94.39.137.0", "8.26.57.127",
+		"2.121.24.48", "45.166.60.59", "69.14.4.201", "73.11.112.209",
+		"119.235.160.135", "158.60.36.47", "173.52.51.91", "160.76.117.247",
+		"99.3.196.77", "26.37.188.143", "252.52.197.42", "189.10.80.173",
+		"32.15.5.182", "73.178.78.95", "166.109.113.195", "39.137.84.170",
+		"82.249.125.238", "154.66.246.230", "53.195.164.196", "79.7.11.105",
+		"98.209.56.64", "74.25.239.123", "211.0.166.153", "54.32.155.245",
+		"49.37.93.82", "141.54.42.188", "202.15.222.2", "39.251.90.236",
+		"227.14.254.34", "163.89.37.232", "232.46.225.13", "125.66.77.152",
+		"134.182.19.76", "4.220.173.35",
+	}
+
+	addrs2 = []string{
+		"7.226.78.25", "90.9.211.160", "201.35.42.214", "71.203.173.18",
+		"80.33.238.63", "115.122.81.134", "213.234.92.168", "139.190.9.146",
+		"161.86.170.251", "95.126.157.42", "160.198.2.231", "146.174.248.226",
+		"206.232.35.67", "99.116.200.57", "95.37.225.234", "227.234.125.133",
+		"66.40.130.160", "166.32.202.71", "229.203.48.121", "122.41.93.73",
+		"19.127.139.118", "242.85.174.83", "121.145.63.93", "125.187.226.190",
+		"227.102.96.138", "133.43.209.108", "245.2.228.113", "43.67.186.61",
+		"194.70.178.182", "155.98.10.21", "157.150.51.175", "222.1.20.83",
+		"19.253.228.59", "195.118.45.237", "159.78.10.205", "206.31.54.66",
+		"31.191.153.165", "130.235.208.32", "130.5.207.98", "5.226.180.24",
+	}
+)
+
+// fakeConn implements net.Conn
+type fakeConn struct {
+	Addr net.Addr
 }
 
-func TestNewDefault(t *testing.T) {
-	h, err := New(DefaultIP, DefaultPort)
-	if err != nil {
-		t.Fail()
-	}
+func (fc fakeConn) Read(b []byte) (n int, err error)   { return 0, nil }
+func (fc fakeConn) Write(b []byte) (n int, err error)  { return 0, nil }
+func (fc fakeConn) Close() error                       { return nil }
+func (fc fakeConn) LocalAddr() net.Addr                { return fc.Addr }
+func (fc fakeConn) RemoteAddr() net.Addr               { return fc.Addr }
+func (fc fakeConn) SetDeadline(t time.Time) error      { return nil }
+func (fc fakeConn) SetReadDeadline(t time.Time) error  { return nil }
+func (fc fakeConn) SetWriteDeadline(t time.Time) error { return nil }
 
-	if h == nil {
-		t.Fail()
-	}
-
-	if h.Peerstore() == nil {
-		t.Fail()
-	}
+// fakeAddr implementes net.Addr
+type fakeAddr struct {
+	Addr string
 }
 
-func TestNewValidPort(t *testing.T) {
-	h, err := New(DefaultIP, 8000)
-	if err != nil {
-		t.Fail()
-	}
+func (fa fakeAddr) Network() string { return fa.Addr }
+func (fa fakeAddr) String() string  { return fa.Addr }
 
-	if h == nil {
-		t.Fail()
+func inList(item string, list []string) bool {
+	for _, listItem := range list {
+		if item == listItem {
+			return true
+		}
 	}
-
-	if h.Peerstore() == nil {
-		t.Fail()
-	}
+	return false
 }
 
-func TestNewValidIP(t *testing.T) {
-	_, err := New("123.211.231.45", DefaultPort)
-	if err == nil {
-		t.Fail()
+// This will error if there are concurrent accesses to the PeerStore, or error
+// if an atomic operation returns un unexpected result.
+func TestConcurrentPeerStore(t *testing.T) {
+	ps := NewPeerStore()
+
+	resChan1 := make(chan bool)
+	resChan2 := make(chan bool)
+
+	// Asynchronously add and find peers
+	go func() {
+		var fa net.Addr
+		var fc net.Conn
+		for _, addr := range addrs2 {
+			fa = fakeAddr{Addr: addr}
+			fc = fakeConn{Addr: fa}
+			ps.Add(New(fc, ps))
+			p := ps.Get(addr)
+			if p.Connection.RemoteAddr().String() != addr {
+				resChan1 <- false
+			}
+		}
+		resChan1 <- true
+	}()
+
+	// Asynchronously add and remove peers
+	go func() {
+		var fa net.Addr
+		var fc net.Conn
+		for _, addr := range addrs1 {
+			fa = fakeAddr{Addr: addr}
+			fc = fakeConn{Addr: fa}
+			ps.Add(New(fc, ps))
+			ps.Remove(addr)
+		}
+		resChan2 <- true
+	}()
+
+	returnCount := 0
+	for returnCount != 2 {
+		select {
+		case res1 := <-resChan1:
+			if !res1 {
+				t.FailNow()
+			}
+			returnCount++
+		case res2 := <-resChan2:
+			if !res2 {
+				t.FailNow()
+			}
+			returnCount++
+		}
 	}
-}
 
-func TestNewInvalidIP(t *testing.T) {
-	_, err := New("asdfasdf", 123)
-	if err == nil {
-		t.Fail()
-	}
-}
-
-func TestExtractPeerInfoValidMultiAddr(t *testing.T) {
-	peerma := "/ip4/127.0.0.1/tcp/8765/ipfs/QmQdfp9Ug4MoLRsBToDPN2aQhg2jPtmmA8UidQUTXGjZcy"
-	pid, ma, err := ExtractPeerInfo(peerma)
-
-	if err != nil {
-		t.Fail()
-	}
-
-	if pid.Pretty() != "QmQdfp9Ug4MoLRsBToDPN2aQhg2jPtmmA8UidQUTXGjZcy" {
-		t.Fail()
-	}
-
-	if ma.String() != "/ip4/127.0.0.1/tcp/8765" {
-		t.Fail()
-	}
-}
-
-func TestExtractPeerInfoInvalidIP(t *testing.T) {
-	peerma := "/ip4/203.532.211.5/tcp/8765/ipfs/Qmb89FuJ8UG3dpgUqEYu9eUqK474uP3mx32WnQ7kePXp8N"
-	_, _, err := ExtractPeerInfo(peerma)
-
-	if err == nil {
-		t.Fail()
-	}
-}
-
-func TestReceiveValidMessage(t *testing.T) {
-	sender, err := New(DefaultIP, DefaultPort)
-	if err != nil {
+	if ps.Size() != len(addrs2) {
 		t.FailNow()
 	}
 
-	sender.SetStreamHandler(CumulusProtocol, sender.Receive)
-
-	receiver, err := New(DefaultIP, 8080)
-	if err != nil {
-		t.FailNow()
+	for i := 0; i < len(addrs2); i++ {
+		p := ps.Get(addrs2[i])
+		if p == nil {
+			t.FailNow()
+		}
+		ps.Remove(addrs2[i])
 	}
 
-	receiver.SetStreamHandler(CumulusProtocol, receiver.Receive)
-
-	receiverMultiAddr := fmt.Sprintf("%s/ipfs/%s",
-		receiver.Addrs()[0], receiver.ID().Pretty())
-
-	stream, err := sender.Connect(receiverMultiAddr)
-	if err != nil {
-		t.FailNow()
-	}
-
-	_, err = stream.Write([]byte("This is a test\n"))
-	if err != nil {
+	if ps.Size() != 0 {
 		t.FailNow()
 	}
 }
 
-func TestReceiveInvalidAddress(t *testing.T) {
-	receiver, err := New(DefaultIP, DefaultPort)
-	if err != nil {
-		t.Fail()
+func TestRemoveRandom(t *testing.T) {
+	var fa fakeAddr
+	var fc fakeConn
+	ps := NewPeerStore()
+	for _, addr := range addrs1 {
+		fa = fakeAddr{Addr: addr}
+		fc = fakeConn{Addr: fa}
+		ps.Add(New(fc, ps))
 	}
 
-	sender, err := New(DefaultIP, 8080)
-	if err != nil {
-		t.Fail()
+	for i := ps.Size(); i > 0; i-- {
+		ps.RemoveRandom()
+		if ps.Size() != i-1 {
+			t.FailNow()
+		}
+	}
+}
+
+func TestAddrs(t *testing.T) {
+	var fa fakeAddr
+	var fc fakeConn
+	ps := NewPeerStore()
+	for _, addr := range addrs1 {
+		fa = fakeAddr{Addr: addr}
+		fc = fakeConn{Addr: fa}
+		ps.Add(New(fc, ps))
 	}
 
-	receiver.SetStreamHandler(CumulusProtocol, receiver.Receive)
+	addrs := ps.Addrs()
+	for _, addr := range addrs {
+		if !inList(addr, addrs1) {
+			t.FailNow()
+		}
+	}
+}
 
-	_, err = sender.Connect(receiver.Addrs()[0].String())
-	if err == nil {
-		t.Fail()
+func TestSetRequestHandler(t *testing.T) {
+	var fa net.Addr
+	var fc net.Conn
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc = fakeConn{Addr: fa}
+	p := New(fc, PStore)
+	if p.requestHandler != nil {
+		t.FailNow()
+	}
+
+	rh := func(req *msg.Request) msg.Response {
+		return msg.Response{
+			ID:       "heyyou",
+			Resource: "i can see you",
+		}
+	}
+
+	p.SetRequestHandler(rh)
+
+	if p.requestHandler == nil {
+		t.FailNow()
+	}
+
+	p2 := New(fc, PStore)
+	if p2.requestHandler != nil {
+		t.FailNow()
+	}
+}
+
+func TestSetPushHandler(t *testing.T) {
+	var fa net.Addr
+	var fc net.Conn
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc = fakeConn{Addr: fa}
+	p := New(fc, PStore)
+	if p.pushHandler != nil {
+		t.FailNow()
+	}
+
+	ph := func(req *msg.Push) {}
+
+	p.SetPushHandler(ph)
+
+	if p.pushHandler == nil {
+		t.FailNow()
+	}
+
+	p2 := New(fc, PStore)
+	if p2.pushHandler != nil {
+		t.FailNow()
+	}
+}
+
+func TestSetDefaultRequestHandler(t *testing.T) {
+	var fa net.Addr
+	var fc net.Conn
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc = fakeConn{Addr: fa}
+	p := New(fc, PStore)
+	if p.requestHandler != nil {
+		t.FailNow()
+	}
+
+	rh := func(req *msg.Request) msg.Response {
+		return msg.Response{
+			ID:       "heyyou",
+			Resource: "i can see you",
+		}
+	}
+
+	SetDefaultRequestHandler(rh)
+
+	if p.requestHandler != nil {
+		t.FailNow()
+	}
+
+	p2 := New(fc, PStore)
+	if p2.requestHandler == nil {
+		t.FailNow()
+	}
+}
+
+func TestSetDefaultPushHandler(t *testing.T) {
+	var fa net.Addr
+	var fc net.Conn
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc = fakeConn{Addr: fa}
+	p := New(fc, PStore)
+	if p.pushHandler != nil {
+		t.FailNow()
+	}
+
+	ph := func(req *msg.Push) {}
+
+	SetDefaultPushHandler(ph)
+
+	if p.pushHandler != nil {
+		t.FailNow()
+	}
+
+	p2 := New(fc, PStore)
+	if p2.pushHandler == nil {
+		t.FailNow()
 	}
 }
