@@ -41,6 +41,6 @@ func init() {
 	// is called directly, e.g.:
 	runCmd.Flags().IntP("port", "p", peer.DefaultPort, "Port to bind to")
 	runCmd.Flags().StringP("interface", "i", peer.DefaultIP, "IP address to listen on")
-	runCmd.Flags().StringP("target", "t", "", "Multiaddress of peer to connect to")
+	runCmd.Flags().StringP("target", "t", "", "Address of peer to connect to")
 	runCmd.Flags().BoolP("verbose", "v", false, "Enable verbose logging")
 }
