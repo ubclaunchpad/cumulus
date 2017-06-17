@@ -91,9 +91,9 @@ func (ps *PeerStore) Get(addr string) *Peer {
 func (ps *PeerStore) Addrs() []string {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
-	addrs := make([]string, len(ps.peers), len(ps.peers))
-	for _, p := range ps.peers {
-		addrs = append(addrs, p.Connection.RemoteAddr().String())
+	addrs := make([]string, 0)
+	for addr := range ps.peers {
+		addrs = append(addrs, addr)
 	}
 	return addrs
 }
