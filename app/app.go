@@ -25,6 +25,11 @@ func Run(cfg conf.Config) {
 	log.Info("Starting Cumulus node")
 	config = &cfg
 
+	// Set logging level
+	if cfg.Verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
 	// for specific peers by calls like p.SetRequestHandler(someHandler)
@@ -74,6 +79,7 @@ func RequestHandler(req *msg.Request) msg.Response {
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
 		res.Resource = peer.PStore.Addrs()
+		log.Debugf("Returning PeerInfo %s", res.Resource)
 	case msg.ResourceBlock, msg.ResourceTransaction:
 		res.Error = msg.NewProtocolError(msg.NotImplemented,
 			"Block and Transaction requests are not yet implemented on this peer")
