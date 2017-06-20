@@ -4,22 +4,30 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"math"
+	"math/big"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	bc "github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/blockchain"
 )
 
 const (
 	// MiningHeaderLen is the length of the MiningHeader struct in bytes
-	MiningHeaderLen = (3 * bc.HashLen) + (1 * (32 / 8)) + (1 * (64 / 8))
+	MiningHeaderLen = (3 * blockchain.HashLen) + (1 * (32 / 8)) + (1 * (64 / 8))
+)
+
+var (
+	// MinDifficulty is the minimum difficulty
+	MinDifficulty = new(big.Int).Sub(BigExp(2, 232), big.NewInt(1))
+	// MaxDifficulty is the maximum difficulty value
+	MaxDifficulty = big.NewInt(1)
 )
 
 // MiningHeader contains the metadata required for mining
 type MiningHeader struct {
-	LastBlock bc.Hash
-	RootHash  bc.Hash
-	Target    bc.Hash
+	LastBlock blockchain.Hash
+	RootHash  blockchain.Hash
+	Target    blockchain.Hash
 	Time      uint32
 	Nonce     uint64
 }
@@ -40,25 +48,22 @@ func (mh *MiningHeader) Marshal() []byte {
 }
 
 // SetMiningHeader sets the mining header (sets the time to the current time)
-func (mh *MiningHeader) SetMiningHeader(lastBlock bc.Hash, rootHash bc.Hash, target bc.Hash) {
+func (mh *MiningHeader) SetMiningHeader(lastBlock blockchain.Hash, rootHash blockchain.Hash, target blockchain.Hash) *MiningHeader {
 	mh.LastBlock = lastBlock
 	mh.RootHash = rootHash
 	mh.Target = target
 	mh.Time = uint32(time.Now().Unix())
 	mh.Nonce = 0
+	return mh
 }
 
 // VerifyProofOfWork computes the hash of the MiningHeader and returns true if the result is less than the target
 func (mh *MiningHeader) VerifyProofOfWork() bool {
-	if mh.DoubleHashSum().CompareTo(mh.Target, bc.LessThan) {
-		return true
-	}
-
-	return false
+	return mh.DoubleHashSum().LessThan(mh.Target)
 }
 
 // DoubleHashSum computes the hash 256 of the marshalled mining header twice
-func (mh *MiningHeader) DoubleHashSum() bc.Hash {
+func (mh *MiningHeader) DoubleHashSum() blockchain.Hash {
 	hash := sha256.Sum256(mh.Marshal())
 	hash = sha256.Sum256(hash[:])
 	return hash
@@ -86,9 +91,16 @@ func (mh *MiningHeader) VerifyMiningHeader() bool {
 		log.Error("Invalid time in mining header")
 		return false
 	}
-	if mh.Target.CompareTo(*bc.MinHash, bc.EqualTo) || mh.Target.CompareTo(*bc.MaxDifficulty, bc.GreaterThan) {
+	target := blockchain.HashToBigInt(mh.Target)
+	// Check if the target is less than the max difficulty, or if the target is greater than the min difficulty
+	if target.Cmp(MinDifficulty) == 1 || target.Cmp(MaxDifficulty) == -1 {
 		log.Error("Invalid target in mining header")
 		return false
 	}
 	return true
+}
+
+// BigExp returns an big int pointer with the result set to base**exp, if y <= 0, the result is 1
+func BigExp(base, exp int) *big.Int {
+	return new(big.Int).Exp(big.NewInt(int64(base)), big.NewInt(int64(exp)), nil)
 }
