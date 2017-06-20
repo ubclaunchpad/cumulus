@@ -101,7 +101,7 @@ func NewInputBlock(t []*Transaction) *Block {
 	}
 }
 
-// NewInputBlock produces new block with given transactions and given input
+// NewOutputBlock produces new block with given transactions and given input
 // block.
 func NewOutputBlock(t []*Transaction, input *Block) *Block {
 	return &Block{

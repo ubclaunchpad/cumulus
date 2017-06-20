@@ -155,3 +155,17 @@ func TestBlockDoubleSpend(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestValidBlockBigNumber(t *testing.T) {
+	bc, b := NewValidChainAndBlock()
+	b.BlockNumber = uint32(len(bc.Blocks)) + 1
+
+	valid, code := bc.ValidBlock(b)
+
+	if valid {
+		t.Fail()
+	}
+	if code != BadBlockNumber {
+		t.Fail()
+	}
+}
