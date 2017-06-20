@@ -7,8 +7,8 @@ import (
 )
 
 func TestValidTransactionNoInputTransaction(t *testing.T) {
-	tr, _ := newTransactionValue(newWallet(), newWallet(), 1, 0)
-	bc, _ := newValidBlockChainFixture()
+	tr, _ := NewTransactionValue(NewWallet(), NewWallet(), 1, 0)
+	bc, _ := NewValidBlockChainFixture()
 
 	valid, code := bc.ValidTransaction(tr)
 
@@ -22,7 +22,7 @@ func TestValidTransactionNoInputTransaction(t *testing.T) {
 
 func TestValidTransactionOverspend(t *testing.T) {
 	// 2 + 2 = 5 ?
-	bc, _ := newValidBlockChainFixture()
+	bc, _ := NewValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
 	tr.Outputs[0].Amount = 5
 
@@ -38,10 +38,10 @@ func TestValidTransactionOverspend(t *testing.T) {
 }
 
 func TestValidTransactionSignatureFail(t *testing.T) {
-	bc, _ := newValidBlockChainFixture()
+	bc, _ := NewValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
 
-	fakeSender := newWallet()
+	fakeSender := NewWallet()
 	tr, _ = tr.TxBody.Sign(fakeSender, rand.Reader)
 	bc.Blocks[1].Transactions[0] = tr
 
@@ -55,7 +55,7 @@ func TestValidTransactionSignatureFail(t *testing.T) {
 }
 
 func TestValidTransactionPass(t *testing.T) {
-	bc, b := newValidChainAndBlock()
+	bc, b := NewValidChainAndBlock()
 	tr := b.Transactions[0]
 
 	valid, code := bc.ValidTransaction(tr)
@@ -69,10 +69,10 @@ func TestValidTransactionPass(t *testing.T) {
 }
 
 func TestTransactionRespend(t *testing.T) {
-	bc, _ := newValidBlockChainFixture()
+	bc, _ := NewValidBlockChainFixture()
 	trC := bc.Blocks[1].Transactions[0]
-	b := newOutputBlock([]*Transaction{trC}, bc.Blocks[1])
-	bc.AppendBlock(b, newWallet().Public())
+	b := NewOutputBlock([]*Transaction{trC}, bc.Blocks[1])
+	bc.AppendBlock(b, NewWallet().Public())
 
 	valid, code := bc.ValidTransaction(trC)
 
@@ -84,8 +84,8 @@ func TestTransactionRespend(t *testing.T) {
 	}
 }
 
-func TestValidBlockBadTransactoion(t *testing.T) {
-	bc, _ := newValidBlockChainFixture()
+func TestValidBlockBadTransaction(t *testing.T) {
+	bc, _ := NewValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[0]
 	tr.Outputs[0].Amount = 5
 
@@ -100,7 +100,7 @@ func TestValidBlockBadTransactoion(t *testing.T) {
 }
 
 func TestValidBlocBadBlockNumber(t *testing.T) {
-	bc, _ := newValidBlockChainFixture()
+	bc, _ := NewValidBlockChainFixture()
 	bc.Blocks[1].BlockNumber = 2
 
 	valid, code := bc.ValidBlock(bc.Blocks[1])
@@ -114,8 +114,8 @@ func TestValidBlocBadBlockNumber(t *testing.T) {
 }
 
 func TestValidBlockBadHash(t *testing.T) {
-	bc, b := newValidChainAndBlock()
-	b.BlockHeader.LastBlock = newHash()
+	bc, b := NewValidChainAndBlock()
+	b.BlockHeader.LastBlock = NewHash()
 
 	valid, code := bc.ValidBlock(b)
 
@@ -128,7 +128,7 @@ func TestValidBlockBadHash(t *testing.T) {
 }
 
 func TestValidBlock(t *testing.T) {
-	bc, b := newValidChainAndBlock()
+	bc, b := NewValidChainAndBlock()
 
 	valid, code := bc.ValidBlock(b)
 
@@ -143,7 +143,7 @@ func TestValidBlock(t *testing.T) {
 func TestBlockDoubleSpend(t *testing.T) {
 	// block should fail to be valid if there exists two transactions
 	// referencing the same input, but output > input (double spend attack)
-	bc, b := newValidChainAndBlock()
+	bc, b := NewValidChainAndBlock()
 	b.Transactions = append(b.Transactions, b.Transactions[0])
 
 	valid, code := bc.ValidBlock(b)

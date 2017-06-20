@@ -1,5 +1,5 @@
-hash: 416d5c866bf090f534cd568c92cf41d6cedb8ac5245a33e4074000ce61e72f3b
-updated: 2017-06-03T10:30:04.32905091-07:00
+hash: 28f9a279b3a6db6a1fa51dead9e30fbd3dd290b08f920a194b6b38a53c7c056e
+updated: 2017-06-10T14:37:37.789226241-07:00
 imports:
 - name: github.com/agl/ed25519
   version: 5312a61534124124185d41f09206b9fef1d88403
@@ -10,6 +10,8 @@ imports:
   version: 1ae306021e323ae11c71ffb8546fbd9019e6cb6f
   subpackages:
   - btcec
+- name: github.com/cevaris/ordered_map
+  version: 531fd444821a2eda0e8d1ed033ae207641e03b54
 - name: github.com/coreos/go-semver
   version: 5e3acbb5668c4c3deb4842615c4098eb61fb6b1e
   subpackages:
