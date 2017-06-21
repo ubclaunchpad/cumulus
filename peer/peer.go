@@ -28,7 +28,7 @@ const (
 	// PeerSearchWaitTime is the amount of time the maintainConnections goroutine
 	// will wait before checking if we can connect to more peers when is sees that
 	// our PeerStore is full.
-	PeerSearchWaitTime = time.Second * 30
+	PeerSearchWaitTime = time.Minute
 )
 
 var (
@@ -128,10 +128,11 @@ type PushHandler func(*msg.Push)
 type RequestHandler func(*msg.Request) msg.Response
 
 // New returns a new Peer
-func New(c net.Conn, ps *PeerStore) *Peer {
+func New(c net.Conn, ps *PeerStore, listenAddr string) *Peer {
 	return &Peer{
 		Connection:       c,
 		Store:            ps,
+		ListenAddr:       listenAddr,
 		requestHandler:   defaultRequestHandler,
 		pushHandler:      defaultPushHandler,
 		responseHandlers: make(map[string]ResponseHandler),
@@ -142,15 +143,13 @@ func New(c net.Conn, ps *PeerStore) *Peer {
 // remote peer. It will create a dispatcher and message handlers to handle
 // retrieving messages over the new connection and sending them to App.
 func ConnectionHandler(c net.Conn) {
-	p := New(c, PStore)
-
 	// Before we can continue we must exchange listen addresses
 	addr, err := exchangeListenAddrs(c, PeerSearchWaitTime)
 	if err != nil {
 		log.WithError(err).Error("Failed to retrieve peer listen address")
 		return
 	}
-	p.ListenAddr = addr
+	p := New(c, PStore, addr)
 
 	// If we are already at MaxPeers, disconnect from a peer to connect to a new
 	// one. This way nobody gets choked out of the network because everybody
