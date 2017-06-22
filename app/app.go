@@ -39,7 +39,7 @@ func Run(cfg conf.Config) {
 	// Start listening on the given interface and port so we can receive
 	// conenctions from other peers
 	log.Infof("Starting listener on %s:%d", cfg.Interface, cfg.Port)
-	peer.LocalAddr = fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
+	peer.ListenAddr = fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
 	go func() {
 		err := conn.Listen(fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port), peer.ConnectionHandler)
 		if err != nil {

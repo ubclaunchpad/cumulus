@@ -1,10 +1,15 @@
 package peer
 
 import (
+	"fmt"
+	"io"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -278,6 +283,306 @@ func TestSetDefaultPushHandler(t *testing.T) {
 
 	p2 := New(fc, PStore, fa.String())
 	if p2.pushHandler == nil {
+		t.FailNow()
+	}
+}
+
+func TestSendRequestAndReceiveResponse(t *testing.T) {
+	ListenAddr = "127.0.0.1:8080"
+	sentResponse := make(chan bool)
+	receivedValidResponse := make(chan bool)
+	var c net.Conn
+
+	go conn.Listen(ListenAddr, ConnectionHandler)
+	c, err := conn.Dial(ListenAddr)
+	if err != nil {
+		t.FailNow()
+	}
+
+	_, err = exchangeListenAddrs(c, time.Second*5)
+	if err != nil {
+		t.FailNow()
+	}
+
+	// Wait a little while to give the peer time to get set up before we check
+	// the PeerStore.
+	select {
+	case <-time.After(time.Second * 1):
+	}
+
+	p := PStore.Get(c.RemoteAddr().String())
+	if p == nil {
+		t.FailNow()
+	}
+
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+	responseHandler := func(res *msg.Response) {
+		addrs := res.Resource.([]string)
+		if len(addrs) != 1 || addrs[0] != "127.0.0.1:8080" {
+			receivedValidResponse <- false
+		}
+		receivedValidResponse <- true
+	}
+	err = p.Request(req, responseHandler)
+	if err != nil {
+		t.FailNow()
+	}
+
+	// Receive request and send response
+	go func() {
+		for {
+			reqMsg, err := msg.Read(c)
+			if err == io.EOF {
+				continue
+			} else if err != nil {
+				sentResponse <- false
+				return
+			}
+
+			switch reqMsg.(type) {
+			case *msg.Request:
+				receivedReq := reqMsg.(*msg.Request)
+				if receivedReq.ResourceType != msg.ResourcePeerInfo {
+					sentResponse <- false
+					return
+				}
+				res := msg.Response{
+					ID:       receivedReq.ID,
+					Resource: PStore.Addrs(),
+				}
+				err := res.Write(c)
+				if err != nil {
+					sentResponse <- false
+					return
+				}
+				sentResponse <- true
+			default:
+				sentResponse <- false
+			}
+		}
+	}()
+
+	select {
+	case sent := <-sentResponse:
+		if !sent {
+			t.FailNow()
+		}
+	case <-time.After(time.Second * 1):
+		t.FailNow()
+	}
+
+	select {
+	case passed := <-receivedValidResponse:
+		if !passed {
+			t.FailNow()
+		}
+	case <-time.After(time.Second * 1):
+		t.FailNow()
+	}
+}
+
+func TestRespondToRequest(t *testing.T) {
+	ListenAddr = "127.0.0.1:8080"
+
+	SetDefaultRequestHandler(func(req *msg.Request) msg.Response {
+		res := msg.Response{ID: req.ID}
+
+		switch req.ResourceType {
+		case msg.ResourcePeerInfo:
+			res.Resource = PStore.Addrs()
+		default:
+			res.Error = msg.NewProtocolError(msg.InvalidResourceType,
+				"Invalid resource type")
+		}
+
+		return res
+	})
+
+	go conn.Listen(ListenAddr, ConnectionHandler)
+	c, err := conn.Dial(ListenAddr)
+	if err != nil {
+		t.FailNow()
+	}
+
+	_, err = exchangeListenAddrs(c, time.Second*5)
+	if err != nil {
+		t.FailNow()
+	}
+
+	// Wait a little while to give the peer time to get set up before we check
+	// the PeerStore.
+	select {
+	case <-time.After(time.Second * 1):
+	}
+
+	p := PStore.Get(c.RemoteAddr().String())
+	if p == nil {
+		t.FailNow()
+	}
+
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+	err = req.Write(c)
+	if err != nil {
+		t.FailNow()
+	}
+
+	resChan := make(chan *msg.Response)
+	failChan := make(chan bool)
+
+	go func() {
+		for {
+			resMsg, err := msg.Read(c)
+			if err == io.EOF {
+				continue
+			} else if err != nil {
+				failChan <- true
+				return
+			}
+			resChan <- resMsg.(*msg.Response)
+		}
+	}()
+
+	select {
+	case res := <-resChan:
+		addrs := res.Resource.([]string)
+		if len(addrs) != 1 || addrs[0] != ListenAddr {
+			t.FailNow()
+		}
+	case <-failChan:
+		t.FailNow()
+	case <-time.After(PeerSearchWaitTime):
+		t.FailNow()
+	}
+}
+
+func TestReceivePush(t *testing.T) {
+	ListenAddr = "127.0.0.1:8080"
+	receivedValidPush := make(chan bool)
+	var c net.Conn
+
+	SetDefaultPushHandler(func(req *msg.Push) {
+		if req.ResourceType != msg.ResourceTransaction {
+			receivedValidPush <- false
+			return
+		}
+		tr := req.Resource.(*blockchain.Transaction)
+		if tr.Len() <= blockchain.SigLen {
+			receivedValidPush <- false
+			return
+		}
+		receivedValidPush <- true
+	})
+
+	go conn.Listen(ListenAddr, ConnectionHandler)
+	c, err := conn.Dial(ListenAddr)
+	if err != nil {
+		t.FailNow()
+	}
+
+	_, err = exchangeListenAddrs(c, time.Second*5)
+	if err != nil {
+		t.FailNow()
+	}
+
+	// Wait a little while to give the peer time to get set up before we check
+	// the PeerStore.
+	select {
+	case <-time.After(time.Second * 1):
+	}
+
+	p := PStore.Get(c.RemoteAddr().String())
+	if p == nil {
+		t.FailNow()
+	}
+
+	req := msg.Push{
+		ResourceType: msg.ResourceTransaction,
+		Resource:     blockchain.NewTransaction(),
+	}
+	err = req.Write(c)
+	if err != nil {
+		fmt.Println("Failed to write push message ", err)
+		t.FailNow()
+	}
+
+	select {
+	case passed := <-receivedValidPush:
+		if !passed {
+			t.FailNow()
+		}
+	case <-time.After(time.Second * 1):
+		t.FailNow()
+	}
+}
+
+func TestSendPushMessage(t *testing.T) {
+	ListenAddr = "127.0.0.1:8080"
+	receivedValidPush := make(chan bool)
+	var c net.Conn
+
+	go conn.Listen(ListenAddr, ConnectionHandler)
+	c, err := conn.Dial(ListenAddr)
+	if err != nil {
+		t.FailNow()
+	}
+
+	_, err = exchangeListenAddrs(c, time.Second*5)
+	if err != nil {
+		t.FailNow()
+	}
+
+	// Wait a little while to give the peer time to get set up before we check
+	// the PeerStore.
+	select {
+	case <-time.After(time.Second * 1):
+	}
+
+	p := PStore.Get(c.RemoteAddr().String())
+	if p == nil {
+		t.FailNow()
+	}
+
+	push := msg.Push{
+		ResourceType: msg.ResourceBlock,
+		Resource:     blockchain.NewBlock(),
+	}
+	err = p.Push(push)
+	if err != nil {
+		t.FailNow()
+	}
+
+	go func() {
+		for {
+			pushMsg, err := msg.Read(c)
+			if err == io.EOF {
+				continue
+			} else if err != nil {
+				receivedValidPush <- false
+				return
+			}
+
+			push := pushMsg.(*msg.Push)
+			block := push.Resource.(*blockchain.Block)
+			if push.ResourceType != msg.ResourceBlock || block.Len() <= blockchain.BlockHeaderLen {
+				receivedValidPush <- false
+				return
+			}
+			receivedValidPush <- true
+		}
+	}()
+
+	select {
+	case passed := <-receivedValidPush:
+		if !passed {
+			t.FailNow()
+		}
+	case <-time.After(time.Second * 1):
 		t.FailNow()
 	}
 }

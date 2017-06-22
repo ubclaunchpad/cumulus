@@ -36,8 +36,8 @@ var (
 	// we connect to should have a reference to this peerstore so they can
 	// populate it.
 	PStore = &PeerStore{peers: make(map[string]*Peer, 0)}
-	// LocalAddr is the TCP address this host is listening on
-	LocalAddr             string
+	// ListenAddr is the TCP address this host is listening on
+	ListenAddr            string
 	defaultRequestHandler RequestHandler
 	defaultPushHandler    PushHandler
 )
@@ -297,7 +297,7 @@ func MaintainConnections() {
 				ResourceType: msg.ResourcePeerInfo,
 			}
 			p := PStore.Get(peerAddrs[i])
-			if p != nil && peerAddrs[i] != LocalAddr {
+			if p != nil && peerAddrs[i] != ListenAddr {
 				// Need to do this check in case the peer got removed
 				p.Request(peerInfoRequest, PeerInfoHandler)
 			}
@@ -318,7 +318,7 @@ func PeerInfoHandler(res *msg.Response) {
 	log.Debugf("Found peers %s", string(strPeers))
 	for i := 0; i < len(peers) && PStore.Size() < MaxPeers; i++ {
 		p := PStore.Get(peers[i])
-		if p != nil || peers[i] == LocalAddr {
+		if p != nil || peers[i] == ListenAddr {
 			// We are already connected to this peer. Skip it.
 			continue
 		}
@@ -352,6 +352,7 @@ func (p *Peer) getResponseHandler(id string) ResponseHandler {
 
 func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 	addrChan := make(chan string)
+	errChan := make(chan error)
 
 	req := msg.Request{
 		ID:           uuid.New().String(),
@@ -370,8 +371,10 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 
 		for !receivedAddr || !sentAddr {
 			message, err := msg.Read(c)
-			if err != nil {
+			if err == io.EOF {
 				continue
+			} else if err != nil {
+				errChan <- err
 			}
 
 			switch message.(type) {
@@ -387,15 +390,14 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 				// Send the remote peer our listen address
 				res := msg.Response{
 					ID:       uuid.New().String(),
-					Resource: LocalAddr,
+					Resource: ListenAddr,
 				}
 				err = res.Write(c)
 				if err != nil {
-					continue
+					errChan <- err
 				}
 				sentAddr = true
 			default:
-				continue
 			}
 		}
 
@@ -405,6 +407,8 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 	select {
 	case addr := <-addrChan:
 		return addr, nil
+	case err := <-errChan:
+		return "", err
 	case <-time.After(d):
 		return "", fmt.Errorf("Failed to exchange listen addresses with %s", c.RemoteAddr().String())
 	}
