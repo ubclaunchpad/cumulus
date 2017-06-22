@@ -8,7 +8,7 @@ import (
 
 func TestGetAndSetTransaction(t *testing.T) {
 	p := New()
-	bc, b := blockchain.NewValidChainAndBlock()
+	bc, b := blockchain.NewTestValidChainAndBlock()
 	if p.Len() != 0 {
 		t.FailNow()
 	}
@@ -34,16 +34,16 @@ func TestGetAndSetTransaction(t *testing.T) {
 
 func TestSetBadTransaction(t *testing.T) {
 	p := New()
-	bc := blockchain.NewBlockChain()
-	if p.Set(blockchain.NewTransaction(), bc) {
+	bc := blockchain.NewTestBlockChain()
+	if p.Set(blockchain.NewTestTransaction(), bc) {
 		t.FailNow()
 	}
 }
 
 func TestUpdatePool(t *testing.T) {
 	p := New()
-	bc, legitBlk := blockchain.NewValidChainAndBlock()
-	badBlock := blockchain.NewBlock()
+	bc, legitBlk := blockchain.NewTestValidChainAndBlock()
+	badBlock := blockchain.NewTestBlock()
 	if p.Update(badBlock, bc) {
 		t.FailNow()
 	}
@@ -68,7 +68,7 @@ func TestUpdatePool(t *testing.T) {
 
 func TestGetTxns(t *testing.T) {
 	p := New()
-	bc, b := blockchain.NewValidChainAndBlock()
+	bc, b := blockchain.NewTestValidChainAndBlock()
 	for _, tr := range b.Transactions {
 		if !p.Set(tr, bc) {
 			t.FailNow()
@@ -97,10 +97,10 @@ func TestGetNewBlockEmpty(t *testing.T) {
 func TestGetIndex(t *testing.T) {
 	p := New()
 	numTxns := 1000
-	tr := blockchain.NewTransaction()
+	tr := blockchain.NewTestTransaction()
 	p.SetUnsafe(tr)
 	for i := 0; i < numTxns; i++ {
-		p.SetUnsafe(blockchain.NewTransaction())
+		p.SetUnsafe(blockchain.NewTestTransaction())
 	}
 	if p.GetIndex(tr) != 0 {
 		t.FailNow()

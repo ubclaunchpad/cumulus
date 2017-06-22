@@ -370,7 +370,7 @@ func TestSendRequestAndReceiveResponse(t *testing.T) {
 		if !sent {
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
 
@@ -379,12 +379,12 @@ func TestSendRequestAndReceiveResponse(t *testing.T) {
 		if !passed {
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
 }
 
-func TestRespondToRequest(t *testing.T) {
+func TestReceiveRequestAndSendResponse(t *testing.T) {
 	ListenAddr = "127.0.0.1:8080"
 
 	SetDefaultRequestHandler(func(req *msg.Request) msg.Response {
@@ -456,7 +456,7 @@ func TestRespondToRequest(t *testing.T) {
 		}
 	case <-failChan:
 		t.FailNow()
-	case <-time.After(PeerSearchWaitTime):
+	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
 }
@@ -503,7 +503,7 @@ func TestReceivePush(t *testing.T) {
 
 	req := msg.Push{
 		ResourceType: msg.ResourceTransaction,
-		Resource:     blockchain.NewTransaction(),
+		Resource:     blockchain.NewTestTransaction(),
 	}
 	err = req.Write(c)
 	if err != nil {
@@ -516,12 +516,12 @@ func TestReceivePush(t *testing.T) {
 		if !passed {
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
 }
 
-func TestSendPushMessage(t *testing.T) {
+func TestSendPush(t *testing.T) {
 	ListenAddr = "127.0.0.1:8080"
 	receivedValidPush := make(chan bool)
 	var c net.Conn
@@ -550,7 +550,7 @@ func TestSendPushMessage(t *testing.T) {
 
 	push := msg.Push{
 		ResourceType: msg.ResourceBlock,
-		Resource:     blockchain.NewBlock(),
+		Resource:     blockchain.NewTestBlock(),
 	}
 	err = p.Push(push)
 	if err != nil {
@@ -582,7 +582,7 @@ func TestSendPushMessage(t *testing.T) {
 		if !passed {
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
 }
