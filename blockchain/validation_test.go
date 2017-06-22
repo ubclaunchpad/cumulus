@@ -3,6 +3,8 @@ package blockchain
 import (
 	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
 	"testing"
 )
 
@@ -72,7 +74,7 @@ func TestTransactionRespend(t *testing.T) {
 	bc, _ := NewValidBlockChainFixture()
 	trC := bc.Blocks[1].Transactions[0]
 	b := NewOutputBlock([]*Transaction{trC}, bc.Blocks[1])
-	bc.AppendBlock(b, NewWallet().Public())
+	bc.AppendBlock(b)
 
 	valid, code := bc.ValidTransaction(trC)
 
@@ -99,7 +101,7 @@ func TestValidBlockBadTransaction(t *testing.T) {
 	}
 }
 
-func TestValidBlocBadBlockNumber(t *testing.T) {
+func TestValidBlockBadBlockNumber(t *testing.T) {
 	bc, _ := NewValidBlockChainFixture()
 	bc.Blocks[1].BlockNumber = 2
 
@@ -123,6 +125,52 @@ func TestValidBlockBadHash(t *testing.T) {
 		t.Fail()
 	}
 	if code != BadHash {
+		t.Fail()
+	}
+}
+
+func TestValidBlockBadTime(t *testing.T) {
+	bc, b := NewValidChainAndBlock()
+	b.Time = 0
+	valid, code := bc.ValidBlock(b)
+
+	if valid {
+		t.Fail()
+	}
+	if code != BadTime {
+		t.Fail()
+	}
+
+	b.Time = math.MaxUint32
+	valid, code = bc.ValidBlock(b)
+
+	if valid {
+		t.Fail()
+	}
+	if code != BadTime {
+		t.Fail()
+	}
+}
+
+func TestValidBlockBadTarget(t *testing.T) {
+	bc, b := NewValidChainAndBlock()
+	b.Target = BigIntToHash(new(big.Int).Add(MinDifficulty, big.NewInt(1)))
+	valid, code := bc.ValidBlock(b)
+
+	if valid {
+		t.Fail()
+	}
+	if code != BadTarget {
+		t.Fail()
+	}
+
+	b.Target = BigIntToHash(new(big.Int).Sub(MaxDifficulty, big.NewInt(1)))
+	valid, code = bc.ValidBlock(b)
+
+	if valid {
+		t.Fail()
+	}
+	if code != BadTarget {
 		t.Fail()
 	}
 }
@@ -166,6 +214,33 @@ func TestValidBlockBigNumber(t *testing.T) {
 		t.Fail()
 	}
 	if code != BadBlockNumber {
+		t.Fail()
+	}
+}
+
+func TestBigExp(t *testing.T) {
+	a := big.NewInt(1)
+	b := BigExp(0, 0)
+
+	if a.Cmp(b) != 0 {
+		t.Fail()
+	}
+
+	a = big.NewInt(1)
+	b = BigExp(10, -2)
+
+	if a.Cmp(b) != 0 {
+		t.Fail()
+	}
+
+	a = new(big.Int).Exp(
+		big.NewInt(int64(2)),
+		big.NewInt(int64(256)),
+		big.NewInt(0),
+	)
+	b = BigExp(2, 256)
+
+	if a.Cmp(b) != 0 {
 		t.Fail()
 	}
 }

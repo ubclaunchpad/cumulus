@@ -42,10 +42,9 @@ func DecodeBlockChain(r io.Reader) *BlockChain {
 }
 
 // AppendBlock adds a block to the end of the block chain.
-func (bc *BlockChain) AppendBlock(b *Block, miner Address) {
+func (bc *BlockChain) AppendBlock(b *Block) {
 	b.BlockNumber = uint32(len(bc.Blocks))
 	b.LastBlock = HashSum(bc.Blocks[b.BlockNumber-1])
-	b.Miner = miner
 	bc.Blocks = append(bc.Blocks, b)
 }
 

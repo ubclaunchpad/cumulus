@@ -12,22 +12,43 @@ const (
 	// BlockSize is the maximum size of a block in bytes when marshaled (about 250K).
 	BlockSize = 1 << 18
 	// BlockHeaderLen is the length in bytes of a block header.
-	BlockHeaderLen = 32/8 + HashLen + AddrLen
+	BlockHeaderLen = 2*(32/8) + 64/8 + 2*HashLen
 )
 
 // BlockHeader contains metadata about a block
 type BlockHeader struct {
+	// BlockNumber is the position of the block within the blockchain
 	BlockNumber uint32
-	LastBlock   Hash
-	Miner       Address
+	// LastBlock is the hash of the previous block
+	LastBlock Hash
+	// Target is the current target
+	Target Hash
+	// Time is represented as the number of seconds elapsed
+	// since January 1, 1970 UTC. It increments every second when mining.
+	Time uint32
+	// Nonce starts at 0 and increments by 1 for every hash when mining
+	Nonce uint64
 }
 
 // Marshal converts a BlockHeader to a byte slice
 func (bh *BlockHeader) Marshal() []byte {
-	buf := make([]byte, 4, BlockHeaderLen)
-	binary.LittleEndian.PutUint32(buf, bh.BlockNumber)
+	var buf []byte
+
+	tempBufBlockNumber := make([]byte, 4)
+	binary.LittleEndian.PutUint32(tempBufBlockNumber, bh.BlockNumber)
+
+	tempBufTime := make([]byte, 4)
+	binary.LittleEndian.PutUint32(tempBufTime, bh.Time)
+
+	tempBufNonce := make([]byte, 8)
+	binary.LittleEndian.PutUint64(tempBufNonce, bh.Nonce)
+
+	buf = append(buf, tempBufBlockNumber...)
 	buf = append(buf, bh.LastBlock.Marshal()...)
-	buf = append(buf, bh.Miner.Marshal()...)
+	buf = append(buf, bh.Target.Marshal()...)
+	buf = append(buf, tempBufTime...)
+	buf = append(buf, tempBufNonce...)
+
 	return buf
 }
 

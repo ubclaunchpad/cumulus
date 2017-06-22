@@ -1,7 +1,11 @@
 package blockchain
 
 // ValidTransaction checks whether a transaction is valid, assuming the
-import "crypto/ecdsa"
+import (
+	"crypto/ecdsa"
+	"math/big"
+	"time"
+)
 
 // TransactionCode is returned from ValidTransaction.
 type TransactionCode uint32
@@ -28,6 +32,10 @@ const (
 	// BadTransaction is returned when the block contains an invalid
 	// transaction.
 	BadTransaction BlockCode = iota
+	// BadTime is returned when the block contains an invalid time
+	BadTime BlockCode = iota
+	// BadTarget is returned when the block contains an invalid target
+	BadTarget BlockCode = iota
 	// BadBlockNumber is returned when block number is not one greater than
 	// previous block.
 	BadBlockNumber BlockCode = iota
@@ -36,6 +44,13 @@ const (
 	// DoubleSpend is returned when two transactions in the block share inputs,
 	// but outputs > inputs.
 	DoubleSpend BlockCode = iota
+)
+
+var (
+	// MinDifficulty is the minimum difficulty
+	MinDifficulty = new(big.Int).Sub(BigExp(2, 232), big.NewInt(1))
+	// MaxDifficulty is the maximum difficulty value
+	MaxDifficulty = big.NewInt(1)
 )
 
 // ValidTransaction tests whether a transaction valid.
@@ -90,6 +105,17 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 		}
 	}
 
+	// Check that the target is within the min and max difficulty levels
+	target := HashToBigInt(b.Target)
+	if target.Cmp(MinDifficulty) == 1 || target.Cmp(MaxDifficulty) == -1 {
+		return false, BadTarget
+	}
+
+	// Check that time is not greater than current time or equal to 0
+	if uint32(b.Time) == 0 || uint32(b.Time) > uint32(time.Now().Unix()) {
+		return false, BadTime
+	}
+
 	// Check that hash of last block is correct
 	if HashSum(lastBlock) != b.LastBlock {
 		return false, BadHash
@@ -108,4 +134,10 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 	}
 
 	return true, ValidBlock
+}
+
+// BigExp returns an big int pointer with the result set to base**exp,
+// if exp <= 0, the result is 1
+func BigExp(base, exp int) *big.Int {
+	return new(big.Int).Exp(big.NewInt(int64(base)), big.NewInt(int64(exp)), nil)
 }

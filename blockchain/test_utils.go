@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"math/big"
 	mrand "math/rand"
+	"time"
 )
 
 // NewHash produces a hash.
@@ -59,7 +60,6 @@ func NewBlockHeader() BlockHeader {
 	return BlockHeader{
 		BlockNumber: mrand.Uint32(),
 		LastBlock:   NewHash(),
-		Miner:       NewWallet().Public(),
 	}
 }
 
@@ -95,7 +95,9 @@ func NewInputBlock(t []*Transaction) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: 0,
 			LastBlock:   NewHash(),
-			Miner:       NewWallet().Public(),
+			Target:      NewValidTarget(),
+			Time:        uint32(time.Now().Unix()),
+			Nonce:       0,
 		},
 		Transactions: t,
 	}
@@ -108,7 +110,9 @@ func NewOutputBlock(t []*Transaction, input *Block) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: input.BlockNumber + 1,
 			LastBlock:   HashSum(input),
-			Miner:       NewWallet().Public(),
+			Target:      NewValidTarget(),
+			Time:        uint32(time.Now().Unix()),
+			Nonce:       0,
 		},
 		Transactions: t,
 	}
@@ -187,6 +191,17 @@ func NewValidChainAndBlock() (*BlockChain, *Block) {
 	tr, _ := tbody.Sign(s, crand.Reader)
 	newBlock := NewOutputBlock([]*Transaction{tr}, inputBlock)
 	return bc, newBlock
+}
+
+// NewValidTarget creates a new valid target that is a random value between the
+// max and min difficulties
+func NewValidTarget() Hash {
+	r := new(big.Int).Rand(
+		mrand.New(mrand.NewSource(time.Now().Unix())),
+		new(big.Int).Add(MinDifficulty, big.NewInt(1)),
+	)
+	r.Add(r, big.NewInt(1))
+	return BigIntToHash(r)
 }
 
 // BigIntToHash converts a big integer to a hash
