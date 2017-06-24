@@ -382,6 +382,8 @@ func TestSendRequestAndReceiveResponse(t *testing.T) {
 	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
+
+	c.Close()
 }
 
 func TestReceiveRequestAndSendResponse(t *testing.T) {
@@ -445,6 +447,7 @@ func TestReceiveRequestAndSendResponse(t *testing.T) {
 				return
 			}
 			resChan <- resMsg.(*msg.Response)
+			return
 		}
 	}()
 
@@ -459,6 +462,8 @@ func TestReceiveRequestAndSendResponse(t *testing.T) {
 	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
+
+	c.Close()
 }
 
 func TestReceivePush(t *testing.T) {
@@ -519,6 +524,8 @@ func TestReceivePush(t *testing.T) {
 	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
+
+	c.Close()
 }
 
 func TestSendPush(t *testing.T) {
@@ -574,6 +581,7 @@ func TestSendPush(t *testing.T) {
 				return
 			}
 			receivedValidPush <- true
+			return
 		}
 	}()
 
@@ -585,4 +593,75 @@ func TestSendPush(t *testing.T) {
 	case <-time.After(time.Second * 5):
 		t.FailNow()
 	}
+
+	c.Close()
+}
+
+func TestMaintinConnections(t *testing.T) {
+	ListenAddr = "127.0.0.1:8080"
+	listenAddr2 := "127.0.0.1:8081"
+	var c1 net.Conn
+	receivedConnection := make(chan bool)
+	responded := make(chan bool)
+
+	go conn.Listen(ListenAddr, ConnectionHandler)
+	c1, err := conn.Dial(ListenAddr)
+	if err != nil {
+		t.FailNow()
+	}
+
+	_, err = exchangeListenAddrs(c1, time.Second*5)
+	if err != nil {
+		t.FailNow()
+	}
+
+	testConnectionHandler := func(c net.Conn) {
+		ConnectionHandler(c)
+		c.Close()
+		receivedConnection <- true
+	}
+
+	go conn.Listen(listenAddr2, testConnectionHandler)
+	ListenAddr = ""
+	go MaintainConnections()
+	go func() {
+		for {
+			reqMsg, err := msg.Read(c1)
+			if err == io.EOF {
+				continue
+			} else if err != nil {
+				responded <- false
+				return
+			}
+
+			req := reqMsg.(*msg.Request)
+			if req.ResourceType != msg.ResourcePeerInfo {
+				responded <- false
+				return
+			}
+			res := msg.Response{
+				ID:       req.ID,
+				Resource: append(make([]string, 0), listenAddr2),
+			}
+			err = res.Write(c1)
+			responded <- err == nil
+			return
+		}
+	}()
+
+	select {
+	case sentInfo := <-responded:
+		if !sentInfo {
+			t.FailNow()
+		}
+	case <-time.After(time.Second * 5):
+		t.FailNow()
+	}
+	select {
+	case <-receivedConnection:
+	case <-time.After(time.Second * 5):
+		t.FailNow()
+	}
+
+	c1.Close()
 }
