@@ -110,34 +110,3 @@ func TestHandleBlockOK(t *testing.T) {
 		t.FailNow()
 	}
 }
-
-// func TestStartTxn(t *testing.T) {
-// 	reset()
-// 	realWorker.Start()
-// 	TransactionWorkQueue <- goodTxnWork
-// 	time.Sleep(50 * time.Millisecond)
-// 	mockResponder.Lock()
-// 	if !mockResponder.Result {
-// 		t.FailNow()
-// 	}
-// 	mockResponder.Unlock()
-// }
-//
-// func TestStartBlk(t *testing.T) {
-// 	reset()
-// 	realWorker.Start()
-// 	BlockWorkQueue <- goodBlkWork
-// 	time.Sleep(50 * time.Millisecond)
-// 	mockResponder.Lock()
-// 	if !mockResponder.Result {
-// 		t.FailNow()
-// 	}
-// 	mockResponder.Unlock()
-// }
-
-// func TestQuitWorker(t *testing.T) {
-// 	reset()
-// 	mockResponder.NumCalls = 0
-// 	realWorker.Start()
-// 	QuitChan <- false
-// }
