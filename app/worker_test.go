@@ -141,7 +141,6 @@ func TestStartBlk(t *testing.T) {
 }
 
 func TestQuitWorker(t *testing.T) {
-	// If the QuitCall fails,
 	reset()
 	for i := 0; i < nWorkers; i++ {
 		NewWorker(i).Start()
