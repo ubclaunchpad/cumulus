@@ -3,6 +3,7 @@ package app
 import (
 	"sync"
 	"testing"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	bc "github.com/ubclaunchpad/cumulus/blockchain"
@@ -76,68 +77,68 @@ func reset() {
 	QuitChan = make(chan bool)
 }
 
-// func TestNewWorker(t *testing.T) {
-// 	reset()
-// 	if realWorker.ID != 7 {
-// 		t.FailNow()
-// 	}
-// }
-//
-// func TestHandleTransactionOK(t *testing.T) {
-// 	reset()
-// 	realWorker.HandleTransaction(goodTxnWork)
-// 	if mockResponder.Result != true {
-// 		t.FailNow()
-// 	}
-// }
-//
-// func TestHandleTransactionNotOK(t *testing.T) {
-// 	reset()
-// 	realWorker.HandleTransaction(badTxnWork)
-// 	if mockResponder.Result != false {
-// 		t.FailNow()
-// 	}
-// }
-//
-// func TestHandleBlockNotOK(t *testing.T) {
-// 	reset()
-// 	realWorker.HandleBlock(goodBlkWork)
-// 	if mockResponder.Result != true {
-// 		t.FailNow()
-// 	}
-// }
-//
-// func TestHandleBlockOK(t *testing.T) {
-// 	reset()
-// 	realWorker.HandleBlock(badBlkWork)
-// 	if mockResponder.Result != false {
-// 		t.FailNow()
-// 	}
-// }
-//
-// func TestStartTxn(t *testing.T) {
-// 	reset()
-// 	realWorker.Start()
-// 	TransactionWorkQueue <- goodTxnWork
-// 	time.Sleep(50 * time.Millisecond)
-// 	mockResponder.Lock()
-// 	if !mockResponder.Result {
-// 		t.FailNow()
-// 	}
-// 	mockResponder.Unlock()
-// }
-//
-// func TestStartBlk(t *testing.T) {
-// 	reset()
-// 	realWorker.Start()
-// 	BlockWorkQueue <- goodBlkWork
-// 	time.Sleep(50 * time.Millisecond)
-// 	mockResponder.Lock()
-// 	if !mockResponder.Result {
-// 		t.FailNow()
-// 	}
-// 	mockResponder.Unlock()
-// }
+func TestNewWorker(t *testing.T) {
+	reset()
+	if realWorker.ID != 7 {
+		t.FailNow()
+	}
+}
+
+func TestHandleTransactionOK(t *testing.T) {
+	reset()
+	realWorker.HandleTransaction(goodTxnWork)
+	if mockResponder.Result != true {
+		t.FailNow()
+	}
+}
+
+func TestHandleTransactionNotOK(t *testing.T) {
+	reset()
+	realWorker.HandleTransaction(badTxnWork)
+	if mockResponder.Result != false {
+		t.FailNow()
+	}
+}
+
+func TestHandleBlockNotOK(t *testing.T) {
+	reset()
+	realWorker.HandleBlock(goodBlkWork)
+	if mockResponder.Result != true {
+		t.FailNow()
+	}
+}
+
+func TestHandleBlockOK(t *testing.T) {
+	reset()
+	realWorker.HandleBlock(badBlkWork)
+	if mockResponder.Result != false {
+		t.FailNow()
+	}
+}
+
+func TestStartTxn(t *testing.T) {
+	reset()
+	realWorker.Start()
+	TransactionWorkQueue <- goodTxnWork
+	time.Sleep(50 * time.Millisecond)
+	mockResponder.Lock()
+	if !mockResponder.Result {
+		t.FailNow()
+	}
+	mockResponder.Unlock()
+}
+
+func TestStartBlk(t *testing.T) {
+	reset()
+	realWorker.Start()
+	BlockWorkQueue <- goodBlkWork
+	time.Sleep(50 * time.Millisecond)
+	mockResponder.Lock()
+	if !mockResponder.Result {
+		t.FailNow()
+	}
+	mockResponder.Unlock()
+}
 
 func TestQuitWorker(t *testing.T) {
 	// If the QuitCall fails,
