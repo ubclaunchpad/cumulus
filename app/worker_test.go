@@ -74,7 +74,7 @@ func reset() {
 		Block:     badBlk,
 		Responder: &mockResponder,
 	}
-	QuitChan = make(chan bool)
+	QuitChan = make(chan int)
 }
 
 func TestNewWorker(t *testing.T) {
@@ -147,5 +147,7 @@ func TestQuitWorker(t *testing.T) {
 	}
 
 	// Would hang if quit call fails, and travis would fail.
-	QuitChan <- false
+	for i := 0; i < nWorkers; i++ {
+		QuitChan <- i
+	}
 }

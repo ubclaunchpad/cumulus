@@ -5,6 +5,9 @@ import log "github.com/Sirupsen/logrus"
 // nWorkers is how many workers this node has.
 const nWorkers = 10
 
+// Workers is a list of workers.
+var workers [nWorkers]*GenericWorker
+
 // Worker is an interface for the basic app worker tasks.
 type Worker interface {
 	HandleTransaction(work TransactionWork)
