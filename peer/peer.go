@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -208,8 +210,10 @@ func (p *Peer) Dispatch() {
 				}
 			} else {
 				log.WithError(err).Error("Dispatcher failed to read message")
-				if errCount == 3 {
-					log.Infof("Disconnecting from peer %s", p.Connection.RemoteAddr().String())
+				log.Info(err.Error(), syscall.ECONNRESET.Error())
+				if strings.Contains(err.Error(), syscall.ECONNRESET.Error()) || errCount == 3 {
+					log.Infof("Disconnecting from peer %s due to %s",
+						p.Connection.RemoteAddr().String(), err.Error())
 					p.Store.Remove(p.ListenAddr)
 					p.Connection.Close()
 					return

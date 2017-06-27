@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
@@ -9,14 +11,14 @@ import (
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/console"
 	"github.com/ubclaunchpad/cumulus/msg"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
 var (
 	config *conf.Config
-	// TODO peer store once it's merged in
-	chain *blockchain.BlockChain
+	chain  *blockchain.BlockChain
 )
 
 // Run sets up and starts a new Cumulus node with the
@@ -65,6 +67,19 @@ func Run(cfg conf.Config) {
 		p.Request(peerInfoRequest, peer.PeerInfoHandler)
 	}
 
+	// If the console flag was passed, redirect logs to a file and run the console
+	if cfg.Console {
+		logFile, err := os.Create(".logfile")
+		if err != nil {
+			log.WithError(err).Fatal("Failed to redirect logs to log file")
+		}
+		log.Warn("Redirecting logs to .logfile")
+
+		logWriter := bufio.NewWriter(logFile)
+		log.SetOutput(logWriter)
+		go console.Run()
+	}
+
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
 	go peer.MaintainConnections()
@@ -100,8 +115,4 @@ func PushHandler(push *msg.Push) {
 	default:
 		// Invalid resource type. Ignore
 	}
-
-	// Ask target for its peers
-	// Connect to these peers until we have enough peers
-	// Download the blockchain
 }
