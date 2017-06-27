@@ -3,10 +3,10 @@ package app
 import "github.com/ubclaunchpad/cumulus/blockchain"
 
 const (
-	// BlockQueueBuffer is the size of the BlockQueue channel.
-	BlockQueueBuffer = 100
-	// TransactionQueueBuffer is the size of the BlockQueue channel.
-	TransactionQueueBuffer = 100
+	// BlockQueueSize is the size of the BlockQueue channel.
+	BlockQueueSize = 100
+	// TransactionQueueSize is the size of the BlockQueue channel.
+	TransactionQueueSize = 100
 )
 
 // Responder is used to handle requests who require a response.
@@ -17,10 +17,10 @@ type Responder interface {
 }
 
 // BlockWorkQueue is a queue of blocks to process.
-var BlockWorkQueue = make(chan BlockWork, BlockQueueBuffer)
+var BlockWorkQueue = make(chan BlockWork, BlockQueueSize)
 
 // TransactionWorkQueue is a queue of transactions to process.
-var TransactionWorkQueue = make(chan TransactionWork, TransactionQueueBuffer)
+var TransactionWorkQueue = make(chan TransactionWork, TransactionQueueSize)
 
 // TransactionWork holds a new transaction job, and a Responder for
 // sending results.

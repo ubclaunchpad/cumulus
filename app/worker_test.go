@@ -13,7 +13,7 @@ import (
 var (
 	legitBlock       *bc.Block
 	legitTransaction *bc.Transaction
-	realWorker       GenericWorker
+	realWorker       AppWorker
 	txnWork          TransactionWork
 	mockResponder    MockResponder
 	badTxnWork       TransactionWork

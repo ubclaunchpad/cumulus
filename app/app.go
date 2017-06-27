@@ -126,9 +126,6 @@ func PushHandler(push *msg.Push) {
 	}
 }
 
-// Shutdown shuts down the node (save the pool and the chain to disk).
-func Shutdown() {}
-
 // initializeNode creates a transaction pool, workers and queues to handle
 // incoming messages.
 func initializeNode() {
@@ -139,8 +136,8 @@ func initializeNode() {
 
 // intializeQueues makes all necessary queues.
 func intializeQueues() {
-	BlockWorkQueue = make(chan BlockWork, BlockQueueBuffer)
-	TransactionWorkQueue = make(chan TransactionWork, TransactionQueueBuffer)
+	BlockWorkQueue = make(chan BlockWork, BlockQueueSize)
+	TransactionWorkQueue = make(chan TransactionWork, TransactionQueueSize)
 	QuitChan = make(chan int)
 }
 

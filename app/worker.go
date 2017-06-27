@@ -6,7 +6,13 @@ import log "github.com/Sirupsen/logrus"
 const nWorkers = 10
 
 // Workers is a list of workers.
-var workers [nWorkers]*GenericWorker
+var workers [nWorkers]*AppWorker
+
+// WorkerQueue is the channel of workers handling work.
+var WorkerQueue chan AppWorker
+
+// QuitChan is the channel we use to kill the workers.
+var QuitChan chan int
 
 // Worker is an interface for the basic app worker tasks.
 type Worker interface {
@@ -14,20 +20,22 @@ type Worker interface {
 	HandleBlock(work BlockWork)
 }
 
-// GenericWorker implements the basic worker.
-type GenericWorker struct {
+// AppWorker implements the basic worker.
+type AppWorker struct {
 	ID int
+	log.FieldLogger
 }
 
 // NewWorker returns a new TransactionWorker object.
-func NewWorker(id int) GenericWorker {
-	return GenericWorker{
-		ID: id,
+func NewWorker(id int) AppWorker {
+	return AppWorker{
+		ID:          id,
+		FieldLogger: log.WithField("id", id),
 	}
 }
 
 // Start continually collects new work from existing work channels.
-func (w GenericWorker) Start() {
+func (w AppWorker) Start() {
 	go func() {
 		for {
 			// Wait for work.
@@ -36,19 +44,13 @@ func (w GenericWorker) Start() {
 			}).Debug("Worker waiting for work.")
 			select {
 			case work := <-TransactionWorkQueue:
-				log.WithFields(log.Fields{
-					"id": w.ID,
-				}).Debug("Worker handling new transaction work.")
+				w.FieldLogger.Debug("Worker handling new transaction work.")
 				w.HandleTransaction(work)
 			case work := <-BlockWorkQueue:
-				log.WithFields(log.Fields{
-					"id": w.ID,
-				}).Debug("Worker handling new block work.")
+				w.FieldLogger.Debug("Worker handling new block work.")
 				w.HandleBlock(work)
 			case <-QuitChan:
-				log.WithFields(log.Fields{
-					"id": w.ID,
-				}).Debug("Worker quitting.")
+				w.FieldLogger.Debug("Worker quitting.")
 				return
 			}
 		}
@@ -61,22 +63,19 @@ func (w GenericWorker) Start() {
 // we validate?
 
 // HandleTransaction handles new instance of TransactionWork.
-func (w *GenericWorker) HandleTransaction(work TransactionWork) {
-	ok, _ := chain.ValidTransaction(work.Transaction)
-	if ok {
-		tpool.SetUnsafe(work.Transaction)
-	}
+func (w *AppWorker) HandleTransaction(work TransactionWork) {
+	ok := tpool.Set(work.Transaction, chain)
 
 	// Respond to the request if a response method was provided.
 	if work.Responder != nil {
 		work.Responder.Lock()
+		defer work.Responder.Unlock()
 		work.Responder.Send(ok)
-		work.Responder.Unlock()
 	}
 }
 
 // HandleBlock handles TransactionWork.
-func (w *GenericWorker) HandleBlock(work BlockWork) {
+func (w *AppWorker) HandleBlock(work BlockWork) {
 	ok, _ := chain.ValidBlock(work.Block)
 	if ok {
 		chain.AppendBlock(work.Block, work.Miner)
@@ -85,7 +84,7 @@ func (w *GenericWorker) HandleBlock(work BlockWork) {
 	// Respond to the request if a response method was provided.
 	if work.Responder != nil {
 		work.Responder.Lock()
+		defer work.Responder.Unlock()
 		work.Responder.Send(ok)
-		work.Responder.Unlock()
 	}
 }
