@@ -32,3 +32,6 @@ vendor
 
 # Text Editors and IDEs
 .vscode
+
+# Log files
+logfile

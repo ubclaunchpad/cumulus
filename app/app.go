@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
@@ -17,8 +19,9 @@ import (
 )
 
 var (
-	config *conf.Config
-	chain  *blockchain.BlockChain
+	config  *conf.Config
+	chain   *blockchain.BlockChain
+	logFile = os.Stdout
 )
 
 // Run sets up and starts a new Cumulus node with the
@@ -31,6 +34,17 @@ func Run(cfg conf.Config) {
 	if cfg.Verbose {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	// Start a goroutine that waits for program termination. Before the program
+	// exits it will flush logs and save the blockchain.
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Info("Saving blockchain...")
+		// TODO
+		os.Exit(0)
+	}()
 
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
@@ -48,6 +62,19 @@ func Run(cfg conf.Config) {
 			log.WithError(err).Fatalf("Failed to listen on %s:%d", cfg.Interface, cfg.Port)
 		}
 	}()
+
+	// If the console flag was passed, redirect logs to a file and run the console
+	if cfg.Console {
+		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE, 0755)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to redirect logs to log file")
+		}
+		log.Warn("Redirecting logs to logfile")
+
+		logWriter := bufio.NewWriter(logFile)
+		log.SetOutput(logWriter)
+		go console.Run()
+	}
 
 	// If a target peer was supplied, connect to it and try discover and connect
 	// to its peers
@@ -67,23 +94,10 @@ func Run(cfg conf.Config) {
 		p.Request(peerInfoRequest, peer.PeerInfoHandler)
 	}
 
-	// If the console flag was passed, redirect logs to a file and run the console
-	if cfg.Console {
-		logFile, err := os.Create(".logfile")
-		if err != nil {
-			log.WithError(err).Fatal("Failed to redirect logs to log file")
-		}
-		log.Warn("Redirecting logs to .logfile")
-
-		logWriter := bufio.NewWriter(logFile)
-		log.SetOutput(logWriter)
-		go console.Run()
-	}
-
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
 	go peer.MaintainConnections()
-	select {}
+	select {} // Hang main thread. Everything happens in goroutines from here
 }
 
 // RequestHandler is called every time a peer sends us a request message expect

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -210,7 +211,6 @@ func (p *Peer) Dispatch() {
 				}
 			} else {
 				log.WithError(err).Error("Dispatcher failed to read message")
-				log.Info(err.Error(), syscall.ECONNRESET.Error())
 				if strings.Contains(err.Error(), syscall.ECONNRESET.Error()) || errCount == 3 {
 					log.Infof("Disconnecting from peer %s due to %s",
 						p.Connection.RemoteAddr().String(), err.Error())
@@ -385,7 +385,9 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 			case *msg.Response:
 				// We got the listen address back
 				addr = message.(*msg.Response).Resource.(string)
-				receivedAddr = true
+				if validAddress(addr) || addr != ListenAddr {
+					receivedAddr = true
+				}
 			case *msg.Request:
 				if message.(*msg.Request).ResourceType != msg.ResourcePeerInfo {
 					continue
@@ -416,4 +418,17 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 	case <-time.After(d):
 		return "", fmt.Errorf("Failed to exchange listen addresses with %s", c.RemoteAddr().String())
 	}
+}
+
+// validAddress checks if the given TCP/IP address is valid
+func validAddress(addr string) bool {
+	parts := strings.Split(addr, ":")
+	if len(parts) != 2 || net.ParseIP(parts[0]) == nil {
+		return false
+	}
+	port, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return false
+	}
+	return port > 1024 && port < 65536
 }

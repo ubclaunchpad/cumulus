@@ -1,16 +1,24 @@
 package peer
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
+)
+
+const (
+	FailConnect = "Failed to create connection and perform handshake"
+	FailGetPeer = "Failed to get peer from peer store after connection was established"
 )
 
 var (
@@ -73,6 +81,28 @@ func inList(item string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func newConnectionAndHandshake(addr string) (net.Conn, error) {
+	go conn.Listen(ListenAddr, ConnectionHandler)
+
+	// Allow 3 retries as the socket might not be open by the time we dial
+	for i := 0; i < 3; i++ {
+		c, err := conn.Dial(ListenAddr)
+		if err == nil {
+			// Success, continue as usual
+			_, err = exchangeListenAddrs(c, time.Second*5)
+			return c, err
+		}
+	}
+	return nil, errors.New("Failed to connect to" + ListenAddr + "after 3 dial attempts")
+}
+
+func TestMain(m *testing.M) {
+	log.SetLevel(log.DebugLevel)
+	fmt.Println("NOTE: Some errors will be logged during tests. Note that these",
+		"errors do NOT necessarily mean the tests are failing.")
+	os.Exit(m.Run())
 }
 
 // This will error if there are concurrent accesses to the PeerStore, or error
@@ -291,18 +321,13 @@ func TestSendRequestAndReceiveResponse(t *testing.T) {
 	ListenAddr = "127.0.0.1:8080"
 	sentResponse := make(chan bool)
 	receivedValidResponse := make(chan bool)
-	var c net.Conn
 
-	go conn.Listen(ListenAddr, ConnectionHandler)
-	c, err := conn.Dial(ListenAddr)
+	c, err := newConnectionAndHandshake(ListenAddr)
 	if err != nil {
+		fmt.Println(FailConnect, ":", err)
 		t.FailNow()
 	}
-
-	_, err = exchangeListenAddrs(c, time.Second*5)
-	if err != nil {
-		t.FailNow()
-	}
+	defer c.Close()
 
 	// Wait a little while to give the peer time to get set up before we check
 	// the PeerStore.
@@ -312,6 +337,7 @@ func TestSendRequestAndReceiveResponse(t *testing.T) {
 
 	p := PStore.Get(c.RemoteAddr().String())
 	if p == nil {
+		fmt.Println(FailGetPeer)
 		t.FailNow()
 	}
 
@@ -328,6 +354,7 @@ func TestSendRequestAndReceiveResponse(t *testing.T) {
 	}
 	err = p.Request(req, responseHandler)
 	if err != nil {
+		fmt.Println("Failed to write request using p.Request()")
 		t.FailNow()
 	}
 
@@ -368,26 +395,22 @@ func TestSendRequestAndReceiveResponse(t *testing.T) {
 	select {
 	case sent := <-sentResponse:
 		if !sent {
+			fmt.Println("Either no request for PeerInfo was received or the response couldn't be sent")
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 5):
-		t.FailNow()
 	}
 
 	select {
 	case passed := <-receivedValidResponse:
 		if !passed {
+			fmt.Println("The peer received an invalid response to its PeerInfo request")
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 5):
-		t.FailNow()
 	}
-
-	c.Close()
 }
 
 func TestReceiveRequestAndSendResponse(t *testing.T) {
-	ListenAddr = "127.0.0.1:8080"
+	ListenAddr = "127.0.0.1:8081"
 
 	SetDefaultRequestHandler(func(req *msg.Request) msg.Response {
 		res := msg.Response{ID: req.ID}
@@ -403,16 +426,12 @@ func TestReceiveRequestAndSendResponse(t *testing.T) {
 		return res
 	})
 
-	go conn.Listen(ListenAddr, ConnectionHandler)
-	c, err := conn.Dial(ListenAddr)
+	c, err := newConnectionAndHandshake(ListenAddr)
 	if err != nil {
+		fmt.Println(FailConnect, ":", err)
 		t.FailNow()
 	}
-
-	_, err = exchangeListenAddrs(c, time.Second*5)
-	if err != nil {
-		t.FailNow()
-	}
+	defer c.Close()
 
 	// Wait a little while to give the peer time to get set up before we check
 	// the PeerStore.
@@ -422,6 +441,7 @@ func TestReceiveRequestAndSendResponse(t *testing.T) {
 
 	p := PStore.Get(c.RemoteAddr().String())
 	if p == nil {
+		fmt.Println("Failed to get peer from PeerStore after connection was established")
 		t.FailNow()
 	}
 
@@ -431,6 +451,7 @@ func TestReceiveRequestAndSendResponse(t *testing.T) {
 	}
 	err = req.Write(c)
 	if err != nil {
+		fmt.Println("Failed to write PeerInfo request to connection")
 		t.FailNow()
 	}
 
@@ -454,22 +475,19 @@ func TestReceiveRequestAndSendResponse(t *testing.T) {
 	select {
 	case res := <-resChan:
 		addrs := res.Resource.([]string)
-		if len(addrs) != 1 || addrs[0] != ListenAddr {
+		if !inList(ListenAddr, addrs) {
+			fmt.Println("Received", addrs, "from peer, expected addresses to contiain", ListenAddr)
 			t.FailNow()
 		}
 	case <-failChan:
-		t.FailNow()
-	case <-time.After(time.Second * 5):
+		fmt.Println("An unexpected error occurred while trying to read the response from the connection")
 		t.FailNow()
 	}
-
-	c.Close()
 }
 
 func TestReceivePush(t *testing.T) {
-	ListenAddr = "127.0.0.1:8080"
+	ListenAddr = "127.0.0.1:8082"
 	receivedValidPush := make(chan bool)
-	var c net.Conn
 
 	SetDefaultPushHandler(func(req *msg.Push) {
 		if req.ResourceType != msg.ResourceTransaction {
@@ -484,16 +502,11 @@ func TestReceivePush(t *testing.T) {
 		receivedValidPush <- true
 	})
 
-	go conn.Listen(ListenAddr, ConnectionHandler)
-	c, err := conn.Dial(ListenAddr)
+	c, err := newConnectionAndHandshake(ListenAddr)
 	if err != nil {
 		t.FailNow()
 	}
-
-	_, err = exchangeListenAddrs(c, time.Second*5)
-	if err != nil {
-		t.FailNow()
-	}
+	defer c.Close()
 
 	// Wait a little while to give the peer time to get set up before we check
 	// the PeerStore.
@@ -521,28 +534,18 @@ func TestReceivePush(t *testing.T) {
 		if !passed {
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 5):
-		t.FailNow()
 	}
-
-	c.Close()
 }
 
 func TestSendPush(t *testing.T) {
-	ListenAddr = "127.0.0.1:8080"
+	ListenAddr = "127.0.0.1:8083"
 	receivedValidPush := make(chan bool)
-	var c net.Conn
 
-	go conn.Listen(ListenAddr, ConnectionHandler)
-	c, err := conn.Dial(ListenAddr)
+	c, err := newConnectionAndHandshake(ListenAddr)
 	if err != nil {
 		t.FailNow()
 	}
-
-	_, err = exchangeListenAddrs(c, time.Second*5)
-	if err != nil {
-		t.FailNow()
-	}
+	defer c.Close()
 
 	// Wait a little while to give the peer time to get set up before we check
 	// the PeerStore.
@@ -590,34 +593,24 @@ func TestSendPush(t *testing.T) {
 		if !passed {
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 5):
-		t.FailNow()
 	}
-
-	c.Close()
 }
 
-func TestMaintinConnections(t *testing.T) {
-	ListenAddr = "127.0.0.1:8080"
-	listenAddr2 := "127.0.0.1:8081"
-	var c1 net.Conn
+func TestMaintainConnections(t *testing.T) {
+	ListenAddr = "127.0.0.1:8084"
+	listenAddr2 := "127.0.0.1:8085"
 	receivedConnection := make(chan bool)
-	responded := make(chan bool)
+	responseStatus := make(chan error)
 
-	go conn.Listen(ListenAddr, ConnectionHandler)
-	c1, err := conn.Dial(ListenAddr)
+	c1, err := newConnectionAndHandshake(ListenAddr)
 	if err != nil {
+		fmt.Println(FailGetPeer)
 		t.FailNow()
 	}
-
-	_, err = exchangeListenAddrs(c1, time.Second*5)
-	if err != nil {
-		t.FailNow()
-	}
+	defer c1.Close()
 
 	testConnectionHandler := func(c net.Conn) {
 		ConnectionHandler(c)
-		c.Close()
 		receivedConnection <- true
 	}
 
@@ -630,13 +623,14 @@ func TestMaintinConnections(t *testing.T) {
 			if err == io.EOF {
 				continue
 			} else if err != nil {
-				responded <- false
+				responseStatus <- errors.New(`An unexpected error occurred while reading a 
+					message from the connection`)
 				return
 			}
 
 			req := reqMsg.(*msg.Request)
 			if req.ResourceType != msg.ResourcePeerInfo {
-				responded <- false
+				responseStatus <- errors.New("Incorrect message ResourceType")
 				return
 			}
 			res := msg.Response{
@@ -644,24 +638,19 @@ func TestMaintinConnections(t *testing.T) {
 				Resource: append(make([]string, 0), listenAddr2),
 			}
 			err = res.Write(c1)
-			responded <- err == nil
+			responseStatus <- err
 			return
 		}
 	}()
 
 	select {
-	case sentInfo := <-responded:
-		if !sentInfo {
+	case status := <-responseStatus:
+		if status != nil {
+			fmt.Println(status)
 			t.FailNow()
 		}
-	case <-time.After(time.Second * 5):
-		t.FailNow()
 	}
 	select {
 	case <-receivedConnection:
-	case <-time.After(time.Second * 5):
-		t.FailNow()
 	}
-
-	c1.Close()
 }
