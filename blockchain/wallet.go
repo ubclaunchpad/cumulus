@@ -23,7 +23,7 @@ var (
 	// NilSig is a signature representing a failed Sign operation
 	NilSig = Signature{big.NewInt(0), big.NewInt(0)}
 	// NilAddr is an address representing no address
-	NilAddr = Address{}
+	NilAddr = Address{big.NewInt(0), big.NewInt(0)}
 )
 
 // Address represents a wallet that can be a recipient in a transaction.

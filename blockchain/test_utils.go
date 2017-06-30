@@ -148,13 +148,13 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 		Recipient: sender.Public(),
 	})
 
-	trB, _ := NewTransactionValue(sender, recipient, 4, 0)
+	trB, _ := NewTransactionValue(sender, recipient, 4, 1)
 	trB.Input.Hash = HashSum(trA)
 
 	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
 
-	inputTransactions := []*Transaction{trA}
-	outputTransactions := []*Transaction{trB}
+	inputTransactions := []*Transaction{NewValidCloudBaseTransaction(), trA}
+	outputTransactions := []*Transaction{NewValidCloudBaseTransaction(), trB}
 
 	inputBlock := NewInputBlock(inputTransactions)
 	outputBlock := NewOutputBlock(outputTransactions, inputBlock)
@@ -189,7 +189,7 @@ func NewValidChainAndBlock() (*BlockChain, *Block) {
 	}
 
 	tr, _ := tbody.Sign(s, crand.Reader)
-	newBlock := NewOutputBlock([]*Transaction{tr}, inputBlock)
+	newBlock := NewOutputBlock([]*Transaction{NewValidCloudBaseTransaction(), tr}, inputBlock)
 	return bc, newBlock
 }
 
@@ -202,6 +202,30 @@ func NewValidTarget() Hash {
 	)
 	r.Add(r, big.NewInt(1))
 	return BigIntToHash(r)
+}
+
+// NewValidCloudBaseTransaction returns a new valid CloudBase transaction
+func NewValidCloudBaseTransaction() *Transaction {
+	w := NewWallet()
+	cbInput := TxHashPointer{
+		BlockNumber: 0,
+		Hash:        NilHash,
+		Index:       0,
+	}
+	cbReward := TxOutput{
+		Amount:    25,
+		Recipient: w.Public(),
+	}
+	cbTxBody := TxBody{
+		Sender:  NilAddr,
+		Input:   cbInput,
+		Outputs: []TxOutput{cbReward},
+	}
+	cbTx := &Transaction{
+		TxBody: cbTxBody,
+		Sig:    NilSig,
+	}
+	return cbTx
 }
 
 // BigIntToHash converts a big integer to a hash
