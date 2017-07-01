@@ -17,27 +17,27 @@ func Run() {
 	shell = ishell.New()
 	shell.AddCmd(&ishell.Cmd{
 		Name: "create",
-		Help: "Create a new wallet hash or transaction",
+		Help: "create a new wallet hash or transaction",
 		Func: create,
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "check",
-		Help: "Check the status of a transaction or wallet",
+		Help: "check the status of a transaction or wallet",
 		Func: check,
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "listen-address",
-		Help: "Show the address this host is listening on",
+		Help: "show the address this host is listening on",
 		Func: listenAddr,
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "peers",
-		Help: "Show the peers this host is connected to",
+		Help: "show the peers this host is connected to",
 		Func: peers,
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "connect",
-		Help: "Connect to another peer",
+		Help: "connect to another peer",
 		Func: connect,
 	})
 

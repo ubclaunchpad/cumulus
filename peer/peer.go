@@ -31,7 +31,7 @@ const (
 	// PeerSearchWaitTime is the amount of time the maintainConnections goroutine
 	// will wait before checking if we can connect to more peers when is sees that
 	// our PeerStore is full.
-	PeerSearchWaitTime = time.Minute
+	PeerSearchWaitTime = time.Second * 10
 )
 
 var (

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/signal"
@@ -41,8 +40,10 @@ func Run(cfg conf.Config) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		log.Info("Saving blockchain...")
+		log.Info("Saving blockchain and flushing logs...")
 		// TODO
+		logFile.Sync()
+		logFile.Close()
 		os.Exit(0)
 	}()
 
@@ -70,9 +71,7 @@ func Run(cfg conf.Config) {
 			log.WithError(err).Fatal("Failed to redirect logs to log file")
 		}
 		log.Warn("Redirecting logs to logfile")
-
-		logWriter := bufio.NewWriter(logFile)
-		log.SetOutput(logWriter)
+		log.SetOutput(logFile)
 		go console.Run()
 	}
 
