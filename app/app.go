@@ -53,23 +53,8 @@ func Run(cfg conf.Config) {
 		}
 	}()
 
-	// If a target peer was supplied, connect to it and try discover and connect
-	// to its peers
-	if len(cfg.Target) > 0 {
-		peerInfoRequest := msg.Request{
-			ID:           uuid.New().String(),
-			ResourceType: msg.ResourcePeerInfo,
-		}
-
-		log.Infof("Dialing target %s", cfg.Target)
-		c, err := conn.Dial(cfg.Target)
-		if err != nil {
-			log.WithError(err).Fatalf("Failed to connect to target")
-		}
-		peer.ConnectionHandler(c)
-		p := peer.PStore.Get(c.RemoteAddr().String())
-		p.Request(peerInfoRequest, peer.PeerInfoHandler)
-	}
+	// Connect to the target and discover its peers.
+	ConnectAndDiscover(cfg.Target)
 
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
@@ -83,6 +68,25 @@ func Run(cfg conf.Config) {
 	select {}
 }
 
+// ConnectAndDiscover tries to connect to a target and discover its peers.
+func ConnectAndDiscover(target string) {
+	if len(target) > 0 {
+		peerInfoRequest := msg.Request{
+			ID:           uuid.New().String(),
+			ResourceType: msg.ResourcePeerInfo,
+		}
+
+		log.Infof("Dialing target %s", target)
+		c, err := conn.Dial(target)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to connect to target")
+		}
+		peer.ConnectionHandler(c)
+		p := peer.PStore.Get(c.RemoteAddr().String())
+		p.Request(peerInfoRequest, peer.PeerInfoHandler)
+	}
+}
+
 // RequestHandler is called every time a peer sends us a request message except
 // on peers whos PushHandlers have been overridden.
 func RequestHandler(req *msg.Request) msg.Response {
@@ -92,16 +96,10 @@ func RequestHandler(req *msg.Request) msg.Response {
 	case msg.ResourcePeerInfo:
 		res.Resource = peer.PStore.Addrs()
 	case msg.ResourceBlock:
-		// Unmarshal request.
 		work := BlockWork{}
-		// Define callback
-		// Add to BlockWorkQueue
 		BlockWorkQueue <- work
 	case msg.ResourceTransaction:
-		// Unmarshal request.
 		work := TransactionWork{}
-		// Define callback.
-		// Add to TransactionWorkQueue
 		TransactionWorkQueue <- work
 	default:
 		res.Error = msg.NewProtocolError(msg.InvalidResourceType,
@@ -116,13 +114,21 @@ func RequestHandler(req *msg.Request) msg.Response {
 func PushHandler(push *msg.Push) {
 	switch push.ResourceType {
 	case msg.ResourceBlock:
-		work := BlockWork{}
-		log.Info("Adding transaction.")
-		BlockWorkQueue <- work
+		blk, ok := push.Resource.(*blockchain.Block)
+		if ok {
+			log.Info("Adding block to work queue.")
+			BlockWorkQueue <- BlockWork{blk, nil}
+		} else {
+			log.Error("Could not cast resource to block.")
+		}
 	case msg.ResourceTransaction:
-		work := TransactionWork{}
-		log.Info("Adding block.")
-		TransactionWorkQueue <- work
+		txn, ok := push.Resource.(*blockchain.Transaction)
+		if ok {
+			log.Info("Adding transaction to work queue.")
+			TransactionWorkQueue <- TransactionWork{txn, nil}
+		} else {
+			log.Error("Could not cast resource to transaction.")
+		}
 	default:
 		// Invalid resource type. Ignore
 	}

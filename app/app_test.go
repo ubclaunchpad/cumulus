@@ -5,11 +5,12 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
 func init() {
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 }
 
 func TestKillWorkers(t *testing.T) {
@@ -52,11 +53,18 @@ func TestInitializeNode(t *testing.T) {
 
 func TestPushHandlerNewBlock(t *testing.T) {
 	intializeQueues()
-	push := msg.Push{ResourceType: msg.ResourceBlock}
+	_, b := blockchain.NewValidChainAndBlock()
+	push := msg.Push{
+		ResourceType: msg.ResourceBlock,
+		Resource:     b,
+	}
 	PushHandler(&push)
 	select {
-	case _, ok := <-BlockWorkQueue:
+	case work, ok := <-BlockWorkQueue:
 		if !ok {
+			t.FailNow()
+		}
+		if work.Block != b {
 			t.FailNow()
 		}
 	}
@@ -65,11 +73,18 @@ func TestPushHandlerNewBlock(t *testing.T) {
 
 func TestPushHandlerNewTransaction(t *testing.T) {
 	intializeQueues()
-	push := msg.Push{ResourceType: msg.ResourceTransaction}
+	txn := blockchain.NewTransaction()
+	push := msg.Push{
+		ResourceType: msg.ResourceTransaction,
+		Resource:     txn,
+	}
 	PushHandler(&push)
 	select {
-	case _, ok := <-TransactionWorkQueue:
+	case work, ok := <-TransactionWorkQueue:
 		if !ok {
+			t.FailNow()
+		}
+		if work.Transaction != txn {
 			t.FailNow()
 		}
 	}
