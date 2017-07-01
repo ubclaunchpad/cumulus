@@ -5,7 +5,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -101,16 +100,4 @@ func TestRequestHandlerNewTransaction(t *testing.T) {
 		}
 	}
 	// Add more here...
-}
-
-func TestRun(t *testing.T) {
-	cfg := conf.Config{
-		Interface: "127.0.0.1",
-		Verbose:   true,
-		Mine:      false,
-	}
-	Run(cfg)
-	if tpool == nil {
-		t.FailNow()
-	}
 }
