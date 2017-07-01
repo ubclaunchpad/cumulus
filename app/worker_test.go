@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	bc "github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/pool"
 )
@@ -44,7 +43,6 @@ func (r *MockResponder) Unlock() {
 }
 
 func init() {
-	log.SetLevel(log.DebugLevel)
 	badTxn = bc.NewTransaction()
 	badBlk = bc.NewBlock()
 }

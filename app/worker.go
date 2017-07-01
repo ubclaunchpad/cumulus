@@ -26,7 +26,7 @@ type AppWorker struct {
 	log.FieldLogger
 }
 
-// NewWorker returns a new TransactionWorker object.
+// NewWorker returns a new AppWorker object.
 func NewWorker(id int) AppWorker {
 	return AppWorker{
 		ID:          id,
@@ -41,26 +41,21 @@ func (w AppWorker) Start() {
 			// Wait for work.
 			log.WithFields(log.Fields{
 				"id": w.ID,
-			}).Debug("Worker waiting for work.")
+			}).Debug("Worker waiting for work")
 			select {
 			case work := <-TransactionWorkQueue:
-				w.FieldLogger.Debug("Worker handling new transaction work.")
+				w.FieldLogger.Debug("Worker handling new transaction work")
 				w.HandleTransaction(work)
 			case work := <-BlockWorkQueue:
-				w.FieldLogger.Debug("Worker handling new block work.")
+				w.FieldLogger.Debug("Worker handling new block work")
 				w.HandleBlock(work)
 			case <-QuitChan:
-				w.FieldLogger.Debug("Worker quitting.")
+				w.FieldLogger.Debug("Worker quitting")
 				return
 			}
 		}
 	}()
 }
-
-// NB: We're currently imposing a validation layer at the app level
-// using methods like SetUnsafe to get the transaction into the
-// pool, etc. Figure out a nicer way to do this, ie: where *should*
-// we validate?
 
 // HandleTransaction handles new instance of TransactionWork.
 func (w *AppWorker) HandleTransaction(work TransactionWork) {

@@ -117,9 +117,11 @@ func PushHandler(push *msg.Push) {
 	switch push.ResourceType {
 	case msg.ResourceBlock:
 		work := BlockWork{}
+		log.Info("Adding transaction.")
 		BlockWorkQueue <- work
 	case msg.ResourceTransaction:
 		work := TransactionWork{}
+		log.Info("Adding block.")
 		TransactionWorkQueue <- work
 	default:
 		// Invalid resource type. Ignore
