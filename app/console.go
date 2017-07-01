@@ -1,4 +1,4 @@
-package console
+package app
 
 import (
 	"strconv"
@@ -11,9 +11,9 @@ import (
 
 var shell *ishell.Shell
 
-// Run starts the Cumulus console. This should be run only once as a
+// RunConsole starts the Cumulus console. This should be run only once as a
 // goroutine, and logging should be redirected away from stdout before it is run.
-func Run() {
+func RunConsole() {
 	shell = ishell.New()
 	shell.AddCmd(&ishell.Cmd{
 		Name: "create",

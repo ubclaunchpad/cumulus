@@ -12,7 +12,6 @@ import (
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
-	"github.com/ubclaunchpad/cumulus/console"
 	"github.com/ubclaunchpad/cumulus/msg"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
@@ -72,7 +71,7 @@ func Run(cfg conf.Config) {
 		}
 		log.Warn("Redirecting logs to logfile")
 		log.SetOutput(logFile)
-		go console.Run()
+		go RunConsole()
 	}
 
 	// If a target peer was supplied, connect to it and try discover and connect
