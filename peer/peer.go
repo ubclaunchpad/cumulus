@@ -1,7 +1,6 @@
 package peer
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -318,8 +317,7 @@ func MaintainConnections() {
 // to establish connections with all new peers in the given response Resource.
 func PeerInfoHandler(res *msg.Response) {
 	peers := res.Resource.([]string)
-	strPeers, _ := json.Marshal(peers)
-	log.Debugf("Found peers %s", string(strPeers))
+	log.Debugf("Found peers %s", peers)
 	for i := 0; i < len(peers) && PStore.Size() < MaxPeers; i++ {
 		p := PStore.Get(peers[i])
 		if p != nil || peers[i] == ListenAddr {
