@@ -11,12 +11,15 @@ import (
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 	"github.com/ubclaunchpad/cumulus/peer"
+	"github.com/ubclaunchpad/cumulus/pool"
 )
 
 var (
 	config *conf.Config
 	// TODO peer store once it's merged in
 	chain *blockchain.BlockChain
+	// A reference to the transaction pool
+	tpool *pool.Pool
 )
 
 // Run sets up and starts a new Cumulus node with the
@@ -24,6 +27,11 @@ var (
 func Run(cfg conf.Config) {
 	log.Info("Starting Cumulus node")
 	config = &cfg
+
+	// Below we'll connect to peers. After which, requests could begin to
+	// stream in. We should first initalize our pool, workers to handle
+	// incoming messages.
+	initializeNode()
 
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
@@ -36,22 +44,40 @@ func Run(cfg conf.Config) {
 	log.Infof("Starting listener on %s:%d", cfg.Interface, cfg.Port)
 	peer.LocalAddr = fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
 	go func() {
-		err := conn.Listen(fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port), peer.ConnectionHandler)
+		address := fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
+		err := conn.Listen(address, peer.ConnectionHandler)
 		if err != nil {
-			log.WithError(err).Fatalf("Failed to listen on %s:%d", cfg.Interface, cfg.Port)
+			log.WithError(
+				err,
+			).Fatalf("Failed to listen on %s:%d", cfg.Interface, cfg.Port)
 		}
 	}()
 
-	// If a target peer was supplied, connect to it and try discover and connect
-	// to its peers
-	if len(cfg.Target) > 0 {
+	// Connect to the target and discover its peers.
+	ConnectAndDiscover(cfg.Target)
+
+	// Try maintain as close to peer.MaxPeers connections as possible while this
+	// peer is running
+	go peer.MaintainConnections()
+
+	// Request the blockchain.
+	log.Info("Requesting blockchain from peers... ")
+	RequestBlockChain()
+
+	// Return to command line.
+	select {}
+}
+
+// ConnectAndDiscover tries to connect to a target and discover its peers.
+func ConnectAndDiscover(target string) {
+	if len(target) > 0 {
 		peerInfoRequest := msg.Request{
 			ID:           uuid.New().String(),
 			ResourceType: msg.ResourcePeerInfo,
 		}
 
-		log.Infof("Dialing target %s", cfg.Target)
-		c, err := conn.Dial(cfg.Target)
+		log.Infof("Dialing target %s", target)
+		c, err := conn.Dial(target)
 		if err != nil {
 			log.WithError(err).Fatalf("Failed to connect to target")
 		}
@@ -59,14 +85,9 @@ func Run(cfg conf.Config) {
 		p := peer.PStore.Get(c.RemoteAddr().String())
 		p.Request(peerInfoRequest, peer.PeerInfoHandler)
 	}
-
-	// Try maintain as close to peer.MaxPeers connections as possible while this
-	// peer is running
-	go peer.MaintainConnections()
-	select {}
 }
 
-// RequestHandler is called every time a peer sends us a request message expect
+// RequestHandler is called every time a peer sends us a request message except
 // on peers whos PushHandlers have been overridden.
 func RequestHandler(req *msg.Request) msg.Response {
 	res := msg.Response{ID: req.ID}
@@ -74,9 +95,12 @@ func RequestHandler(req *msg.Request) msg.Response {
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
 		res.Resource = peer.PStore.Addrs()
-	case msg.ResourceBlock, msg.ResourceTransaction:
-		res.Error = msg.NewProtocolError(msg.NotImplemented,
-			"Block and Transaction requests are not yet implemented on this peer")
+	case msg.ResourceBlock:
+		work := BlockWork{}
+		BlockWorkQueue <- work
+	case msg.ResourceTransaction:
+		work := TransactionWork{}
+		TransactionWorkQueue <- work
 	default:
 		res.Error = msg.NewProtocolError(msg.InvalidResourceType,
 			"Invalid resource type")
@@ -85,17 +109,63 @@ func RequestHandler(req *msg.Request) msg.Response {
 	return res
 }
 
-// PushHandler is called every time a peer sends us a Push message expect on
+// PushHandler is called every time a peer sends us a Push message except on
 // peers whos PushHandlers have been overridden.
 func PushHandler(push *msg.Push) {
 	switch push.ResourceType {
 	case msg.ResourceBlock:
+		blk, ok := push.Resource.(*blockchain.Block)
+		if ok {
+			log.Info("Adding block to work queue.")
+			BlockWorkQueue <- BlockWork{blk, nil}
+		} else {
+			log.Error("Could not cast resource to block.")
+		}
 	case msg.ResourceTransaction:
+		txn, ok := push.Resource.(*blockchain.Transaction)
+		if ok {
+			log.Info("Adding transaction to work queue.")
+			TransactionWorkQueue <- TransactionWork{txn, nil}
+		} else {
+			log.Error("Could not cast resource to transaction.")
+		}
 	default:
 		// Invalid resource type. Ignore
 	}
-
-	// Ask target for its peers
-	// Connect to these peers until we have enough peers
-	// Download the blockchain
 }
+
+// initializeNode creates a transaction pool, workers and queues to handle
+// incoming messages.
+func initializeNode() {
+	tpool = pool.New()
+	intializeQueues()
+	initializeWorkers()
+}
+
+// intializeQueues makes all necessary queues.
+func intializeQueues() {
+	BlockWorkQueue = make(chan BlockWork, BlockQueueSize)
+	TransactionWorkQueue = make(chan TransactionWork, TransactionQueueSize)
+	QuitChan = make(chan int)
+}
+
+// initializeWorkers kicks off workers to handle incoming requests.
+func initializeWorkers() {
+	for i := 0; i < nWorkers; i++ {
+		log.WithFields(log.Fields{"id": i}).Debug("Starting worker. ")
+		worker := NewWorker(i)
+		worker.Start()
+		workers[i] = &worker
+	}
+}
+
+// killWorkers kills all workers.
+func killWorkers() {
+	for i := 0; i < nWorkers; i++ {
+		QuitChan <- i
+		workers[i] = nil
+	}
+}
+
+// RequestBlockChain asks existing peers for a copy of the blockchain.
+func RequestBlockChain() {}
