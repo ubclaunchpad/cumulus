@@ -102,3 +102,8 @@ func (b *Block) ContainsTransaction(t *Transaction) (bool, uint32) {
 	}
 	return false, 0
 }
+
+// GetCloudBaseTransaction returns the CloudBase transaction within a block
+func (b *Block) GetCloudBaseTransaction() *Transaction {
+	return b.Transactions[0]
+}

@@ -75,12 +75,14 @@ func ValidMinedBlock(
 
 	// Check if the CloudBase transaction reward is equal to the network's
 	// current block reward
-	if b.Transactions[0].Outputs[0].Amount != BlockReward {
+	if b.GetCloudBaseTransaction().Outputs[0].Amount != BlockReward {
 		log.Error("Invalid Block Reward")
 		return false, BadBlockReward
 	}
 
-	if b.Transactions[0].Outputs[0].Recipient != cb {
+	// Check if the CloudBase transaction recipient is equal to the address
+	// of the miner that mined the block
+	if b.GetCloudBaseTransaction().Outputs[0].Recipient != cb {
 		log.Error("Invalid CloudBase address")
 		return false, BadCloudBase
 	}
