@@ -105,6 +105,20 @@ func TestValidMinedBlockBadNonce(t *testing.T) {
 	}
 }
 
+func TestValidMinedBlockBadCloudBase(t *testing.T) {
+	bc, b, a := newValidBlockChainAndCloudBaseBlock()
+	b.Transactions[0].Outputs[0].Recipient = blockchain.NewWallet().Public()
+	valid, code := ValidMinedBlock(a, bc, b)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadCloudBase {
+		t.Fail()
+	}
+}
+
 func TestValidMinedBlock(t *testing.T) {
 	tempMaxTarget := blockchain.MaxTarget
 	tempCurrentDifficulty := CurrentDifficulty

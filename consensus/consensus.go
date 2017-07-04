@@ -24,6 +24,9 @@ const (
 	// BadBlockReward is returned when the block's rewards is not equal to the
 	// current reward of the network
 	BadBlockReward MinedBlockCode = iota
+	// BadCloudBase is returned when the address of the recipient of the
+	// CloudBase transaction is not valid
+	BadCloudBase MinedBlockCode = iota
 )
 
 const (
@@ -75,6 +78,11 @@ func ValidMinedBlock(
 	if b.Transactions[0].Outputs[0].Amount != BlockReward {
 		log.Error("Invalid Block Reward")
 		return false, BadBlockReward
+	}
+
+	if b.Transactions[0].Outputs[0].Recipient != cb {
+		log.Error("Invalid CloudBase address")
+		return false, BadCloudBase
 	}
 
 	// Check if the block's target is equal to the network's current target

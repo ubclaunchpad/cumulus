@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
 func TestMine(t *testing.T) {
@@ -34,6 +35,37 @@ func TestMine(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestCloudBase(t *testing.T) {
+	bc, _ := blockchain.NewValidBlockChainFixture()
+	w := blockchain.NewWallet()
+	bcSize := uint32(len(bc.Blocks))
+	b := &blockchain.Block{
+		BlockHeader: blockchain.BlockHeader{
+			BlockNumber: bcSize,
+			LastBlock:   blockchain.HashSum(bc.Blocks[bcSize-1]),
+			Target:      consensus.CurrentTarget(),
+			Time:        uint32(time.Now().Unix()),
+			Nonce:       0,
+		},
+		Transactions: make([]*blockchain.Transaction, 0),
+	}
+
+	CloudBase(b, bc, w.Public())
+
+	if valid, _ := bc.ValidBlock(b); !valid {
+		t.Fail()
+	}
+
+	if b.Transactions[0].Outputs[0].Amount != consensus.BlockReward {
+		t.Fail()
+	}
+
+	if b.Transactions[0].Outputs[0].Recipient != w.Public() {
+		t.Fail()
+	}
+}
+
 func TestVerifyProofOfWork(t *testing.T) {
 	_, b := blockchain.NewValidChainAndBlock()
 	b.Target = blockchain.BigIntToHash(
