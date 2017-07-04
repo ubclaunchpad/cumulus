@@ -54,7 +54,7 @@ func TestValidMinedBlockBadBlockReward(t *testing.T) {
 	bc, b, a := newValidBlockChainAndCloudBaseBlock()
 
 	var r uint64
-	for r = rand.Uint64(); r == BlockReward; r = rand.Uint64() {
+	for r = RandomUint64(); r == BlockReward; r = RandomUint64() {
 	}
 
 	b.Transactions[0].Outputs[0].Amount = r
@@ -164,4 +164,9 @@ func newValidBlockChainAndCloudBaseBlock() (
 	}
 	b.Transactions[0] = cbTx
 	return bc, b, a
+}
+
+// Creates a random uint64 value
+func RandomUint64() uint64 {
+	return uint64(rand.Uint32())<<32 + uint64(rand.Uint32())
 }
