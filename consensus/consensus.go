@@ -11,8 +11,8 @@ import (
 type MinedBlockCode uint32
 
 const (
-	// ValidMinedBlock is returned when a mined block is valid
-	ValidMinedBlock MinedBlockCode = iota
+	// ValidNewBlock is returned when a mined block is valid
+	ValidNewBlock MinedBlockCode = iota
 	// BadBlock is returned when an invalid block was mined
 	BadBlock MinedBlockCode = iota
 	// BadNonce is returned when the hash of the block is not less than the
@@ -36,7 +36,7 @@ var (
 	// BlockReward is the current reward for mining a block
 	BlockReward uint64 = 25
 	// CurrentDifficulty is the current hashing difficulty of the network
-	CurrentDifficulty *big.Int
+	CurrentDifficulty = blockchain.MinTarget
 )
 
 // HalveReward halves the current blockReward if the size of the BlockChain is a
@@ -51,28 +51,29 @@ func HalveReward(bc *blockchain.BlockChain) {
 func CurrentTarget() blockchain.Hash {
 	return blockchain.BigIntToHash(
 		new(big.Int).Div(
-			blockchain.MinDifficulty,
+			blockchain.MaxTarget,
 			CurrentDifficulty,
 		),
 	)
 }
 
-// ValidateMinedBlock validates that the mined block conforms to the
+// ValidMinedBlock validates that the mined block conforms to the
 // consensus rules of Cumulus
-func ValidateMinedBlock(
+func ValidMinedBlock(
 	cb blockchain.Address,
 	bc *blockchain.BlockChain,
 	b *blockchain.Block) (bool, MinedBlockCode) {
 
 	// Check if the block is valid
 	if valid, code := bc.ValidBlock(b); !valid {
-		log.Errorf("Invalid block, BlockCode:%d", code)
+		log.Errorf("Invalid block, BlockCode: %d", code)
 		return false, BadBlock
 	}
 
 	// Check if the CloudBase transaction reward is equal to the network's
 	// current block reward
 	if b.Transactions[0].Outputs[0].Amount != BlockReward {
+		log.Error("Invalid Block Reward")
 		return false, BadBlockReward
 	}
 
@@ -83,10 +84,10 @@ func ValidateMinedBlock(
 	}
 
 	// Verify proof of work
-	if blockchain.HashSum(b).LessThan(b.Target) {
+	if !blockchain.HashSum(b).LessThan(b.Target) {
 		log.Error("Invalid Nonce, no proof of work")
 		return false, BadNonce
 	}
 
-	return true, ValidMinedBlock
+	return true, ValidNewBlock
 }

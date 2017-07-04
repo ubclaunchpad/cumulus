@@ -180,7 +180,7 @@ func TestValidBlockBadTime(t *testing.T) {
 
 func TestValidBlockBadTarget(t *testing.T) {
 	bc, b := NewValidChainAndBlock()
-	b.Target = BigIntToHash(new(big.Int).Add(MinDifficulty, big.NewInt(1)))
+	b.Target = BigIntToHash(new(big.Int).Add(MaxTarget, big.NewInt(1)))
 	valid, code := bc.ValidBlock(b)
 
 	if valid {
@@ -190,7 +190,7 @@ func TestValidBlockBadTarget(t *testing.T) {
 		t.Fail()
 	}
 
-	b.Target = BigIntToHash(new(big.Int).Sub(MaxDifficulty, big.NewInt(1)))
+	b.Target = BigIntToHash(new(big.Int).Sub(MinTarget, big.NewInt(1)))
 	valid, code = bc.ValidBlock(b)
 
 	if valid {
@@ -270,7 +270,7 @@ func TestValidCloudBaseNilCloudBase(t *testing.T) {
 }
 
 func TestValidCloudBaseTransaction(t *testing.T) {
-	cbTx := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTransaction()
 	valid, code := ValidCloudBase(cbTx)
 
 	if !valid {
@@ -283,7 +283,7 @@ func TestValidCloudBaseTransaction(t *testing.T) {
 
 func TestValidCloudBaseBadSender(t *testing.T) {
 	w := NewWallet()
-	cbTx := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTransaction()
 	cbTx.Sender = w.Public()
 	valid, code := ValidCloudBase(cbTx)
 
@@ -296,7 +296,7 @@ func TestValidCloudBaseBadSender(t *testing.T) {
 }
 
 func TestValidCloudBaseBadBadInput(t *testing.T) {
-	cbTx := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTransaction()
 	cbTx.TxBody.Input.BlockNumber = 1
 	valid, code := ValidCloudBase(cbTx)
 
@@ -307,7 +307,7 @@ func TestValidCloudBaseBadBadInput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTransaction()
 	cbTx.TxBody.Input.Hash = NewHash()
 	valid, code = ValidCloudBase(cbTx)
 
@@ -318,7 +318,7 @@ func TestValidCloudBaseBadBadInput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTransaction()
 	cbTx.TxBody.Input.Index = 1
 	valid, code = ValidCloudBase(cbTx)
 
@@ -331,7 +331,7 @@ func TestValidCloudBaseBadBadInput(t *testing.T) {
 }
 
 func TestValidCloudBaseBadOutput(t *testing.T) {
-	cbTx := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTransaction()
 	w := NewWallet()
 	cbTx.Outputs = append(cbTx.Outputs, TxOutput{25, w.Public()})
 	valid, code := ValidCloudBase(cbTx)
@@ -343,7 +343,7 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTransaction()
 	var emptyOutputs []TxOutput
 	cbTx.Outputs = emptyOutputs
 	valid, code = ValidCloudBase(cbTx)
@@ -355,7 +355,7 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTransaction()
 	cbTx.Outputs[0].Amount = 0
 	valid, code = ValidCloudBase(cbTx)
 
@@ -366,7 +366,7 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTransaction()
 	cbTx.Outputs[0].Recipient = NilAddr
 	valid, code = ValidCloudBase(cbTx)
 
@@ -379,7 +379,7 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 }
 
 func TestValidCloudBaseBadSig(t *testing.T) {
-	cbTx := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTransaction()
 	w := NewWallet()
 	cbTx.Sig, _ = w.Sign(NewHash(), rand.Reader)
 	valid, code := ValidCloudBase(cbTx)

@@ -60,6 +60,9 @@ func NewBlockHeader() BlockHeader {
 	return BlockHeader{
 		BlockNumber: mrand.Uint32(),
 		LastBlock:   NewHash(),
+		Target:      NewValidTarget(),
+		Time:        mrand.Uint32(),
+		Nonce:       mrand.Uint64(),
 	}
 }
 
@@ -153,8 +156,10 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 
 	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
 
-	inputTransactions := []*Transaction{NewValidCloudBaseTransaction(), trA}
-	outputTransactions := []*Transaction{NewValidCloudBaseTransaction(), trB}
+	cbA, _ := NewValidCloudBaseTransaction()
+	cbB, _ := NewValidCloudBaseTransaction()
+	inputTransactions := []*Transaction{cbA, trA}
+	outputTransactions := []*Transaction{cbB, trB}
 
 	inputBlock := NewInputBlock(inputTransactions)
 	outputBlock := NewOutputBlock(outputTransactions, inputBlock)
@@ -189,7 +194,8 @@ func NewValidChainAndBlock() (*BlockChain, *Block) {
 	}
 
 	tr, _ := tbody.Sign(s, crand.Reader)
-	newBlock := NewOutputBlock([]*Transaction{NewValidCloudBaseTransaction(), tr}, inputBlock)
+	cb, _ := NewValidCloudBaseTransaction()
+	newBlock := NewOutputBlock([]*Transaction{cb, tr}, inputBlock)
 	return bc, newBlock
 }
 
@@ -198,14 +204,15 @@ func NewValidChainAndBlock() (*BlockChain, *Block) {
 func NewValidTarget() Hash {
 	r := new(big.Int).Rand(
 		mrand.New(mrand.NewSource(time.Now().Unix())),
-		new(big.Int).Add(MinDifficulty, big.NewInt(1)),
+		new(big.Int).Add(MaxTarget, big.NewInt(1)),
 	)
 	r.Add(r, big.NewInt(1))
 	return BigIntToHash(r)
 }
 
-// NewValidCloudBaseTransaction returns a new valid CloudBase transaction
-func NewValidCloudBaseTransaction() *Transaction {
+// NewValidCloudBaseTransaction returns a new valid CloudBase transaction and
+// the address of the recipient of the transaction
+func NewValidCloudBaseTransaction() (*Transaction, Address) {
 	w := NewWallet()
 	cbInput := TxHashPointer{
 		BlockNumber: 0,
@@ -225,7 +232,7 @@ func NewValidCloudBaseTransaction() *Transaction {
 		TxBody: cbTxBody,
 		Sig:    NilSig,
 	}
-	return cbTx
+	return cbTx, w.Public()
 }
 
 // BigIntToHash converts a big integer to a hash

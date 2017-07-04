@@ -79,10 +79,10 @@ const (
 )
 
 var (
-	// MinDifficulty is the minimum difficulty
-	MinDifficulty = new(big.Int).Sub(BigExp(2, 232), big.NewInt(1))
-	// MaxDifficulty is the maximum difficulty value
-	MaxDifficulty = big.NewInt(1)
+	// MaxTarget is the minimum difficulty
+	MaxTarget = new(big.Int).Sub(BigExp(2, 232), big.NewInt(1))
+	// MinTarget is the maximum difficulty value
+	MinTarget = big.NewInt(1)
 )
 
 // ValidTransaction tests whether a transaction valid.
@@ -192,7 +192,7 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 
 	// Check that the target is within the min and max difficulty levels
 	target := HashToBigInt(b.Target)
-	if target.Cmp(MinDifficulty) == 1 || target.Cmp(MaxDifficulty) == -1 {
+	if target.Cmp(MaxTarget) == 1 || target.Cmp(MinTarget) == -1 {
 		return false, BadTarget
 	}
 
