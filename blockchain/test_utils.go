@@ -62,7 +62,7 @@ func NewBlockHeader() BlockHeader {
 		LastBlock:   NewHash(),
 		Target:      NewValidTarget(),
 		Time:        mrand.Uint32(),
-		Nonce:       mrand.Uint64(),
+		Nonce:       0,
 	}
 }
 
