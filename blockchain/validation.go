@@ -4,7 +4,6 @@ package blockchain
 import (
 	"crypto/ecdsa"
 	"math/big"
-	"time"
 )
 
 // TransactionCode is returned from ValidTransaction.
@@ -197,7 +196,7 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 	}
 
 	// Check that time is not greater than current time or equal to 0
-	if uint32(b.Time) == 0 || uint32(b.Time) > uint32(time.Now().Unix()) {
+	if uint32(b.Time) == 0 {
 		return false, BadTime
 	}
 

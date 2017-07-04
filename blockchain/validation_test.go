@@ -3,7 +3,6 @@ package blockchain
 import (
 	"crypto/rand"
 	"fmt"
-	"math"
 	"math/big"
 	"testing"
 )
@@ -159,16 +158,6 @@ func TestValidBlockBadTime(t *testing.T) {
 	bc, b := NewValidChainAndBlock()
 	b.Time = 0
 	valid, code := bc.ValidBlock(b)
-
-	if valid {
-		t.Fail()
-	}
-	if code != BadTime {
-		t.Fail()
-	}
-
-	b.Time = math.MaxUint32
-	valid, code = bc.ValidBlock(b)
 
 	if valid {
 		t.Fail()
