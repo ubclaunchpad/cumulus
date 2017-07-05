@@ -27,11 +27,16 @@ func TestMine(t *testing.T) {
 	mineResult := Mine(bc, b)
 	blockchain.MaxTarget = tempMaxTarget
 
-	if bc == nil {
+	if !mineResult {
 		t.Fail()
 	}
+}
 
-	if !mineResult {
+func TestMineBadBlock(t *testing.T) {
+	bc, _ := blockchain.NewValidChainAndBlock()
+	mineResult := Mine(bc, nil)
+
+	if mineResult {
 		t.Fail()
 	}
 }
