@@ -111,6 +111,28 @@ func TestValidBlockNilBlock(t *testing.T) {
 	}
 }
 
+func TestValidBlockBadGenesisBlock(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb.Target = BigIntToHash(BigExp(2, 255))
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisBlock {
+		t.Fail()
+	}
+}
+
 func TestValidBlockBadTransaction(t *testing.T) {
 	bc, _ := NewValidBlockChainFixture()
 	tr := bc.Blocks[1].Transactions[1]
@@ -377,6 +399,193 @@ func TestValidCloudBaseBadSig(t *testing.T) {
 		t.Fail()
 	}
 	if code != BadCloudBaseSig {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlock(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidGenesisBlock(gb)
+
+	if !valid {
+		t.Fail()
+	}
+
+	if code != ValidGenesisBlock {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlockNilGenesisBlock(t *testing.T) {
+
+	bc := &BlockChain{
+		Blocks: []*Block{nil},
+		Head:   NewHash(),
+	}
+
+	valid, code := bc.ValidGenesisBlock(nil)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != NilGenesisBlock {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlockBadGenesisBlockNumber(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb.BlockHeader.BlockNumber = 1
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidGenesisBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisBlockNumber {
+		t.Fail()
+	}
+
+	gb.BlockHeader.BlockNumber = 0
+	bc = &BlockChain{
+		Blocks: []*Block{NewBlock(), gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code = bc.ValidGenesisBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisBlockNumber {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlockBadGenesisLastBlock(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb.LastBlock = NewHash()
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidGenesisBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisLastBlock {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlockBadGenesisTransactions(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb.Transactions = append(gb.Transactions, NewTransaction())
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidGenesisBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisTransactions {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlockBadGenesisCloudBaseTransaction(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb.Transactions[0] = NewTransaction()
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidGenesisBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisCloudBaseTransaction {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlockBadGenesisTarget(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb.Target = BigIntToHash(BigExp(2, 255))
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidGenesisBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisTarget {
+		t.Fail()
+	}
+}
+
+func TestValidGenesisBlockBadGenesisTime(t *testing.T) {
+	miner := NewWallet()
+	currentTarget := BigIntToHash(MaxTarget)
+	currentBlockReward := uint64(25)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb.Time = 0
+	bc := &BlockChain{
+		Blocks: []*Block{gb},
+		Head:   HashSum(gb),
+	}
+
+	valid, code := bc.ValidGenesisBlock(gb)
+
+	if valid {
+		t.Fail()
+	}
+
+	if code != BadGenesisTime {
 		t.Fail()
 	}
 }
