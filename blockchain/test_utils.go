@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"math/big"
 	mrand "math/rand"
+	"time"
 )
 
 // NewHash produces a hash.
@@ -59,7 +60,9 @@ func NewBlockHeader() BlockHeader {
 	return BlockHeader{
 		BlockNumber: mrand.Uint32(),
 		LastBlock:   NewHash(),
-		Miner:       NewWallet().Public(),
+		Target:      NewValidTarget(),
+		Time:        mrand.Uint32(),
+		Nonce:       0,
 	}
 }
 
@@ -95,7 +98,9 @@ func NewInputBlock(t []*Transaction) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: 0,
 			LastBlock:   NewHash(),
-			Miner:       NewWallet().Public(),
+			Target:      NewValidTarget(),
+			Time:        uint32(time.Now().Unix()),
+			Nonce:       0,
 		},
 		Transactions: t,
 	}
@@ -108,7 +113,9 @@ func NewOutputBlock(t []*Transaction, input *Block) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: input.BlockNumber + 1,
 			LastBlock:   HashSum(input),
-			Miner:       NewWallet().Public(),
+			Target:      NewValidTarget(),
+			Time:        uint32(time.Now().Unix()),
+			Nonce:       0,
 		},
 		Transactions: t,
 	}
@@ -144,13 +151,15 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 		Recipient: sender.Public(),
 	})
 
-	trB, _ := NewTransactionValue(sender, recipient, 4, 0)
+	trB, _ := NewTransactionValue(sender, recipient, 4, 1)
 	trB.Input.Hash = HashSum(trA)
 
 	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
 
-	inputTransactions := []*Transaction{trA}
-	outputTransactions := []*Transaction{trB}
+	cbA, _ := NewValidCloudBaseTransaction()
+	cbB, _ := NewValidCloudBaseTransaction()
+	inputTransactions := []*Transaction{cbA, trA}
+	outputTransactions := []*Transaction{cbB, trB}
 
 	inputBlock := NewInputBlock(inputTransactions)
 	outputBlock := NewOutputBlock(outputTransactions, inputBlock)
@@ -185,8 +194,45 @@ func NewValidChainAndBlock() (*BlockChain, *Block) {
 	}
 
 	tr, _ := tbody.Sign(s, crand.Reader)
-	newBlock := NewOutputBlock([]*Transaction{tr}, inputBlock)
+	cb, _ := NewValidCloudBaseTransaction()
+	newBlock := NewOutputBlock([]*Transaction{cb, tr}, inputBlock)
 	return bc, newBlock
+}
+
+// NewValidTarget creates a new valid target that is a random value between the
+// max and min difficulties
+func NewValidTarget() Hash {
+	r := new(big.Int).Rand(
+		mrand.New(mrand.NewSource(time.Now().Unix())),
+		new(big.Int).Add(MaxTarget, big.NewInt(1)),
+	)
+	r.Add(r, big.NewInt(1))
+	return BigIntToHash(r)
+}
+
+// NewValidCloudBaseTransaction returns a new valid CloudBase transaction and
+// the address of the recipient of the transaction
+func NewValidCloudBaseTransaction() (*Transaction, Address) {
+	w := NewWallet()
+	cbInput := TxHashPointer{
+		BlockNumber: 0,
+		Hash:        NilHash,
+		Index:       0,
+	}
+	cbReward := TxOutput{
+		Amount:    25,
+		Recipient: w.Public(),
+	}
+	cbTxBody := TxBody{
+		Sender:  NilAddr,
+		Input:   cbInput,
+		Outputs: []TxOutput{cbReward},
+	}
+	cbTx := &Transaction{
+		TxBody: cbTxBody,
+		Sig:    NilSig,
+	}
+	return cbTx, w.Public()
 }
 
 // BigIntToHash converts a big integer to a hash

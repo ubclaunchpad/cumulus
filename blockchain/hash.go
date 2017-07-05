@@ -10,6 +10,11 @@ const (
 	HashLen = 32
 )
 
+var (
+	// NilHash represents a nil hash
+	NilHash = BigIntToHash(big.NewInt(0))
+)
+
 // Hash represents a 256-bit hash of a block or transaction
 type Hash [HashLen]byte
 
@@ -27,9 +32,10 @@ type Marshaller interface {
 	Marshal() []byte
 }
 
-// HashSum computes the SHA256 hash  of a Marshaller.
+// HashSum computes the SHA256 squared hash of a Marshaller.
 func HashSum(m Marshaller) Hash {
-	return sha256.Sum256(m.Marshal())
+	hash := sha256.Sum256(m.Marshal())
+	return sha256.Sum256(hash[:])
 }
 
 // LessThan returns true if the receiver hash is less than the hash provided, and false otherwise

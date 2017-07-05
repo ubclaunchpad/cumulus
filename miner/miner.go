@@ -1,106 +1,75 @@
 package miner
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
 	"math"
-	"math/big"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
-const (
-	// MiningHeaderLen is the length of the MiningHeader struct in bytes
-	MiningHeaderLen = (3 * blockchain.HashLen) + (1 * (32 / 8)) + (1 * (64 / 8))
-)
-
-var (
-	// MinDifficulty is the minimum difficulty
-	MinDifficulty = new(big.Int).Sub(BigExp(2, 232), big.NewInt(1))
-	// MaxDifficulty is the maximum difficulty value
-	MaxDifficulty = big.NewInt(1)
-)
-
-// MiningHeader contains the metadata required for mining
-type MiningHeader struct {
-	LastBlock blockchain.Hash
-	RootHash  blockchain.Hash
-	Target    blockchain.Hash
-	Time      uint32
-	Nonce     uint64
-}
-
-// Marshal converts a Mining Header to a byte slice
-func (mh *MiningHeader) Marshal() []byte {
-	var buf []byte
-	buf = append(buf, mh.LastBlock.Marshal()...)
-	buf = append(buf, mh.RootHash.Marshal()...)
-	buf = append(buf, mh.Target.Marshal()...)
-	tempBufTime := make([]byte, 4)
-	binary.LittleEndian.PutUint32(tempBufTime, mh.Time)
-	buf = append(buf, tempBufTime...)
-	tempBufNonce := make([]byte, 8)
-	binary.LittleEndian.PutUint64(tempBufNonce, mh.Nonce)
-	buf = append(buf, tempBufNonce...)
-	return buf
-}
-
-// SetMiningHeader sets the mining header (sets the time to the current time)
-func (mh *MiningHeader) SetMiningHeader(lastBlock blockchain.Hash, rootHash blockchain.Hash, target blockchain.Hash) *MiningHeader {
-	mh.LastBlock = lastBlock
-	mh.RootHash = rootHash
-	mh.Target = target
-	mh.Time = uint32(time.Now().Unix())
-	mh.Nonce = 0
-	return mh
-}
-
-// VerifyProofOfWork computes the hash of the MiningHeader and returns true if the result is less than the target
-func (mh *MiningHeader) VerifyProofOfWork() bool {
-	return mh.DoubleHashSum().LessThan(mh.Target)
-}
-
-// DoubleHashSum computes the hash 256 of the marshalled mining header twice
-func (mh *MiningHeader) DoubleHashSum() blockchain.Hash {
-	hash := sha256.Sum256(mh.Marshal())
-	hash = sha256.Sum256(hash[:])
-	return hash
-}
-
-// Mine continuously increases the nonce and tries to verify the proof of work until the puzzle is solved
-func (mh *MiningHeader) Mine() bool {
-	if !mh.VerifyMiningHeader() {
+// Mine continuously increases the nonce and tries to verify the proof of work
+// until the puzzle is solved
+func Mine(bc *blockchain.BlockChain, b *blockchain.Block) bool {
+	if valid, _ := bc.ValidBlock(b); !valid {
+		log.Error("Invalid block")
 		return false
 	}
 
-	for !mh.VerifyProofOfWork() {
-		if mh.Nonce == math.MaxUint64 {
-			mh.Nonce = 0
+	for !VerifyProofOfWork(b) {
+		if b.Nonce == math.MaxUint64 {
+			b.Nonce = 0
 		}
-		mh.Time = uint32(time.Now().Unix())
-		mh.Nonce++
+		b.Time = uint32(time.Now().Unix())
+		b.Nonce++
 	}
 	return true
 }
 
-// VerifyMiningHeader confirms that the mining header is properly set
-func (mh *MiningHeader) VerifyMiningHeader() bool {
-	if mh.Time == 0 || mh.Time > uint32(time.Now().Unix()) {
-		log.Error("Invalid time in mining header")
-		return false
+// CloudBase prepends the cloudbase transaction to the front of a list of
+// transactions in a block that is to be added to the blockchain
+func CloudBase(
+	b *blockchain.Block,
+	bc *blockchain.BlockChain,
+	cb blockchain.Address) *blockchain.Block {
+	// Create a cloudbase transaction by setting all inputs to 0
+	cbInput := blockchain.TxHashPointer{
+		BlockNumber: 0,
+		Hash:        blockchain.NilHash,
+		Index:       0,
 	}
-	target := blockchain.HashToBigInt(mh.Target)
-	// Check if the target is less than the max difficulty, or if the target is greater than the min difficulty
-	if target.Cmp(MinDifficulty) == 1 || target.Cmp(MaxDifficulty) == -1 {
-		log.Error("Invalid target in mining header")
-		return false
+	// Set the transaction amount to the BlockReward
+	// TODO: Add transaction fees
+	cbReward := blockchain.TxOutput{
+		Amount:    consensus.BlockReward,
+		Recipient: cb,
 	}
-	return true
+	cbTxBody := blockchain.TxBody{
+		Sender:  blockchain.NilAddr,
+		Input:   cbInput,
+		Outputs: []blockchain.TxOutput{cbReward},
+	}
+	cbTx := blockchain.Transaction{
+		TxBody: cbTxBody,
+		Sig:    blockchain.NilSig,
+	}
+
+	b.Transactions = append([]*blockchain.Transaction{&cbTx}, b.Transactions...)
+
+	// Increment the input index of every transaction that has an input in the
+	// new block
+	for _, tx := range b.Transactions[1:] {
+		if tx.Input.BlockNumber == uint32(len(bc.Blocks)) {
+			tx.Input.Index++
+		}
+	}
+
+	return b
 }
 
-// BigExp returns an big int pointer with the result set to base**exp, if y <= 0, the result is 1
-func BigExp(base, exp int) *big.Int {
-	return new(big.Int).Exp(big.NewInt(int64(base)), big.NewInt(int64(exp)), nil)
+// VerifyProofOfWork computes the hash of the MiningHeader and returns true if
+// the result is less than the target
+func VerifyProofOfWork(b *blockchain.Block) bool {
+	return blockchain.HashSum(b).LessThan(b.Target)
 }
