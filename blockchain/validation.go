@@ -24,15 +24,15 @@ const (
 	// ValidTransaction is returned when transaction is valid.
 	ValidTransaction TransactionCode = iota
 	// NoInputTransaction is returned when transaction has no valid input transaction.
-	NoInputTransaction TransactionCode = iota
+	NoInputTransaction
 	// Overspend is returned when transaction outputs exceed transaction inputs.
-	Overspend TransactionCode = iota
+	Overspend
 	// BadSig is returned when the signature verification fails.
-	BadSig TransactionCode = iota
+	BadSig
 	// Respend is returned when inputs have been spent elsewhere in the chain.
-	Respend TransactionCode = iota
+	Respend
 	// NilTransaction is returned when the transaction pointer is nil.
-	NilTransaction TransactionCode = iota
+	NilTransaction
 )
 
 const (
@@ -41,19 +41,19 @@ const (
 	ValidCloudBaseTransaction CloudBaseTransactionCode = iota
 	// BadCloudBaseSender is returned when the sender address in the CloudBase
 	// transaction is not a NilAddr.
-	BadCloudBaseSender CloudBaseTransactionCode = iota
+	BadCloudBaseSender
 	// BadCloudBaseInput is returned when all the fields inf the  CloudBase
 	// transaction input are not equal to 0.
-	BadCloudBaseInput CloudBaseTransactionCode = iota
+	BadCloudBaseInput
 	// BadCloudBaseOutput is returned when the CloudBase transaction output is
 	// invalid.
-	BadCloudBaseOutput CloudBaseTransactionCode = iota
+	BadCloudBaseOutput
 	// BadCloudBaseSig is returned when the CloudBase transaction signature is
 	// not equal to NilSig.
-	BadCloudBaseSig CloudBaseTransactionCode = iota
+	BadCloudBaseSig
 	// NilCloudBaseTransaction is returned when the CloudBase transaction
 	// pointer is nil
-	NilCloudBaseTransaction CloudBaseTransactionCode = iota
+	NilCloudBaseTransaction
 )
 
 const (
@@ -61,22 +61,22 @@ const (
 	ValidGenesisBlock GenesisBlockCode = iota
 	// BadGenesisLastBlock is returned when the LastBlock of the genesis block
 	// is not equal to 0.
-	BadGenesisLastBlock GenesisBlockCode = iota
+	BadGenesisLastBlock
 	// BadGenesisTransactions is returned when the genesis block does not contain
 	// exactly 1 transaction, the first CloudBase transaction.
-	BadGenesisTransactions GenesisBlockCode = iota
+	BadGenesisTransactions
 	// BadGenesisCloudBaseTransaction is returned when the transaction in the
 	// genesis block is not a valid CloudBase transaction.
-	BadGenesisCloudBaseTransaction GenesisBlockCode = iota
+	BadGenesisCloudBaseTransaction
 	// BadGenesisBlockNumber is returned when the block number in the genesis
 	// block is not equal to 0.
-	BadGenesisBlockNumber GenesisBlockCode = iota
+	BadGenesisBlockNumber
 	// BadGenesisTarget is returned when the genesis block's target is invalid.
-	BadGenesisTarget GenesisBlockCode = iota
+	BadGenesisTarget
 	// BadGenesisTime is returned when teh gensis block's time is invalid.
-	BadGenesisTime GenesisBlockCode = iota
+	BadGenesisTime
 	// NilGenesisBlock is returned when the genesis block is equal to nil.
-	NilGenesisBlock GenesisBlockCode = iota
+	NilGenesisBlock
 )
 
 const (
@@ -84,28 +84,28 @@ const (
 	ValidBlock BlockCode = iota
 	// BadTransaction is returned when the block contains an invalid
 	// transaction.
-	BadTransaction BlockCode = iota
+	BadTransaction
 	// BadTime is returned when the block contains an invalid time.
-	BadTime BlockCode = iota
+	BadTime
 	// BadTarget is returned when the block contains an invalid target.
-	BadTarget BlockCode = iota
+	BadTarget
 	// BadBlockNumber is returned when block number is not one greater than
 	// previous block.
-	BadBlockNumber BlockCode = iota
+	BadBlockNumber
 	// BadHash is returned when the block contains incorrect hash.
-	BadHash BlockCode = iota
+	BadHash
 	// DoubleSpend is returned when two transactions in the block share inputs,
 	// but outputs > inputs.
-	DoubleSpend BlockCode = iota
+	DoubleSpend
 	// BadCloudBaseTransaction is returned when a block does not have a
 	// CloudBase transaction as the first transaction in its list of
 	// transactions.
-	BadCloudBaseTransaction BlockCode = iota
+	BadCloudBaseTransaction
 	// BadGenesisBlock is returned if the block is a genesis block and is
 	// invalid.
-	BadGenesisBlock BlockCode = iota
+	BadGenesisBlock
 	// NilBlock is returned when the block pointer is nil.
-	NilBlock BlockCode = iota
+	NilBlock
 )
 
 var (
