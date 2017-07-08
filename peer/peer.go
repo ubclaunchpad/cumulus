@@ -209,7 +209,6 @@ func (p *Peer) Dispatch() {
 				case <-time.After(MessageWaitTime):
 				}
 			} else {
-				log.WithError(err).Error("Dispatcher failed to read message")
 				if strings.Contains(err.Error(), syscall.ECONNRESET.Error()) || errCount == 3 {
 					log.Infof("Disconnecting from peer %s due to %s",
 						p.Connection.RemoteAddr().String(), err.Error())
@@ -217,6 +216,7 @@ func (p *Peer) Dispatch() {
 					p.Connection.Close()
 					return
 				}
+				log.WithError(err).Error("Dispatcher failed to read message")
 				errCount++
 			}
 			continue
