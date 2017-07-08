@@ -234,22 +234,3 @@ func NewValidCloudBaseTransaction() (*Transaction, Address) {
 	}
 	return cbTx, w.Public()
 }
-
-// BigIntToHash converts a big integer to a hash
-func BigIntToHash(x *big.Int) Hash {
-	bytes := x.Bytes()
-
-	var result Hash
-	for i := 0; i < HashLen; i++ {
-		result[i] = 0
-	}
-
-	if len(bytes) > HashLen {
-		return result
-	}
-
-	for i := 0; i < len(bytes); i++ {
-		result[len(bytes)-1-i] = bytes[i]
-	}
-	return result
-}

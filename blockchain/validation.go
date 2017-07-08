@@ -4,13 +4,18 @@ package blockchain
 import (
 	"crypto/ecdsa"
 	"math/big"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 // TransactionCode is returned from ValidTransaction.
 type TransactionCode uint32
 
-// CloudBaseTransactionCode is returned from ValidCloudBaseTransaction
+// CloudBaseTransactionCode is returned from ValidCloudBaseTransaction.
 type CloudBaseTransactionCode uint32
+
+// GenesisBlockCode is returned from ValidGenesisBlock.
+type GenesisBlockCode uint32
 
 // BlockCode is returned from ValidBlock.
 type BlockCode uint32
@@ -19,15 +24,15 @@ const (
 	// ValidTransaction is returned when transaction is valid.
 	ValidTransaction TransactionCode = iota
 	// NoInputTransaction is returned when transaction has no valid input transaction.
-	NoInputTransaction TransactionCode = iota
+	NoInputTransaction
 	// Overspend is returned when transaction outputs exceed transaction inputs.
-	Overspend TransactionCode = iota
+	Overspend
 	// BadSig is returned when the signature verification fails.
-	BadSig TransactionCode = iota
+	BadSig
 	// Respend is returned when inputs have been spent elsewhere in the chain.
-	Respend TransactionCode = iota
-	// NilTransaction is returned when the transaction pointer is nil
-	NilTransaction TransactionCode = iota
+	Respend
+	// NilTransaction is returned when the transaction pointer is nil.
+	NilTransaction
 )
 
 const (
@@ -36,19 +41,42 @@ const (
 	ValidCloudBaseTransaction CloudBaseTransactionCode = iota
 	// BadCloudBaseSender is returned when the sender address in the CloudBase
 	// transaction is not a NilAddr.
-	BadCloudBaseSender CloudBaseTransactionCode = iota
+	BadCloudBaseSender
 	// BadCloudBaseInput is returned when all the fields inf the  CloudBase
 	// transaction input are not equal to 0.
-	BadCloudBaseInput CloudBaseTransactionCode = iota
+	BadCloudBaseInput
 	// BadCloudBaseOutput is returned when the CloudBase transaction output is
 	// invalid.
-	BadCloudBaseOutput CloudBaseTransactionCode = iota
+	BadCloudBaseOutput
 	// BadCloudBaseSig is returned when the CloudBase transaction signature is
 	// not equal to NilSig.
-	BadCloudBaseSig CloudBaseTransactionCode = iota
+	BadCloudBaseSig
 	// NilCloudBaseTransaction is returned when the CloudBase transaction
 	// pointer is nil
-	NilCloudBaseTransaction CloudBaseTransactionCode = iota
+	NilCloudBaseTransaction
+)
+
+const (
+	// ValidGenesisBlock is returned when a block is a valid genesis block.
+	ValidGenesisBlock GenesisBlockCode = iota
+	// BadGenesisLastBlock is returned when the LastBlock of the genesis block
+	// is not equal to 0.
+	BadGenesisLastBlock
+	// BadGenesisTransactions is returned when the genesis block does not contain
+	// exactly 1 transaction, the first CloudBase transaction.
+	BadGenesisTransactions
+	// BadGenesisCloudBaseTransaction is returned when the transaction in the
+	// genesis block is not a valid CloudBase transaction.
+	BadGenesisCloudBaseTransaction
+	// BadGenesisBlockNumber is returned when the block number in the genesis
+	// block is not equal to 0.
+	BadGenesisBlockNumber
+	// BadGenesisTarget is returned when the genesis block's target is invalid.
+	BadGenesisTarget
+	// BadGenesisTime is returned when teh gensis block's time is invalid.
+	BadGenesisTime
+	// NilGenesisBlock is returned when the genesis block is equal to nil.
+	NilGenesisBlock
 )
 
 const (
@@ -56,25 +84,28 @@ const (
 	ValidBlock BlockCode = iota
 	// BadTransaction is returned when the block contains an invalid
 	// transaction.
-	BadTransaction BlockCode = iota
-	// BadTime is returned when the block contains an invalid time
-	BadTime BlockCode = iota
-	// BadTarget is returned when the block contains an invalid target
-	BadTarget BlockCode = iota
+	BadTransaction
+	// BadTime is returned when the block contains an invalid time.
+	BadTime
+	// BadTarget is returned when the block contains an invalid target.
+	BadTarget
 	// BadBlockNumber is returned when block number is not one greater than
 	// previous block.
-	BadBlockNumber BlockCode = iota
+	BadBlockNumber
 	// BadHash is returned when the block contains incorrect hash.
-	BadHash BlockCode = iota
+	BadHash
 	// DoubleSpend is returned when two transactions in the block share inputs,
 	// but outputs > inputs.
-	DoubleSpend BlockCode = iota
+	DoubleSpend
 	// BadCloudBaseTransaction is returned when a block does not have a
 	// CloudBase transaction as the first transaction in its list of
 	// transactions.
-	BadCloudBaseTransaction BlockCode = iota
-	// NilBlock is returned when the block pointer is nil
-	NilBlock BlockCode = iota
+	BadCloudBaseTransaction
+	// BadGenesisBlock is returned if the block is a genesis block and is
+	// invalid.
+	BadGenesisBlock
+	// NilBlock is returned when the block pointer is nil.
+	NilBlock
 )
 
 var (
@@ -157,12 +188,64 @@ func ValidCloudBase(t *Transaction) (bool, CloudBaseTransactionCode) {
 	return true, ValidCloudBaseTransaction
 }
 
+// ValidGenesisBlock checks whether a block is a valid genesis block.
+func (bc *BlockChain) ValidGenesisBlock(gb *Block) (bool, GenesisBlockCode) {
+	// Check if the genesis block is equal to nil.
+	if gb == nil {
+		return false, NilGenesisBlock
+	}
+
+	// Check if the genesis block's block number is equal to 0.
+	if gb.BlockHeader.BlockNumber != 0 ||
+		bc.Blocks[0] != gb {
+		return false, BadGenesisBlockNumber
+	}
+
+	// Check if the genesis block's last block hash is equal to 0.
+	if HashToBigInt(gb.BlockHeader.LastBlock).Cmp(big.NewInt(0)) != 0 {
+		return false, BadGenesisLastBlock
+	}
+
+	// Check if the size of the transaction list is equal to 1.
+	if len(gb.Transactions) != 1 {
+		return false, BadGenesisTransactions
+	}
+
+	// Check if the transaction is a valid cloud base transaction.
+	if valid, code := ValidCloudBase(gb.Transactions[0]); !valid {
+		log.Errorf("Invalid CloudBase, CloudBaseTransactionCode: %d", code)
+		return false, BadGenesisCloudBaseTransaction
+	}
+
+	// Check that the target is within the min and max difficulty levels.
+	target := HashToBigInt(gb.Target)
+	if target.Cmp(MaxTarget) == 1 || target.Cmp(MinTarget) == -1 {
+		return false, BadGenesisTarget
+	}
+
+	// Check that time is not greater than current time or equal to 0.
+	if uint32(gb.Time) == 0 {
+		return false, BadGenesisTime
+	}
+
+	return true, ValidGenesisBlock
+}
+
 // ValidBlock checks whether a block is valid.
 func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 
 	// Check if the block is equal to nil
 	if b == nil {
 		return false, NilBlock
+	}
+
+	// Check if the block is the genesis block
+	if b.BlockHeader.BlockNumber == 0 || bc.Blocks[0] == b {
+		if valid, code := bc.ValidGenesisBlock(b); !valid {
+			log.Errorf("Invalid GenesisBlock, GenesisBlockCode: %d", code)
+			return false, BadGenesisBlock
+		}
+		return true, ValidBlock
 	}
 
 	// Check that block number between 0 and max blocks.
@@ -178,7 +261,8 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 	}
 
 	// Check that the first transaction is a CloudBase transaction
-	if valid, _ := ValidCloudBase(b.Transactions[0]); !valid {
+	if valid, code := ValidCloudBase(b.Transactions[0]); !valid {
+		log.Errorf("Invalid CloudBase, CloudBaseTransactionCode: %d", code)
 		return false, BadCloudBaseTransaction
 	}
 
