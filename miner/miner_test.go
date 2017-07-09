@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/consensus"
 )
@@ -27,18 +28,43 @@ func TestMine(t *testing.T) {
 	mineResult := Mine(bc, b)
 	blockchain.MaxTarget = tempMaxTarget
 
-	if !mineResult {
-		t.Fail()
-	}
+	assert.True(t, mineResult.Complete)
+	assert.Equal(t, mineResult.Info, MiningSuccessful)
 }
 
 func TestMineBadBlock(t *testing.T) {
 	bc, _ := blockchain.NewValidChainAndBlock()
 	mineResult := Mine(bc, nil)
 
-	if mineResult {
-		t.Fail()
-	}
+	assert.False(t, mineResult.Complete)
+	assert.Equal(t, mineResult.Info, MiningNeverStarted)
+}
+
+func TestMineHaltMiner(t *testing.T) {
+	bc, b := blockchain.NewValidChainAndBlock()
+
+	// Set min difficulty to be equal to the target so that the block validation
+	// passes
+	blockchain.MaxTarget = new(big.Int).Sub(
+		blockchain.BigExp(2, 256),
+		big.NewInt(1),
+	)
+
+	// Set target to be as hard as possible so that we stall.
+	b.Target = blockchain.BigIntToHash(blockchain.MinTarget)
+	b.Time = uint32(time.Now().Unix())
+
+	// Use a thread to stop the miner a few moments after starting.
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		StopMiner()
+	}()
+
+	// Start the miner.
+	mineResult := Mine(bc, b)
+
+	assert.False(t, mineResult.Complete)
+	assert.Equal(t, mineResult.Info, MiningHalted)
 }
 
 func TestCloudBase(t *testing.T) {
