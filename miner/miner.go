@@ -19,7 +19,7 @@ var CurrentlyMiningLock sync.RWMutex
 const (
 	// MiningSuccessful is returned when the miner mines a block.
 	MiningSuccessful = iota
-	// MiningNeverStarted is returned when the block is invalid.
+	// MiningNeverStarted is returned when the block header is invalid.
 	MiningNeverStarted = iota
 	// MiningHalted is returned when the app halts the miner.
 	MiningHalted = iota
@@ -47,6 +47,7 @@ func RestartMiner(bc *blockchain.BlockChain, b *blockchain.Block) {
 
 // Mine continuously increases the nonce and tries to verify the proof of work
 // until the puzzle is solved
+// TODO: Make Mine take an interface with a callback as an arguement.
 func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
 	setStart()
 	if valid, _ := bc.ValidBlock(b); !valid {
