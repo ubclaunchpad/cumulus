@@ -71,3 +71,12 @@ func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (b
 	}
 	return false, 0, 0
 }
+
+// CopyLocalBlockByIndex returns a copy of a block in the local chain by index.
+func (bc *BlockChain) CopyBlockByIndex(i uint32) *Block {
+	blk := bc.Blocks[i]
+	b := *blk
+	b.Transactions = make([]*Transaction, len(blk.Transactions))
+	copy(b.Transactions, blk.Transactions)
+	return &b
+}

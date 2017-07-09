@@ -5,12 +5,22 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
 func init() {
 	log.SetLevel(log.InfoLevel)
+}
+
+func createNewBlockRequest(blockNumber interface{}) *msg.Request {
+	params := make(map[string]interface{}, 1)
+	params["blockNumber"] = blockNumber
+	return &msg.Request{
+		ResourceType: msg.ResourceBlock,
+		Params:       params,
+	}
 }
 
 func TestKillWorkers(t *testing.T) {
@@ -91,28 +101,63 @@ func TestPushHandlerNewTransaction(t *testing.T) {
 	// Add more here...
 }
 
-func TestRequestHandlerNewBlock(t *testing.T) {
-	intializeQueues()
-	push := msg.Request{ResourceType: msg.ResourceBlock}
-	RequestHandler(&push)
-	select {
-	case _, ok := <-BlockWorkQueue:
-		if !ok {
-			t.FailNow()
-		}
-	}
-	// Add more here...
+func TestRequestHandlerNewBlockOK(t *testing.T) {
+	initializeChain()
+
+	// Set up a request (requesting block 0)
+	blockNumber := uint32(0)
+	req := createNewBlockRequest(blockNumber)
+
+	resp := RequestHandler(req)
+	block, ok := resp.Resource.(*blockchain.Block)
+
+	// Assertion time!
+	assert.True(t, ok, "resource should contain block")
+	assert.Equal(t, block.BlockNumber, blockNumber,
+		"block number should be "+string(blockNumber))
 }
 
-func TestRequestHandlerNewTransaction(t *testing.T) {
-	intializeQueues()
-	push := msg.Request{ResourceType: msg.ResourceTransaction}
-	RequestHandler(&push)
-	select {
-	case _, ok := <-TransactionWorkQueue:
-		if !ok {
-			t.FailNow()
-		}
-	}
-	// Add more here...
+func TestRequestHandlerNewBlockBadParams(t *testing.T) {
+	initializeChain()
+
+	// Set up a request.
+	blockNumber := "definitelynotanindex"
+	req := createNewBlockRequest(blockNumber)
+
+	resp := RequestHandler(req)
+	block, ok := resp.Resource.(*blockchain.Block)
+
+	// Make sure request failed.
+	assert.False(t, ok, "resource should not contain block")
+	assert.Nil(t, block, "resource should not contain block")
+}
+
+func TestRequestHandlerNewBlockBadType(t *testing.T) {
+	initializeChain()
+
+	// Set up a request.
+	req := createNewBlockRequest("doesntmatter")
+	req.ResourceType = 25
+
+	resp := RequestHandler(req)
+	block, ok := resp.Resource.(*blockchain.Block)
+
+	// Make sure request failed.
+	assert.False(t, ok, "resource should not contain block")
+	assert.Nil(t, block, "resource should not contain block")
+}
+
+func TestRequestHandlerPeerInfo(t *testing.T) {
+	initializeChain()
+
+	// Set up a request.
+	req := createNewBlockRequest("doesntmatter")
+	req.ResourceType = msg.ResourcePeerInfo
+
+	resp := RequestHandler(req)
+	res := resp.Resource
+
+	// Make sure request did not fail.
+	assert.NotNil(t, res, "resource should contain peer info")
+	// Assert peer address returned valid.
 }

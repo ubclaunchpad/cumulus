@@ -61,8 +61,10 @@ func Run(cfg conf.Config) {
 	go peer.MaintainConnections()
 
 	// Request the blockchain.
-	log.Info("Requesting blockchain from peers... ")
-	RequestBlockChain()
+	if chain == nil {
+		log.Info("Request blockchain from peers not yet implemented.")
+		initializeChain()
+	}
 
 	// Return to command line.
 	select {}
@@ -91,19 +93,23 @@ func ConnectAndDiscover(target string) {
 // on peers whos PushHandlers have been overridden.
 func RequestHandler(req *msg.Request) msg.Response {
 	res := msg.Response{ID: req.ID}
+	typeErr := msg.NewProtocolError(msg.InvalidResourceType,
+		"Invalid resource type")
+	paramErr := msg.NewProtocolError(msg.InvalidResourceType,
+		"Invalid request parameter, blockNumber must be uint32.")
 
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
 		res.Resource = peer.PStore.Addrs()
 	case msg.ResourceBlock:
-		work := BlockWork{}
-		BlockWorkQueue <- work
-	case msg.ResourceTransaction:
-		work := TransactionWork{}
-		TransactionWorkQueue <- work
+		blockNumber, ok := req.Params["blockNumber"].(uint32)
+		if ok {
+			res.Resource = chain.CopyBlockByIndex(blockNumber)
+		} else {
+			res.Error = paramErr
+		}
 	default:
-		res.Error = msg.NewProtocolError(msg.InvalidResourceType,
-			"Invalid resource type")
+		res.Error = typeErr
 	}
 
 	return res
@@ -159,6 +165,13 @@ func initializeWorkers() {
 	}
 }
 
+// initializeChain creates the blockchain for the node.
+func initializeChain() {
+	chain, _ = blockchain.NewValidChainAndBlock()
+	// Check if chain exists on disk.
+	// If not, request chain from peers.
+}
+
 // killWorkers kills all workers.
 func killWorkers() {
 	for i := 0; i < nWorkers; i++ {
@@ -166,6 +179,3 @@ func killWorkers() {
 		workers[i] = nil
 	}
 }
-
-// RequestBlockChain asks existing peers for a copy of the blockchain.
-func RequestBlockChain() {}
