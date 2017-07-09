@@ -50,7 +50,7 @@ func init() {
 func reset() {
 	tpool = pool.New()
 	chain, legitBlock = bc.NewValidChainAndBlock()
-	legitTransaction = legitBlock.Transactions[0]
+	legitTransaction = legitBlock.Transactions[1]
 	realWorker = NewWorker(7)
 	mockResponder = MockResponder{
 		Mutex:  &sync.Mutex{},
