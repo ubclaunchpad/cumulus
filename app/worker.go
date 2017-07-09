@@ -73,7 +73,7 @@ func (w *AppWorker) HandleTransaction(work TransactionWork) {
 func (w *AppWorker) HandleBlock(work BlockWork) {
 	ok, _ := chain.ValidBlock(work.Block)
 	if ok {
-		chain.AppendBlock(work.Block, work.Miner)
+		chain.AppendBlock(work.Block)
 	}
 
 	// Respond to the request if a response method was provided.

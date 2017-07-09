@@ -98,7 +98,7 @@ func TestHandleTransactionNotOK(t *testing.T) {
 	}
 }
 
-func TestHandleBlockNotOK(t *testing.T) {
+func TestHandleBlockOK(t *testing.T) {
 	reset()
 	realWorker.HandleBlock(goodBlkWork)
 	if mockResponder.Result != true {
@@ -106,7 +106,7 @@ func TestHandleBlockNotOK(t *testing.T) {
 	}
 }
 
-func TestHandleBlockOK(t *testing.T) {
+func TestHandleBlockNotOK(t *testing.T) {
 	reset()
 	realWorker.HandleBlock(badBlkWork)
 	if mockResponder.Result != false {
