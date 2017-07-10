@@ -43,13 +43,6 @@ func TestMineBadBlock(t *testing.T) {
 func TestMineHaltMiner(t *testing.T) {
 	bc, b := blockchain.NewValidChainAndBlock()
 
-	// Set min difficulty to be equal to the target so that the block validation
-	// passes
-	blockchain.MaxTarget = new(big.Int).Sub(
-		blockchain.BigExp(2, 256),
-		big.NewInt(1),
-	)
-
 	// Set target to be as hard as possible so that we stall.
 	b.Target = blockchain.BigIntToHash(blockchain.MinTarget)
 	b.Time = uint32(time.Now().Unix())
@@ -57,7 +50,7 @@ func TestMineHaltMiner(t *testing.T) {
 	// Use a thread to stop the miner a few moments after starting.
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		StopMiner()
+		StopMining()
 	}()
 
 	// Start the miner.

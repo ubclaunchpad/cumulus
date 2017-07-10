@@ -10,11 +10,11 @@ import (
 	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
-// CurrentlyMining is a flag to control the miner.
-var CurrentlyMining bool
+// currentlyMining is a flag to control the miner.
+var currentlyMining bool
 
-// CurrentlyMiningLock is a read/write lock to change the Mining flag.
-var CurrentlyMiningLock sync.RWMutex
+// currentlyMiningLock is a read/write lock to change the Mining flag.
+var currentlyMiningLock sync.RWMutex
 
 const (
 	// MiningSuccessful is returned when the miner mines a block.
@@ -31,17 +31,9 @@ type MiningResult struct {
 	Info     int
 }
 
-// IsMining returns the mining status of the miner.
-// Many threads can read this status, only one can write.
-func IsMining() bool {
-	CurrentlyMiningLock.RLock()
-	defer CurrentlyMiningLock.RUnlock()
-	return CurrentlyMining
-}
-
 // RestartMiner restarts the miner with a new block.
 func RestartMiner(bc *blockchain.BlockChain, b *blockchain.Block) {
-	StopMiner()
+	StopMining()
 	Mine(bc, b)
 }
 
@@ -84,16 +76,24 @@ func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
 }
 
 func setStart() {
-	CurrentlyMiningLock.Lock()
-	defer CurrentlyMiningLock.Unlock()
-	CurrentlyMining = true
+	currentlyMiningLock.Lock()
+	defer currentlyMiningLock.Unlock()
+	currentlyMining = true
 }
 
-// StopMiner stops the miner from mining.
-func StopMiner() {
-	CurrentlyMiningLock.Lock()
-	defer CurrentlyMiningLock.Unlock()
-	CurrentlyMining = false
+// StopMining stops the miner from mining.
+func StopMining() {
+	currentlyMiningLock.Lock()
+	defer currentlyMiningLock.Unlock()
+	currentlyMining = false
+}
+
+// IsMining returns the mining status of the miner.
+// Many threads can read this status, only one can write.
+func IsMining() bool {
+	currentlyMiningLock.RLock()
+	defer currentlyMiningLock.RUnlock()
+	return currentlyMining
 }
 
 // CloudBase prepends the cloudbase transaction to the front of a list of

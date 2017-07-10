@@ -168,8 +168,8 @@ func initializeWorkers() {
 // initializeChain creates the blockchain for the node.
 func initializeChain() {
 	chain, _ = blockchain.NewValidChainAndBlock()
-	// Check if chain exists on disk.
-	// If not, request chain from peers.
+	// TODO: Check if chain exists on disk.
+	// TODO: If not, request chain from peers.
 }
 
 // killWorkers kills all workers.
