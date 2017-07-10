@@ -73,8 +73,11 @@ const (
 	BadGenesisBlockNumber
 	// BadGenesisTarget is returned when the genesis block's target is invalid.
 	BadGenesisTarget
-	// BadGenesisTime is returned when teh gensis block's time is invalid.
+	// BadGenesisTime is returned when the gensis block's time is invalid.
 	BadGenesisTime
+	// BadGenesisBlockSize is returned when the size of the block exceeds the
+	// maximum block size
+	BadGenesisBlockSize
 	// NilGenesisBlock is returned when the genesis block is equal to nil.
 	NilGenesisBlock
 )
@@ -104,6 +107,9 @@ const (
 	// BadGenesisBlock is returned if the block is a genesis block and is
 	// invalid.
 	BadGenesisBlock
+	// BadBlockSize is returned when the size of the block exceeds the maximum
+	// block size
+	BadBlockSize
 	// NilBlock is returned when the block pointer is nil.
 	NilBlock
 )
@@ -190,9 +196,15 @@ func ValidCloudBase(t *Transaction) (bool, CloudBaseTransactionCode) {
 
 // ValidGenesisBlock checks whether a block is a valid genesis block.
 func (bc *BlockChain) ValidGenesisBlock(gb *Block) (bool, GenesisBlockCode) {
+
 	// Check if the genesis block is equal to nil.
 	if gb == nil {
 		return false, NilGenesisBlock
+	}
+
+	// Check if the genesis block is too large.
+	if gb.Len() > MaxBlockSize {
+		return false, BadGenesisBlockSize
 	}
 
 	// Check if the genesis block's block number is equal to 0.
@@ -234,12 +246,17 @@ func (bc *BlockChain) ValidGenesisBlock(gb *Block) (bool, GenesisBlockCode) {
 // ValidBlock checks whether a block is valid.
 func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 
-	// Check if the block is equal to nil
+	// Check if the block is equal to nil.
 	if b == nil {
 		return false, NilBlock
 	}
 
-	// Check if the block is the genesis block
+	// Check if the block is too large.
+	if b.Len() > MaxBlockSize {
+		return false, BadBlockSize
+	}
+
+	// Check if the block is the genesis block.
 	if b.BlockHeader.BlockNumber == 0 || bc.Blocks[0] == b {
 		if valid, code := bc.ValidGenesisBlock(b); !valid {
 			log.Errorf("Invalid GenesisBlock, GenesisBlockCode: %d", code)

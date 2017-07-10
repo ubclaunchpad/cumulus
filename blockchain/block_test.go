@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"testing"
+	"time"
 )
 
 func TestEncodeDecodeBlock(t *testing.T) {
@@ -22,6 +23,38 @@ func TestContainsTransaction(t *testing.T) {
 	b := NewBlock()
 
 	if exists, _ := b.ContainsTransaction(b.Transactions[0]); !exists {
+		t.Fail()
+	}
+}
+
+func TestBlockHeaderLen(t *testing.T) {
+	bh := &BlockHeader{
+		0,
+		NewHash(),
+		NewValidTarget(),
+		uint32(time.Now().Unix()),
+		0,
+		[]byte{0x00, 0x01, 0x02},
+	}
+
+	len := 2*(32/8) + 64/8 + 2*HashLen + 3
+
+	if bh.Len() != len {
+		t.Fail()
+	}
+
+	bh = &BlockHeader{
+		0,
+		NewHash(),
+		NewValidTarget(),
+		uint32(time.Now().Unix()),
+		0,
+		[]byte{},
+	}
+
+	len = 2*(32/8) + 64/8 + 2*HashLen
+
+	if bh.Len() != len {
 		t.Fail()
 	}
 }
