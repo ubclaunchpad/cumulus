@@ -8,12 +8,6 @@ import (
 	"io"
 )
 
-const (
-	// MaxBlockSize is the maximum size of a block in bytes when marshaled
-	// (about 250K).
-	MaxBlockSize = 1 << 18
-)
-
 // BlockHeader contains metadata about a block
 type BlockHeader struct {
 	// BlockNumber is the position of the block within the blockchain
