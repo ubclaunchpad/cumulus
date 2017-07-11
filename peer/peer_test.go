@@ -1,7 +1,6 @@
 package peer
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -78,21 +76,6 @@ func inList(item string, list []string) bool {
 		}
 	}
 	return false
-}
-
-func newConnectionAndHandshake(addr string) (net.Conn, error) {
-	go conn.Listen(ListenAddr, ConnectionHandler)
-
-	// Allow 3 retries as the socket might not be open by the time we dial
-	for i := 0; i < 3; i++ {
-		c, err := conn.Dial(ListenAddr)
-		if err == nil {
-			// Success, continue as usual
-			_, err = exchangeListenAddrs(c, time.Second*5)
-			return c, err
-		}
-	}
-	return nil, errors.New("Failed to connect to" + ListenAddr + "after 3 dial attempts")
 }
 
 func TestMain(m *testing.M) {
