@@ -75,9 +75,6 @@ const (
 	BadGenesisTarget
 	// BadGenesisTime is returned when the gensis block's time is invalid.
 	BadGenesisTime
-	// BadGenesisBlockSize is returned when the size of the block exceeds the
-	// maximum block size
-	BadGenesisBlockSize
 	// NilGenesisBlock is returned when the genesis block is equal to nil.
 	NilGenesisBlock
 )
@@ -107,9 +104,6 @@ const (
 	// BadGenesisBlock is returned if the block is a genesis block and is
 	// invalid.
 	BadGenesisBlock
-	// BadBlockSize is returned when the size of the block exceeds the maximum
-	// block size
-	BadBlockSize
 	// NilBlock is returned when the block pointer is nil.
 	NilBlock
 )
@@ -202,11 +196,6 @@ func (bc *BlockChain) ValidGenesisBlock(gb *Block) (bool, GenesisBlockCode) {
 		return false, NilGenesisBlock
 	}
 
-	// Check if the genesis block is too large.
-	if gb.Len() > MaxBlockSize {
-		return false, BadGenesisBlockSize
-	}
-
 	// Check if the genesis block's block number is equal to 0.
 	if gb.BlockHeader.BlockNumber != 0 ||
 		bc.Blocks[0] != gb {
@@ -249,11 +238,6 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 	// Check if the block is equal to nil.
 	if b == nil {
 		return false, NilBlock
-	}
-
-	// Check if the block is too large.
-	if b.Len() > MaxBlockSize {
-		return false, BadBlockSize
 	}
 
 	// Check if the block is the genesis block.

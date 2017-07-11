@@ -57,9 +57,7 @@ func (bh *BlockHeader) Marshal() []byte {
 
 // Len returns the length in bytes of the BlockHeader.
 func (bh *BlockHeader) Len() int {
-	l := 2*(32/8) + 64/8 + 2*HashLen
-	l += len(bh.ExtraData)
-	return l
+	return len(bh.Marshal())
 }
 
 // Block represents a block in the blockchain. Contains transactions and header metadata.
@@ -70,16 +68,12 @@ type Block struct {
 
 // Len returns the length in bytes of the Block.
 func (b *Block) Len() int {
-	l := b.BlockHeader.Len()
-	for _, t := range b.Transactions {
-		l += t.Len()
-	}
-	return l
+	return len(b.Marshal())
 }
 
 // Marshal converts a Block to a byte slice.
 func (b *Block) Marshal() []byte {
-	buf := make([]byte, 0, b.Len())
+	var buf []byte
 	buf = append(buf, b.BlockHeader.Marshal()...)
 	for _, t := range b.Transactions {
 		buf = append(buf, t.Marshal()...)

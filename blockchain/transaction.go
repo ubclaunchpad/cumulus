@@ -21,7 +21,7 @@ type TxHashPointer struct {
 
 // Marshal converts a TxHashPointer to a byte slice
 func (thp TxHashPointer) Marshal() []byte {
-	buf := make([]byte, 4, TxHashPointerLen)
+	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, thp.BlockNumber)
 	buf = append(buf, thp.Hash.Marshal()...)
 	return buf
@@ -35,7 +35,7 @@ type TxOutput struct {
 
 // Marshal converts a TxOutput to a byte slice
 func (to TxOutput) Marshal() []byte {
-	buf := make([]byte, 8, TxOutputLen)
+	buf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buf, to.Amount)
 	buf = append(buf, to.Recipient.Marshal()...)
 	return buf
@@ -50,12 +50,12 @@ type TxBody struct {
 
 // Len returns the length of a transaction body
 func (tb TxBody) Len() int {
-	return AddrLen + TxHashPointerLen + len(tb.Outputs)*TxOutputLen
+	return len(tb.Marshal())
 }
 
 // Marshal converts a TxBody to a byte slice
 func (tb TxBody) Marshal() []byte {
-	buf := make([]byte, 0, tb.Len())
+	var buf []byte
 	buf = append(buf, tb.Sender.Marshal()...)
 	buf = append(buf, tb.Input.Marshal()...)
 	for _, out := range tb.Outputs {
@@ -79,12 +79,12 @@ type Transaction struct {
 
 // Len returns the length in bytes of a transaction
 func (t *Transaction) Len() int {
-	return t.TxBody.Len() + SigLen
+	return len(t.Marshal())
 }
 
 // Marshal converts a Transaction to a byte slice
 func (t *Transaction) Marshal() []byte {
-	buf := make([]byte, 0, t.Len())
+	var buf []byte
 	buf = append(buf, t.TxBody.Marshal()...)
 	buf = append(buf, t.Sig.Marshal()...)
 	return buf

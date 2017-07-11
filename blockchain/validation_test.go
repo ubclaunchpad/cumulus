@@ -111,29 +111,6 @@ func TestValidBlockNilBlock(t *testing.T) {
 	}
 }
 
-func TestValidBlockBadBlockSize(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
-
-	for i := 0; i <= MaxBlockSize/TxOutputLen; i++ {
-		b.Transactions[0].Outputs = append(
-			b.Transactions[0].Outputs,
-			TxOutput{
-				0,
-				NewWallet().Public(),
-			},
-		)
-	}
-
-	valid, code := bc.ValidBlock(b)
-
-	if valid {
-		t.Fail()
-	}
-	if code != BadBlockSize {
-		t.Fail()
-	}
-}
-
 func TestValidBlockBadGenesisBlock(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
@@ -461,38 +438,6 @@ func TestValidGenesisBlockNilGenesisBlock(t *testing.T) {
 	}
 
 	if code != NilGenesisBlock {
-		t.Fail()
-	}
-}
-
-func TestValidGenesisBlockBadGenesisBlockSize(t *testing.T) {
-	miner := NewWallet()
-	currentTarget := BigIntToHash(MaxTarget)
-	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
-
-	for i := 0; i <= MaxBlockSize/TxOutputLen; i++ {
-		gb.Transactions[0].Outputs = append(
-			gb.Transactions[0].Outputs,
-			TxOutput{
-				0,
-				NewWallet().Public(),
-			},
-		)
-	}
-
-	bc := &BlockChain{
-		Blocks: []*Block{gb},
-		Head:   HashSum(gb),
-	}
-
-	valid, code := bc.ValidGenesisBlock(gb)
-
-	if valid {
-		t.Fail()
-	}
-
-	if code != BadGenesisBlockSize {
 		t.Fail()
 	}
 }
