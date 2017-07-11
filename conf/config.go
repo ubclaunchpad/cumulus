@@ -9,9 +9,10 @@ type Config struct {
 	// The address of the ingress node we should use to connect
 	// to the network.
 	Target string
-
 	// Whether or not to enable verbose logging.
 	Verbose bool
 	// Whether or not to participate in mining new blocks.
 	Mine bool
+	// Whether or not to start the Cumulus console
+	Console bool
 }

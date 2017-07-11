@@ -2,6 +2,9 @@ package app
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
@@ -15,9 +18,9 @@ import (
 )
 
 var (
-	config *conf.Config
-	// TODO peer store once it's merged in
-	chain *blockchain.BlockChain
+	config  *conf.Config
+	chain   *blockchain.BlockChain
+	logFile = os.Stdout
 	// A reference to the transaction pool
 	tpool *pool.Pool
 )
@@ -27,6 +30,24 @@ var (
 func Run(cfg conf.Config) {
 	log.Info("Starting Cumulus node")
 	config = &cfg
+
+	// Set logging level
+	if cfg.Verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	// Start a goroutine that waits for program termination. Before the program
+	// exits it will flush logs and save the blockchain.
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Info("Saving blockchain and flushing logs...")
+		// TODO
+		logFile.Sync()
+		logFile.Close()
+		os.Exit(0)
+	}()
 
 	// Below we'll connect to peers. After which, requests could begin to
 	// stream in. We should first initalize our pool, workers to handle
@@ -42,7 +63,7 @@ func Run(cfg conf.Config) {
 	// Start listening on the given interface and port so we can receive
 	// conenctions from other peers
 	log.Infof("Starting listener on %s:%d", cfg.Interface, cfg.Port)
-	peer.LocalAddr = fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
+	peer.ListenAddr = fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
 	go func() {
 		address := fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
 		err := conn.Listen(address, peer.ConnectionHandler)
@@ -53,8 +74,21 @@ func Run(cfg conf.Config) {
 		}
 	}()
 
-	// Connect to the target and discover its peers.
-	ConnectAndDiscover(cfg.Target)
+	// If the console flag was passed, redirect logs to a file and run the console
+	if cfg.Console {
+		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE, 0755)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to redirect logs to log file")
+		}
+		log.Warn("Redirecting logs to logfile")
+		log.SetOutput(logFile)
+		go RunConsole()
+	}
+
+	if len(config.Target) > 0 {
+		// Connect to the target and discover its peers.
+		ConnectAndDiscover(cfg.Target)
+	}
 
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
@@ -65,30 +99,28 @@ func Run(cfg conf.Config) {
 	RequestBlockChain()
 
 	// Return to command line.
-	select {}
+	select {} // Hang main thread. Everything happens in goroutines from here
 }
 
 // ConnectAndDiscover tries to connect to a target and discover its peers.
 func ConnectAndDiscover(target string) {
-	if len(target) > 0 {
-		peerInfoRequest := msg.Request{
-			ID:           uuid.New().String(),
-			ResourceType: msg.ResourcePeerInfo,
-		}
-
-		log.Infof("Dialing target %s", target)
-		c, err := conn.Dial(target)
-		if err != nil {
-			log.WithError(err).Fatalf("Failed to connect to target")
-		}
-		peer.ConnectionHandler(c)
-		p := peer.PStore.Get(c.RemoteAddr().String())
-		p.Request(peerInfoRequest, peer.PeerInfoHandler)
+	peerInfoRequest := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
 	}
+
+	log.Infof("Dialing target %s", target)
+	c, err := conn.Dial(target)
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to connect to target")
+	}
+	peer.ConnectionHandler(c)
+	p := peer.PStore.Get(c.RemoteAddr().String())
+	p.Request(peerInfoRequest, peer.PeerInfoHandler)
 }
 
 // RequestHandler is called every time a peer sends us a request message except
-// on peers whos PushHandlers have been overridden.
+// on peers whos RequestHandlers have been overridden.
 func RequestHandler(req *msg.Request) msg.Response {
 	res := msg.Response{ID: req.ID}
 

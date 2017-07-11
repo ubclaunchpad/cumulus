@@ -11,7 +11,7 @@ import (
 )
 
 func TestHalveReward(t *testing.T) {
-	bc, _ := blockchain.NewValidChainAndBlock()
+	bc, _ := blockchain.NewValidTestChainAndBlock()
 	tempBlockReward := BlockReward
 
 	for i := 0; i < blockRewardHalvingRate-2; i++ {
@@ -73,7 +73,7 @@ func TestValidMinedBlockBadBlockReward(t *testing.T) {
 
 func TestValidMinedBlockBadTarget(t *testing.T) {
 	bc, b, a := newValidBlockChainAndCloudBaseBlock()
-	b.Target = blockchain.NewValidTarget()
+	b.Target = blockchain.NewValidTestTarget()
 
 	valid, code := ValidMinedBlock(a, bc, b)
 
@@ -150,7 +150,7 @@ func newValidBlockChainAndCloudBaseBlock() (
 	*blockchain.Block,
 	blockchain.Address) {
 	bc, _ := blockchain.NewValidBlockChainFixture()
-	cbTx, a := blockchain.NewValidCloudBaseTransaction()
+	cbTx, a := blockchain.NewValidCloudBaseTestTransaction()
 	bcSize := uint32(len(bc.Blocks))
 	b := &blockchain.Block{
 		BlockHeader: blockchain.BlockHeader{

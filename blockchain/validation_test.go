@@ -21,7 +21,7 @@ func TestValidTransactionNilTransaction(t *testing.T) {
 }
 
 func TestValidTransactionNoInputTransaction(t *testing.T) {
-	tr, _ := NewTransactionValue(NewWallet(), NewWallet(), 1, 0)
+	tr, _ := NewTestTransactionValue(NewWallet(), NewWallet(), 1, 0)
 	bc, _ := NewValidBlockChainFixture()
 
 	valid, code := bc.ValidTransaction(tr)
@@ -69,7 +69,7 @@ func TestValidTransactionSignatureFail(t *testing.T) {
 }
 
 func TestValidTransactionPass(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
+	bc, b := NewValidTestChainAndBlock()
 	tr := b.Transactions[1]
 
 	valid, code := bc.ValidTransaction(tr)
@@ -85,7 +85,7 @@ func TestValidTransactionPass(t *testing.T) {
 func TestTransactionRespend(t *testing.T) {
 	bc, _ := NewValidBlockChainFixture()
 	trC := bc.Blocks[1].Transactions[1]
-	b := NewOutputBlock([]*Transaction{trC}, bc.Blocks[1])
+	b := NewTestOutputBlock([]*Transaction{trC}, bc.Blocks[1])
 	bc.AppendBlock(b)
 
 	valid, code := bc.ValidTransaction(trC)
@@ -163,8 +163,8 @@ func TestValidBlockBadBlockNumber(t *testing.T) {
 }
 
 func TestValidBlockBadHash(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
-	b.BlockHeader.LastBlock = NewHash()
+	bc, b := NewValidTestChainAndBlock()
+	b.BlockHeader.LastBlock = NewTestHash()
 
 	valid, code := bc.ValidBlock(b)
 
@@ -177,7 +177,7 @@ func TestValidBlockBadHash(t *testing.T) {
 }
 
 func TestValidBlockBadTime(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
+	bc, b := NewValidTestChainAndBlock()
 	b.Time = 0
 	valid, code := bc.ValidBlock(b)
 
@@ -190,7 +190,7 @@ func TestValidBlockBadTime(t *testing.T) {
 }
 
 func TestValidBlockBadTarget(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
+	bc, b := NewValidTestChainAndBlock()
 	b.Target = BigIntToHash(new(big.Int).Add(MaxTarget, big.NewInt(1)))
 	valid, code := bc.ValidBlock(b)
 
@@ -213,7 +213,7 @@ func TestValidBlockBadTarget(t *testing.T) {
 }
 
 func TestValidBlock(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
+	bc, b := NewValidTestChainAndBlock()
 
 	valid, code := bc.ValidBlock(b)
 
@@ -228,7 +228,7 @@ func TestValidBlock(t *testing.T) {
 func TestBlockDoubleSpend(t *testing.T) {
 	// block should fail to be valid if there exists two transactions
 	// referencing the same input, but output > input (double spend attack)
-	bc, b := NewValidChainAndBlock()
+	bc, b := NewValidTestChainAndBlock()
 	b.Transactions = append(b.Transactions, b.Transactions[1])
 
 	valid, code := bc.ValidBlock(b)
@@ -242,7 +242,7 @@ func TestBlockDoubleSpend(t *testing.T) {
 }
 
 func TestValidBlockBigNumber(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
+	bc, b := NewValidTestChainAndBlock()
 	b.BlockNumber = uint32(len(bc.Blocks)) + 1
 
 	valid, code := bc.ValidBlock(b)
@@ -256,8 +256,8 @@ func TestValidBlockBigNumber(t *testing.T) {
 }
 
 func TestValidBlockBadCloudBaseTransaction(t *testing.T) {
-	bc, b := NewValidChainAndBlock()
-	b.Transactions[0] = NewTransaction()
+	bc, b := NewValidTestChainAndBlock()
+	b.Transactions[0] = NewTestTransaction()
 
 	valid, code := bc.ValidBlock(b)
 
@@ -281,7 +281,7 @@ func TestValidCloudBaseNilCloudBase(t *testing.T) {
 }
 
 func TestValidCloudBaseTransaction(t *testing.T) {
-	cbTx, _ := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTestTransaction()
 	valid, code := ValidCloudBase(cbTx)
 
 	if !valid {
@@ -294,7 +294,7 @@ func TestValidCloudBaseTransaction(t *testing.T) {
 
 func TestValidCloudBaseBadSender(t *testing.T) {
 	w := NewWallet()
-	cbTx, _ := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTestTransaction()
 	cbTx.Sender = w.Public()
 	valid, code := ValidCloudBase(cbTx)
 
@@ -307,7 +307,7 @@ func TestValidCloudBaseBadSender(t *testing.T) {
 }
 
 func TestValidCloudBaseBadBadInput(t *testing.T) {
-	cbTx, _ := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTestTransaction()
 	cbTx.TxBody.Input.BlockNumber = 1
 	valid, code := ValidCloudBase(cbTx)
 
@@ -318,8 +318,8 @@ func TestValidCloudBaseBadBadInput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx, _ = NewValidCloudBaseTransaction()
-	cbTx.TxBody.Input.Hash = NewHash()
+	cbTx, _ = NewValidCloudBaseTestTransaction()
+	cbTx.TxBody.Input.Hash = NewTestHash()
 	valid, code = ValidCloudBase(cbTx)
 
 	if valid {
@@ -329,7 +329,7 @@ func TestValidCloudBaseBadBadInput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx, _ = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTestTransaction()
 	cbTx.TxBody.Input.Index = 1
 	valid, code = ValidCloudBase(cbTx)
 
@@ -342,7 +342,7 @@ func TestValidCloudBaseBadBadInput(t *testing.T) {
 }
 
 func TestValidCloudBaseBadOutput(t *testing.T) {
-	cbTx, _ := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTestTransaction()
 	w := NewWallet()
 	cbTx.Outputs = append(cbTx.Outputs, TxOutput{25, w.Public()})
 	valid, code := ValidCloudBase(cbTx)
@@ -354,7 +354,7 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx, _ = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTestTransaction()
 	var emptyOutputs []TxOutput
 	cbTx.Outputs = emptyOutputs
 	valid, code = ValidCloudBase(cbTx)
@@ -366,7 +366,7 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx, _ = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTestTransaction()
 	cbTx.Outputs[0].Amount = 0
 	valid, code = ValidCloudBase(cbTx)
 
@@ -377,7 +377,7 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 		t.Fail()
 	}
 
-	cbTx, _ = NewValidCloudBaseTransaction()
+	cbTx, _ = NewValidCloudBaseTestTransaction()
 	cbTx.Outputs[0].Recipient = NilAddr
 	valid, code = ValidCloudBase(cbTx)
 
@@ -390,9 +390,9 @@ func TestValidCloudBaseBadOutput(t *testing.T) {
 }
 
 func TestValidCloudBaseBadSig(t *testing.T) {
-	cbTx, _ := NewValidCloudBaseTransaction()
+	cbTx, _ := NewValidCloudBaseTestTransaction()
 	w := NewWallet()
-	cbTx.Sig, _ = w.Sign(NewHash(), rand.Reader)
+	cbTx.Sig, _ = w.Sign(NewTestHash(), rand.Reader)
 	valid, code := ValidCloudBase(cbTx)
 
 	if valid {
@@ -428,7 +428,7 @@ func TestValidGenesisBlockNilGenesisBlock(t *testing.T) {
 
 	bc := &BlockChain{
 		Blocks: []*Block{nil},
-		Head:   NewHash(),
+		Head:   NewTestHash(),
 	}
 
 	valid, code := bc.ValidGenesisBlock(nil)
@@ -465,7 +465,7 @@ func TestValidGenesisBlockBadGenesisBlockNumber(t *testing.T) {
 
 	gb.BlockHeader.BlockNumber = 0
 	bc = &BlockChain{
-		Blocks: []*Block{NewBlock(), gb},
+		Blocks: []*Block{NewTestBlock(), gb},
 		Head:   HashSum(gb),
 	}
 
@@ -485,7 +485,7 @@ func TestValidGenesisBlockBadGenesisLastBlock(t *testing.T) {
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
-	gb.LastBlock = NewHash()
+	gb.LastBlock = NewTestHash()
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),
@@ -507,7 +507,7 @@ func TestValidGenesisBlockBadGenesisTransactions(t *testing.T) {
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
-	gb.Transactions = append(gb.Transactions, NewTransaction())
+	gb.Transactions = append(gb.Transactions, NewTestTransaction())
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),
@@ -529,7 +529,7 @@ func TestValidGenesisBlockBadGenesisCloudBaseTransaction(t *testing.T) {
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
-	gb.Transactions[0] = NewTransaction()
+	gb.Transactions[0] = NewTestTransaction()
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),

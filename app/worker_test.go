@@ -43,13 +43,13 @@ func (r *MockResponder) Unlock() {
 }
 
 func init() {
-	badTxn = bc.NewTransaction()
-	badBlk = bc.NewBlock()
+	badTxn = bc.NewTestTransaction()
+	badBlk = bc.NewTestBlock()
 }
 
 func reset() {
 	tpool = pool.New()
-	chain, legitBlock = bc.NewValidChainAndBlock()
+	chain, legitBlock = bc.NewValidTestChainAndBlock()
 	legitTransaction = legitBlock.Transactions[1]
 	realWorker = NewWorker(7)
 	mockResponder = MockResponder{
