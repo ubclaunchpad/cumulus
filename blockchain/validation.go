@@ -73,7 +73,7 @@ const (
 	BadGenesisBlockNumber
 	// BadGenesisTarget is returned when the genesis block's target is invalid.
 	BadGenesisTarget
-	// BadGenesisTime is returned when the gensis block's time is invalid.
+	// BadGenesisTime is returned when the genesis block's time is invalid.
 	BadGenesisTime
 	// NilGenesisBlock is returned when the genesis block is equal to nil.
 	NilGenesisBlock
