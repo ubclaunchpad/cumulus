@@ -3,7 +3,9 @@ package blockchain
 import (
 	crand "crypto/rand"
 	"crypto/sha256"
+	"math/big"
 	mrand "math/rand"
+	"time"
 )
 
 // NewTestHash produces a hash.
@@ -58,7 +60,9 @@ func NewTestBlockHeader() BlockHeader {
 	return BlockHeader{
 		BlockNumber: mrand.Uint32(),
 		LastBlock:   NewTestHash(),
-		Miner:       NewWallet().Public(),
+		Target:      NewValidTestTarget(),
+		Time:        mrand.Uint32(),
+		Nonce:       0,
 	}
 }
 
@@ -94,7 +98,9 @@ func NewTestInputBlock(t []*Transaction) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: 0,
 			LastBlock:   NewTestHash(),
-			Miner:       NewWallet().Public(),
+			Target:      NewValidTestTarget(),
+			Time:        uint32(time.Now().Unix()),
+			Nonce:       0,
 		},
 		Transactions: t,
 	}
@@ -107,7 +113,9 @@ func NewTestOutputBlock(t []*Transaction, input *Block) *Block {
 		BlockHeader: BlockHeader{
 			BlockNumber: input.BlockNumber + 1,
 			LastBlock:   HashSum(input),
-			Miner:       NewWallet().Public(),
+			Target:      NewValidTestTarget(),
+			Time:        uint32(time.Now().Unix()),
+			Nonce:       0,
 		},
 		Transactions: t,
 	}
@@ -131,8 +139,8 @@ func NewTestTransactionValue(s, r Wallet, a uint64, i uint32) (*Transaction, err
 	return tbody.Sign(s, crand.Reader)
 }
 
-// NewTestValidBlockChainFixture creates a valid blockchain of two blocks.
-func NewTestValidBlockChainFixture() (*BlockChain, Wallet) {
+// NewValidBlockChainFixture creates a valid blockchain of two blocks.
+func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	original := NewWallet()
 	sender := NewWallet()
 	recipient := NewWallet()
@@ -143,13 +151,15 @@ func NewTestValidBlockChainFixture() (*BlockChain, Wallet) {
 		Recipient: sender.Public(),
 	})
 
-	trB, _ := NewTestTransactionValue(sender, recipient, 4, 0)
+	trB, _ := NewTestTransactionValue(sender, recipient, 4, 1)
 	trB.Input.Hash = HashSum(trA)
 
 	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
 
-	inputTransactions := []*Transaction{trA}
-	outputTransactions := []*Transaction{trB}
+	cbA, _ := NewValidCloudBaseTestTransaction()
+	cbB, _ := NewValidCloudBaseTestTransaction()
+	inputTransactions := []*Transaction{cbA, trA}
+	outputTransactions := []*Transaction{cbB, trB}
 
 	inputBlock := NewTestInputBlock(inputTransactions)
 	outputBlock := NewTestOutputBlock(outputTransactions, inputBlock)
@@ -160,10 +170,10 @@ func NewTestValidBlockChainFixture() (*BlockChain, Wallet) {
 	}, recipient
 }
 
-// NewTestValidChainAndBlock creates a valid BlockChain and a Block that is valid
+// NewValidTestChainAndBlock creates a valid BlockChain and a Block that is valid
 // with respect to the BlockChain.
-func NewTestValidChainAndBlock() (*BlockChain, *Block) {
-	bc, s := NewTestValidBlockChainFixture()
+func NewValidTestChainAndBlock() (*BlockChain, *Block) {
+	bc, s := NewValidBlockChainFixture()
 	inputBlock := bc.Blocks[1]
 	inputTransaction := inputBlock.Transactions[0]
 	a := inputTransaction.Outputs[0].Amount
@@ -184,6 +194,43 @@ func NewTestValidChainAndBlock() (*BlockChain, *Block) {
 	}
 
 	tr, _ := tbody.Sign(s, crand.Reader)
-	newBlock := NewTestOutputBlock([]*Transaction{tr}, inputBlock)
+	cb, _ := NewValidCloudBaseTestTransaction()
+	newBlock := NewTestOutputBlock([]*Transaction{cb, tr}, inputBlock)
 	return bc, newBlock
+}
+
+// NewValidTestTarget creates a new valid target that is a random value between the
+// max and min difficulties
+func NewValidTestTarget() Hash {
+	r := new(big.Int).Rand(
+		mrand.New(mrand.NewSource(time.Now().Unix())),
+		new(big.Int).Add(MaxTarget, big.NewInt(1)),
+	)
+	r.Add(r, big.NewInt(1))
+	return BigIntToHash(r)
+}
+
+// NewValidCloudBaseTestTransaction returns a new valid CloudBase transaction and
+// the address of the recipient of the transaction
+func NewValidCloudBaseTestTransaction() (*Transaction, Address) {
+	w := NewWallet()
+	cbInput := TxHashPointer{
+		BlockNumber: 0,
+		Hash:        NilHash,
+		Index:       0,
+	}
+	cbReward := TxOutput{
+		Amount:    25,
+		Recipient: w.Public(),
+	}
+	cbTxBody := TxBody{
+		Sender:  NilAddr,
+		Input:   cbInput,
+		Outputs: []TxOutput{cbReward},
+	}
+	cbTx := &Transaction{
+		TxBody: cbTxBody,
+		Sig:    NilSig,
+	}
+	return cbTx, w.Public()
 }

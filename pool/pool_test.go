@@ -8,11 +8,11 @@ import (
 
 func TestGetAndSetTransaction(t *testing.T) {
 	p := New()
-	bc, b := blockchain.NewTestValidChainAndBlock()
+	bc, b := blockchain.NewValidTestChainAndBlock()
 	if p.Len() != 0 {
 		t.FailNow()
 	}
-	tr := b.Transactions[0]
+	tr := b.Transactions[1]
 	if !p.Set(tr, bc) {
 		t.FailNow()
 	}
@@ -42,19 +42,19 @@ func TestSetBadTransaction(t *testing.T) {
 
 func TestUpdatePool(t *testing.T) {
 	p := New()
-	bc, legitBlk := blockchain.NewTestValidChainAndBlock()
+	bc, legitBlk := blockchain.NewValidTestChainAndBlock()
 	badBlock := blockchain.NewTestBlock()
 	if p.Update(badBlock, bc) {
 		t.FailNow()
 	}
 
-	for _, tr := range legitBlk.Transactions {
+	for _, tr := range legitBlk.Transactions[1:] {
 		p.Set(tr, bc)
 	}
 	if p.Len() == 0 {
 		t.FailNow()
 	}
-	if p.Len() != len(legitBlk.Transactions) {
+	if p.Len() != len(legitBlk.Transactions[1:]) {
 		t.FailNow()
 	}
 
@@ -68,13 +68,13 @@ func TestUpdatePool(t *testing.T) {
 
 func TestGetTxns(t *testing.T) {
 	p := New()
-	bc, b := blockchain.NewTestValidChainAndBlock()
-	for _, tr := range b.Transactions {
+	bc, b := blockchain.NewValidTestChainAndBlock()
+	for _, tr := range b.Transactions[1:] {
 		if !p.Set(tr, bc) {
 			t.FailNow()
 		}
 	}
-	nTxns := len(b.Transactions) + 12 // arbitrary.
+	nTxns := len(b.Transactions[1:]) + 12 // arbitrary.
 	txns := p.PopTxns(nTxns)
 	for _, tr := range txns {
 		if ok, _ := b.ContainsTransaction(tr); !ok {
