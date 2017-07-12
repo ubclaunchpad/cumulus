@@ -5,13 +5,6 @@ import (
 	"io"
 )
 
-const (
-	// TxHashPointerLen is the length in bytes of a hash pointer.
-	TxHashPointerLen = 32/8 + HashLen
-	// TxOutputLen is the length in bytes of a transaction output.
-	TxOutputLen = 64/8 + AddrLen
-)
-
 // TxHashPointer is a reference to a transaction on the blockchain.
 type TxHashPointer struct {
 	BlockNumber uint32
@@ -24,6 +17,9 @@ func (thp TxHashPointer) Marshal() []byte {
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, thp.BlockNumber)
 	buf = append(buf, thp.Hash.Marshal()...)
+	tempBufIndex := make([]byte, 4)
+	binary.LittleEndian.PutUint32(tempBufIndex, thp.Index)
+	buf = append(buf, tempBufIndex...)
 	return buf
 }
 
