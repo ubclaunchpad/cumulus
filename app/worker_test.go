@@ -43,14 +43,14 @@ func (r *MockResponder) Unlock() {
 }
 
 func init() {
-	badTxn = bc.NewTransaction()
-	badBlk = bc.NewBlock()
+	badTxn = bc.NewTestTransaction()
+	badBlk = bc.NewTestBlock()
 }
 
 func reset() {
 	tpool = pool.New()
-	chain, legitBlock = bc.NewValidChainAndBlock()
-	legitTransaction = legitBlock.Transactions[0]
+	chain, legitBlock = bc.NewValidTestChainAndBlock()
+	legitTransaction = legitBlock.Transactions[1]
 	realWorker = NewWorker(7)
 	mockResponder = MockResponder{
 		Mutex:  &sync.Mutex{},
@@ -98,7 +98,7 @@ func TestHandleTransactionNotOK(t *testing.T) {
 	}
 }
 
-func TestHandleBlockNotOK(t *testing.T) {
+func TestHandleBlockOK(t *testing.T) {
 	reset()
 	realWorker.HandleBlock(goodBlkWork)
 	if mockResponder.Result != true {
@@ -106,7 +106,7 @@ func TestHandleBlockNotOK(t *testing.T) {
 	}
 }
 
-func TestHandleBlockOK(t *testing.T) {
+func TestHandleBlockNotOK(t *testing.T) {
 	reset()
 	realWorker.HandleBlock(badBlkWork)
 	if mockResponder.Result != false {

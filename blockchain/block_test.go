@@ -7,7 +7,7 @@ import (
 )
 
 func TestEncodeDecodeBlock(t *testing.T) {
-	b1 := NewBlock()
+	b1 := NewTestBlock()
 
 	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
 
@@ -20,7 +20,7 @@ func TestEncodeDecodeBlock(t *testing.T) {
 }
 
 func TestContainsTransaction(t *testing.T) {
-	b := NewBlock()
+	b := NewTestBlock()
 
 	if exists, _ := b.ContainsTransaction(b.Transactions[0]); !exists {
 		t.Fail()
@@ -30,8 +30,8 @@ func TestContainsTransaction(t *testing.T) {
 func TestBlockHeaderLen(t *testing.T) {
 	bh := &BlockHeader{
 		0,
-		NewHash(),
-		NewValidTarget(),
+		NewTestHash(),
+		NewValidTestTarget(),
 		uint32(time.Now().Unix()),
 		0,
 		[]byte{0x00, 0x01, 0x02},
@@ -45,8 +45,8 @@ func TestBlockHeaderLen(t *testing.T) {
 
 	bh = &BlockHeader{
 		0,
-		NewHash(),
-		NewValidTarget(),
+		NewTestHash(),
+		NewValidTestTarget(),
 		uint32(time.Now().Unix()),
 		0,
 		[]byte{},

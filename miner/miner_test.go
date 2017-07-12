@@ -10,7 +10,7 @@ import (
 )
 
 func TestMine(t *testing.T) {
-	bc, b := blockchain.NewValidChainAndBlock()
+	bc, b := blockchain.NewValidTestChainAndBlock()
 	tempMaxTarget := blockchain.MaxTarget
 
 	// Set min difficulty to be equal to the target so that the block validation
@@ -33,7 +33,7 @@ func TestMine(t *testing.T) {
 }
 
 func TestMineBadBlock(t *testing.T) {
-	bc, _ := blockchain.NewValidChainAndBlock()
+	bc, _ := blockchain.NewValidTestChainAndBlock()
 	mineResult := Mine(bc, nil)
 
 	if mineResult {
@@ -72,7 +72,7 @@ func TestCloudBase(t *testing.T) {
 }
 
 func TestVerifyProofOfWork(t *testing.T) {
-	_, b := blockchain.NewValidChainAndBlock()
+	_, b := blockchain.NewValidTestChainAndBlock()
 	b.Target = blockchain.BigIntToHash(
 		new(big.Int).Sub(
 			blockchain.BigExp(2, 256),
