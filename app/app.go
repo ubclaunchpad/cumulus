@@ -25,11 +25,21 @@ var (
 	tpool *pool.Pool
 )
 
+// App contains information about a running instance of a Cumulus node
+type App struct {
+	PeerStore *peer.PeerStore
+}
+
 // Run sets up and starts a new Cumulus node with the
-// given configuration.
+// given configuration. This should only be called once (except in tests)
 func Run(cfg conf.Config) {
 	log.Info("Starting Cumulus node")
 	config = &cfg
+
+	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
+	a := App{
+		PeerStore: peer.NewPeerStore(addr),
+	}
 
 	// Set logging level
 	if cfg.Verbose {
@@ -57,42 +67,39 @@ func Run(cfg conf.Config) {
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
 	// for specific peers by calls like p.SetRequestHandler(someHandler)
-	peer.SetDefaultPushHandler(PushHandler)
-	peer.SetDefaultRequestHandler(RequestHandler)
+	a.PeerStore.SetDefaultPushHandler(a.PushHandler)
+	a.PeerStore.SetDefaultRequestHandler(a.RequestHandler)
 
 	// Start listening on the given interface and port so we can receive
 	// conenctions from other peers
 	log.Infof("Starting listener on %s:%d", cfg.Interface, cfg.Port)
-	peer.ListenAddr = fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
+	a.PeerStore.ListenAddr = addr
 	go func() {
-		address := fmt.Sprintf("%s:%d", cfg.Interface, cfg.Port)
-		err := conn.Listen(address, peer.ConnectionHandler)
+		err := conn.Listen(addr, a.PeerStore.ConnectionHandler)
 		if err != nil {
-			log.WithError(
-				err,
-			).Fatalf("Failed to listen on %s:%d", cfg.Interface, cfg.Port)
+			log.WithError(err).Fatalf("Failed to listen on %s", addr)
 		}
 	}()
 
 	// If the console flag was passed, redirect logs to a file and run the console
 	if cfg.Console {
-		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE, 0755)
+		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
 		if err != nil {
-			log.WithError(err).Fatal("Failed to redirect logs to log file")
+			log.WithError(err).Fatal("Failed to redirect logs to file")
 		}
-		log.Warn("Redirecting logs to logfile")
+		log.Warn("Redirecting logs to file")
 		log.SetOutput(logFile)
-		go RunConsole()
+		go RunConsole(a.PeerStore)
 	}
 
 	if len(config.Target) > 0 {
 		// Connect to the target and discover its peers.
-		ConnectAndDiscover(cfg.Target)
+		a.ConnectAndDiscover(cfg.Target)
 	}
 
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
-	go peer.MaintainConnections()
+	go a.PeerStore.MaintainConnections()
 
 	// Request the blockchain.
 	if chain == nil {
@@ -100,30 +107,28 @@ func Run(cfg conf.Config) {
 		initializeChain()
 	}
 
-	// Return to command line.
-	select {} // Hang main thread. Everything happens in goroutines from here
+	// Hang main thread. Everything happens in goroutines from here
+	select {}
 }
 
 // ConnectAndDiscover tries to connect to a target and discover its peers.
-func ConnectAndDiscover(target string) {
+func (a App) ConnectAndDiscover(target string) {
 	peerInfoRequest := msg.Request{
 		ID:           uuid.New().String(),
 		ResourceType: msg.ResourcePeerInfo,
 	}
 
 	log.Infof("Dialing target %s", target)
-	c, err := conn.Dial(target)
+	p, err := peer.Connect(target, a.PeerStore)
 	if err != nil {
-		log.WithError(err).Fatalf("Failed to connect to target")
+		log.WithError(err).Fatal("Failed to dial target")
 	}
-	peer.ConnectionHandler(c)
-	p := peer.PStore.Get(c.RemoteAddr().String())
-	p.Request(peerInfoRequest, peer.PeerInfoHandler)
+	p.Request(peerInfoRequest, a.PeerStore.PeerInfoHandler)
 }
 
-// RequestHandler is called every time a peer sends us a request message except
-// on peers whos RequestHandlers have been overridden.
-func RequestHandler(req *msg.Request) msg.Response {
+// RequestHandler is called every time a peer sends us a request message expect
+// on peers whos PushHandlers have been overridden.
+func (a App) RequestHandler(req *msg.Request) msg.Response {
 	res := msg.Response{ID: req.ID}
 	typeErr := msg.NewProtocolError(msg.InvalidResourceType,
 		"Invalid resource type")
@@ -132,7 +137,7 @@ func RequestHandler(req *msg.Request) msg.Response {
 
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
-		res.Resource = peer.PStore.Addrs()
+		res.Resource = a.PeerStore.Addrs()
 	case msg.ResourceBlock:
 		blockNumber, ok := req.Params["blockNumber"].(uint32)
 		if ok {
@@ -154,7 +159,7 @@ func RequestHandler(req *msg.Request) msg.Response {
 
 // PushHandler is called every time a peer sends us a Push message except on
 // peers whos PushHandlers have been overridden.
-func PushHandler(push *msg.Push) {
+func (a App) PushHandler(push *msg.Push) {
 	switch push.ResourceType {
 	case msg.ResourceBlock:
 		blk, ok := push.Resource.(*blockchain.Block)

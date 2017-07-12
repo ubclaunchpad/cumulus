@@ -1,6 +1,8 @@
 package peer
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -33,30 +35,64 @@ const (
 	PeerSearchWaitTime = time.Second * 10
 )
 
-var (
-	// PStore stores information about every peer we are connected to. All peers
-	// we connect to should have a reference to this peerstore so they can
-	// populate it.
-	PStore = &PeerStore{peers: make(map[string]*Peer, 0)}
-	// ListenAddr is the TCP address this host is listening on
-	ListenAddr            string
-	defaultRequestHandler RequestHandler
-	defaultPushHandler    PushHandler
-)
-
 // PeerStore is a thread-safe container for all the peers we are currently
 // connected to. It maps remote peer listen addresses to Peer objects.
 type PeerStore struct {
-	peers map[string]*Peer
-	lock  sync.RWMutex
+	peers                 map[string]*Peer
+	ListenAddr            string
+	defaultRequestHandler RequestHandler
+	defaultPushHandler    PushHandler
+	lock                  *sync.RWMutex
 }
 
 // NewPeerStore returns an initialized peerstore.
-func NewPeerStore() *PeerStore {
+func NewPeerStore(la string) *PeerStore {
 	return &PeerStore{
-		peers: make(map[string]*Peer, 0),
-		lock:  sync.RWMutex{},
+		peers:      make(map[string]*Peer, 0),
+		ListenAddr: la,
+		lock:       &sync.RWMutex{},
 	}
+}
+
+// Connect attempts to establish a connection with a peer given its listen
+// address (in the form <IP address>:<TCP port>). If successful returns the
+// peer, otherwise returns error.
+func Connect(address string, ps *PeerStore) (*Peer, error) {
+	c, err := conn.Dial(address)
+	if err != nil {
+		return nil, err
+	}
+	ps.ConnectionHandler(c)
+	p := ps.Get(c.RemoteAddr().String())
+	if p == nil {
+		// This will only be the case if we exchangeListedAddrs fails
+		return nil, errors.New("Failed to exchange listen addresses with peer")
+	}
+	return p, nil
+}
+
+// ConnectionHandler is called when a new connection is opened with us by a
+// remote peer. It will create a dispatcher and message handlers to handle
+// retrieving messages over the new connection and sending them to App.
+func (ps *PeerStore) ConnectionHandler(c net.Conn) {
+	// Before we can continue we must exchange listen addresses
+	addr, err := exchangeListenAddrs(c, PeerSearchWaitTime, ps.ListenAddr)
+	if err != nil {
+		log.WithError(err).Error("Failed to retrieve peer listen address")
+		return
+	}
+	p := New(c, ps, addr)
+
+	// If we are already at MaxPeers, disconnect from a peer to connect to a new
+	// one. This way nobody gets choked out of the network because everybody
+	// happens to be fully connected.
+	if p.Store.Size() >= MaxPeers {
+		p.Store.RemoveRandom()
+	}
+	p.Store.Add(p)
+
+	go p.Dispatch()
+	log.Infof("Connected to %s", p.ListenAddr)
 }
 
 // Add synchronously adds the given peer to the peerstore
@@ -88,6 +124,52 @@ func (ps *PeerStore) Get(addr string) *Peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 	return ps.peers[addr]
+}
+
+// SetDefaultRequestHandler will ensure that all new peers created who's
+// RequestHandlers have not been set will use the given request handler by default
+// until it is overridden by the call to SetRequestHandler().
+func (ps *PeerStore) SetDefaultRequestHandler(rh RequestHandler) {
+	ps.defaultRequestHandler = rh
+}
+
+// SetDefaultPushHandler will ensure that all new peers created who's
+// PushHandlers have not been set will use the given request handler by default
+// until it is overridden by the call to SetPushHandler().
+func (ps *PeerStore) SetDefaultPushHandler(ph PushHandler) {
+	ps.defaultPushHandler = ph
+}
+
+// Broadcast sends the given push message to all peers in the PeerStore at the
+// time this function is called. Note that if we fail to write the push message
+// to a peer the failure is ignored. Generally this is okay, because push
+// messages sent via Broadcast() should be propagated by other peers.
+func (ps *PeerStore) Broadcast(push msg.Push) {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+	for _, p := range ps.peers {
+		p.Push(push)
+	}
+}
+
+// PeerInfoHandler will handle the response to a PeerInfo request by attempting
+// to establish connections with all new peers in the given response Resource.
+func (ps *PeerStore) PeerInfoHandler(res *msg.Response) {
+	peers := res.Resource.([]string)
+	strPeers, _ := json.Marshal(peers)
+	log.Debugf("Found peers %s", string(strPeers))
+	for i := 0; i < len(peers) && ps.Size() < MaxPeers; i++ {
+		if ps.Get(peers[i]) != nil || peers[i] == ps.ListenAddr {
+			// We are already connected to this peer. Skip it.
+			continue
+		}
+
+		p, err := Connect(peers[i], ps)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to dial peer %s", peers[i])
+		}
+		log.Infof("Connected to %s", p.ListenAddr)
+	}
 }
 
 // Addrs returns the list of addresses of the peers in the peerstore in the form
@@ -135,34 +217,10 @@ func New(c net.Conn, ps *PeerStore, listenAddr string) *Peer {
 		Connection:       c,
 		Store:            ps,
 		ListenAddr:       listenAddr,
-		requestHandler:   defaultRequestHandler,
-		pushHandler:      defaultPushHandler,
+		requestHandler:   ps.defaultRequestHandler,
+		pushHandler:      ps.defaultPushHandler,
 		responseHandlers: make(map[string]ResponseHandler),
 	}
-}
-
-// ConnectionHandler is called when a new connection is opened with us by a
-// remote peer. It will create a dispatcher and message handlers to handle
-// retrieving messages over the new connection and sending them to App.
-func ConnectionHandler(c net.Conn) {
-	// Before we can continue we must exchange listen addresses
-	addr, err := exchangeListenAddrs(c, PeerSearchWaitTime)
-	if err != nil {
-		log.WithError(err).Error("Failed to retrieve peer listen address")
-		return
-	}
-	p := New(c, PStore, addr)
-
-	// If we are already at MaxPeers, disconnect from a peer to connect to a new
-	// one. This way nobody gets choked out of the network because everybody
-	// happens to be fully connected.
-	if PStore.Size() >= MaxPeers {
-		PStore.RemoveRandom()
-	}
-	p.Store.Add(p)
-
-	go p.Dispatch()
-	log.Infof("Connected to %s", p.ListenAddr)
 }
 
 // SetRequestHandler will add the given request handler to this peer. The
@@ -179,20 +237,6 @@ func (p *Peer) SetPushHandler(ph PushHandler) {
 	p.pushHandler = ph
 }
 
-// SetDefaultRequestHandler will ensure that all new peers created who's
-// RequestHandlers have not been set will use the given request handler by default
-// until it is overridden by the call to SetRequestHandler().
-func SetDefaultRequestHandler(rh RequestHandler) {
-	defaultRequestHandler = rh
-}
-
-// SetDefaultPushHandler will ensure that all new peers created who's
-// PushHandlers have not been set will use the given request handler by default
-// until it is overridden by the call to SetPushHandler().
-func SetDefaultPushHandler(ph PushHandler) {
-	defaultPushHandler = ph
-}
-
 // Dispatch listens on this peer's Connection and passes received messages
 // to the appropriate message handlers.
 func (p *Peer) Dispatch() {
@@ -205,13 +249,11 @@ func (p *Peer) Dispatch() {
 		if err != nil {
 			if err == io.EOF {
 				// This just means the peer hasn't sent anything
-				select {
-				case <-time.After(MessageWaitTime):
-				}
+				time.Sleep(MessageWaitTime)
 			} else {
 				if strings.Contains(err.Error(), syscall.ECONNRESET.Error()) || errCount == 3 {
-					log.Infof("Disconnecting from peer %s due to %s",
-						p.Connection.RemoteAddr().String(), err.Error())
+					log.WithError(err).Infof("Disconnecting from peer %s",
+						p.Connection.RemoteAddr().String())
 					p.Store.Remove(p.ListenAddr)
 					p.Connection.Close()
 					return
@@ -270,27 +312,15 @@ func (p *Peer) Push(push msg.Push) error {
 	return push.Write(p.Connection)
 }
 
-// Broadcast sends the given push message to all peers in the PeerStore at the
-// time this function is called. Note that if we fail to write the push message
-// to a peer the failure is ignored. Generally this is okay, because push
-// messages sent via Broadcast() should be propagated by other peers.
-func Broadcast(push msg.Push) {
-	PStore.lock.RLock()
-	defer PStore.lock.RUnlock()
-	for _, p := range PStore.peers {
-		p.Push(push)
-	}
-}
-
 // MaintainConnections will infinitely attempt to maintain as close to MaxPeers
 // connections as possible by requesting PeerInfo from peers in the PeerStore
 // and establishing connections with newly discovered peers.
 // NOTE: this should be called only once and should be run as a goroutine.
-func MaintainConnections() {
+func (ps *PeerStore) MaintainConnections() {
 	for {
-		peerAddrs := PStore.Addrs()
+		peerAddrs := ps.Addrs()
 		for i := 0; i < len(peerAddrs); i++ {
-			if PStore.Size() >= MaxPeers {
+			if ps.Size() >= MaxPeers {
 				// Already connected to enough peers. Don't try connecting to
 				// any more for a while.
 				break
@@ -299,38 +329,15 @@ func MaintainConnections() {
 				ID:           uuid.New().String(),
 				ResourceType: msg.ResourcePeerInfo,
 			}
-			p := PStore.Get(peerAddrs[i])
-			if p != nil && peerAddrs[i] != ListenAddr {
+			p := ps.Get(peerAddrs[i])
+			if p != nil && peerAddrs[i] != ps.ListenAddr {
 				// Need to do this check in case the peer got removed
-				p.Request(peerInfoRequest, PeerInfoHandler)
+				p.Request(peerInfoRequest, ps.PeerInfoHandler)
 			}
 		}
 		// Looks like we hit peer.MaxPeers. Wait for a while before checking how many
 		// peers we are connected to. We don't want to spin.
-		select {
-		case <-time.After(PeerSearchWaitTime):
-		}
-	}
-}
-
-// PeerInfoHandler will handle the response to a PeerInfo request by attempting
-// to establish connections with all new peers in the given response Resource.
-func PeerInfoHandler(res *msg.Response) {
-	peers := res.Resource.([]string)
-	log.Debugf("Found peers %s", peers)
-	for i := 0; i < len(peers) && PStore.Size() < MaxPeers; i++ {
-		p := PStore.Get(peers[i])
-		if p != nil || peers[i] == ListenAddr {
-			// We are already connected to this peer. Skip it.
-			continue
-		}
-		newConn, err := conn.Dial(peers[i])
-		if err != nil {
-			log.WithError(err).Errorf("Failed to dial peer %s", peers[i])
-			continue
-		}
-		ConnectionHandler(newConn)
-		log.Infof("Connected to %s", newConn.RemoteAddr().String())
+		time.Sleep(PeerSearchWaitTime)
 	}
 }
 
@@ -352,7 +359,7 @@ func (p *Peer) getResponseHandler(id string) ResponseHandler {
 	return p.responseHandlers[id]
 }
 
-func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
+func exchangeListenAddrs(c net.Conn, d time.Duration, listenAddr string) (string, error) {
 	addrChan := make(chan string)
 	errChan := make(chan error)
 
@@ -383,7 +390,7 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 			case *msg.Response:
 				// We got the listen address back
 				addr = message.(*msg.Response).Resource.(string)
-				if validAddress(addr) || addr != ListenAddr {
+				if validAddress(addr) || addr != listenAddr {
 					receivedAddr = true
 				}
 			case *msg.Request:
@@ -394,7 +401,7 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 				// Send the remote peer our listen address
 				res := msg.Response{
 					ID:       uuid.New().String(),
-					Resource: ListenAddr,
+					Resource: listenAddr,
 				}
 				err = res.Write(c)
 				if err != nil {

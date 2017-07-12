@@ -45,6 +45,8 @@ var (
 		"19.253.228.59", "195.118.45.237", "159.78.10.205", "206.31.54.66",
 		"31.191.153.165", "130.235.208.32", "130.5.207.98", "5.226.180.24",
 	}
+
+	peerStore PeerStore
 )
 
 // fakeConn implements net.Conn
@@ -88,7 +90,7 @@ func TestMain(m *testing.M) {
 // This will error if there are concurrent accesses to the PeerStore, or error
 // if an atomic operation returns un unexpected result.
 func TestConcurrentPeerStore(t *testing.T) {
-	ps := NewPeerStore()
+	ps := NewPeerStore("")
 
 	resChan1 := make(chan bool)
 	resChan2 := make(chan bool)
@@ -158,7 +160,7 @@ func TestConcurrentPeerStore(t *testing.T) {
 func TestRemoveRandom(t *testing.T) {
 	var fa fakeAddr
 	var fc fakeConn
-	ps := NewPeerStore()
+	ps := NewPeerStore("")
 	for _, addr := range addrs1 {
 		fa = fakeAddr{Addr: addr}
 		fc = fakeConn{Addr: fa}
@@ -176,7 +178,7 @@ func TestRemoveRandom(t *testing.T) {
 func TestAddrs(t *testing.T) {
 	var fa fakeAddr
 	var fc fakeConn
-	ps := NewPeerStore()
+	ps := NewPeerStore("")
 	for _, addr := range addrs1 {
 		fa = fakeAddr{Addr: addr}
 		fc = fakeConn{Addr: fa}
@@ -196,7 +198,9 @@ func TestSetRequestHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore, fa.String())
+	ps := NewPeerStore("")
+
+	p := New(fc, ps, fa.String())
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
@@ -214,7 +218,7 @@ func TestSetRequestHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore, fa.String())
+	p2 := New(fc, ps, fa.String())
 	if p2.requestHandler != nil {
 		t.FailNow()
 	}
@@ -225,7 +229,9 @@ func TestSetPushHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore, fa.String())
+	ps := NewPeerStore("")
+
+	p := New(fc, ps, fa.String())
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
@@ -238,7 +244,7 @@ func TestSetPushHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore, fa.String())
+	p2 := New(fc, ps, fa.String())
 	if p2.pushHandler != nil {
 		t.FailNow()
 	}
@@ -249,7 +255,9 @@ func TestSetDefaultRequestHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore, fa.String())
+	ps := NewPeerStore("")
+
+	p := New(fc, ps, fa.String())
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
@@ -261,13 +269,13 @@ func TestSetDefaultRequestHandler(t *testing.T) {
 		}
 	}
 
-	SetDefaultRequestHandler(rh)
+	ps.SetDefaultRequestHandler(rh)
 
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore, fa.String())
+	p2 := New(fc, ps, fa.String())
 	if p2.requestHandler == nil {
 		t.FailNow()
 	}
@@ -278,20 +286,22 @@ func TestSetDefaultPushHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore, fa.String())
+	ps := NewPeerStore("")
+
+	p := New(fc, ps, fa.String())
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
 
 	ph := func(req *msg.Push) {}
 
-	SetDefaultPushHandler(ph)
+	ps.SetDefaultPushHandler(ph)
 
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore, fa.String())
+	p2 := New(fc, ps, fa.String())
 	if p2.pushHandler == nil {
 		t.FailNow()
 	}

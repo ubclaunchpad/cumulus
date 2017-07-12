@@ -5,16 +5,22 @@ import (
 
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
-	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/peer"
 )
 
-var shell *ishell.Shell
+var (
+	shell     *ishell.Shell
+	peerStore *peer.PeerStore
+)
 
 // RunConsole starts the Cumulus console. This should be run only once as a
 // goroutine, and logging should be redirected away from stdout before it is run.
-func RunConsole() {
+// It takes a pointer to a PeerStore so we can use the PeerStore to interact
+// with other peers and give the user info about the running instance.
+func RunConsole(ps *peer.PeerStore) {
+	peerStore = ps
 	shell = ishell.New()
+
 	shell.AddCmd(&ishell.Cmd{
 		Name: "create",
 		Help: "create a new wallet hash or transaction",
@@ -26,7 +32,7 @@ func RunConsole() {
 		Func: check,
 	})
 	shell.AddCmd(&ishell.Cmd{
-		Name: "listen-address",
+		Name: "address",
 		Help: "show the address this host is listening on",
 		Func: listenAddr,
 	})
@@ -83,11 +89,11 @@ func check(ctx *ishell.Context) {
 }
 
 func listenAddr(ctx *ishell.Context) {
-	shell.Println("Listening on", peer.ListenAddr)
+	shell.Println("Listening on", peerStore.ListenAddr)
 }
 
 func peers(tcx *ishell.Context) {
-	shell.Println("Connected to", peer.PStore.Addrs())
+	shell.Println("Connected to", peerStore.Addrs())
 }
 
 func connect(ctx *ishell.Context) {
@@ -97,14 +103,9 @@ func connect(ctx *ishell.Context) {
 	}
 
 	addr := ctx.Args[0]
-	c, err := conn.Dial(addr)
+	_, err := peer.Connect(addr, peerStore)
 	if err != nil {
-		shell.Println("Failed to dial peer", addr, ":", err)
-		return
-	}
-	peer.ConnectionHandler(c)
-	if peer.PStore.Get(addr) == nil {
-		shell.Println("Failed to extablish connection. See logs for details.")
+		shell.Println("Failed to extablish connection:", err)
 	} else {
 		shell.Println("Connected to", addr)
 	}
