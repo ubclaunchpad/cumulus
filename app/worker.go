@@ -1,6 +1,9 @@
 package app
 
-import log "github.com/Sirupsen/logrus"
+import (
+	log "github.com/Sirupsen/logrus"
+	"github.com/ubclaunchpad/cumulus/miner"
+)
 
 // nWorkers is how many workers this node has.
 const nWorkers = 10
@@ -74,6 +77,9 @@ func (w *AppWorker) HandleBlock(work BlockWork) {
 	ok, _ := chain.ValidBlock(work.Block)
 	if ok {
 		chain.AppendBlock(work.Block)
+		if miner.IsMining() {
+			miner.RestartMiner(chain, work.Block)
+		}
 	}
 
 	// Respond to the request if a response method was provided.
