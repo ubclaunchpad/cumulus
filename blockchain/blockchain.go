@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"encoding/gob"
+	"errors"
 	"io"
 )
 
@@ -73,10 +74,13 @@ func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (b
 }
 
 // CopyLocalBlockByIndex returns a copy of a block in the local chain by index.
-func (bc *BlockChain) CopyBlockByIndex(i uint32) *Block {
-	blk := bc.Blocks[i]
-	b := *blk
-	b.Transactions = make([]*Transaction, len(blk.Transactions))
-	copy(b.Transactions, blk.Transactions)
-	return &b
+func (bc *BlockChain) CopyBlockByIndex(i uint32) (*Block, error) {
+	if i >= 0 && i < uint32(len(bc.Blocks)) {
+		blk := bc.Blocks[i]
+		b := *blk
+		b.Transactions = make([]*Transaction, len(blk.Transactions))
+		copy(b.Transactions, blk.Transactions)
+		return &b, nil
+	}
+	return nil, errors.New("block request out of bounds")
 }

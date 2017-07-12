@@ -20,9 +20,9 @@ const (
 	// MiningSuccessful is returned when the miner mines a block.
 	MiningSuccessful = iota
 	// MiningNeverStarted is returned when the block header is invalid.
-	MiningNeverStarted = iota
+	MiningNeverStarted
 	// MiningHalted is returned when the app halts the miner.
-	MiningHalted = iota
+	MiningHalted
 )
 
 // MiningResult contains the result of the mining operation.
@@ -43,7 +43,7 @@ func RestartMiner(bc *blockchain.BlockChain, b *blockchain.Block) {
 func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
 	setStart()
 	if valid, _ := bc.ValidBlock(b); !valid {
-		log.Error("Invalid block")
+		log.Error("miner given invalid block")
 		return &MiningResult{
 			Complete: false,
 			Info:     MiningNeverStarted,

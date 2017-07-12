@@ -136,7 +136,12 @@ func RequestHandler(req *msg.Request) msg.Response {
 	case msg.ResourceBlock:
 		blockNumber, ok := req.Params["blockNumber"].(uint32)
 		if ok {
-			res.Resource = chain.CopyBlockByIndex(blockNumber)
+			blk, err := chain.CopyBlockByIndex(blockNumber)
+			if err != nil {
+				res.Error = paramErr
+			} else {
+				res.Resource = blk
+			}
 		} else {
 			res.Error = paramErr
 		}

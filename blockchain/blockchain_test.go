@@ -27,7 +27,7 @@ func TestEncodeDecodeBlockChain(t *testing.T) {
 
 func TestCopyBlock(t *testing.T) {
 	bc, _ := NewValidTestChainAndBlock()
-	b := bc.CopyBlockByIndex(0)
+	b, _ := bc.CopyBlockByIndex(0)
 
 	if !reflect.DeepEqual(b, bc.Blocks[0]) {
 		t.FailNow()
