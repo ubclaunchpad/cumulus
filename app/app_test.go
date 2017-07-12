@@ -63,7 +63,7 @@ func TestInitializeNode(t *testing.T) {
 
 func TestPushHandlerNewBlock(t *testing.T) {
 	intializeQueues()
-	_, b := blockchain.NewValidChainAndBlock()
+	_, b := blockchain.NewValidTestChainAndBlock()
 	push := msg.Push{
 		ResourceType: msg.ResourceBlock,
 		Resource:     b,
@@ -81,9 +81,9 @@ func TestPushHandlerNewBlock(t *testing.T) {
 	// Add more here...
 }
 
-func TestPushHandlerNewTransaction(t *testing.T) {
+func TestPushHandlerNewTestTransaction(t *testing.T) {
 	intializeQueues()
-	txn := blockchain.NewTransaction()
+	txn := blockchain.NewTestTransaction()
 	push := msg.Push{
 		ResourceType: msg.ResourceTransaction,
 		Resource:     txn,

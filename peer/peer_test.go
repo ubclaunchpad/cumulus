@@ -1,11 +1,19 @@
 package peer
 
 import (
+	"fmt"
 	"net"
+	"os"
 	"testing"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/msg"
+)
+
+const (
+	FailConnect = "Failed to create connection and perform handshake"
+	FailGetPeer = "Failed to get peer from peer store after connection was established"
 )
 
 var (
@@ -70,6 +78,13 @@ func inList(item string, list []string) bool {
 	return false
 }
 
+func TestMain(m *testing.M) {
+	log.SetLevel(log.DebugLevel)
+	fmt.Println("NOTE: Some errors will be logged during tests. Note that these",
+		"errors do NOT necessarily mean the tests are failing.")
+	os.Exit(m.Run())
+}
+
 // This will error if there are concurrent accesses to the PeerStore, or error
 // if an atomic operation returns un unexpected result.
 func TestConcurrentPeerStore(t *testing.T) {
@@ -85,9 +100,9 @@ func TestConcurrentPeerStore(t *testing.T) {
 		for _, addr := range addrs2 {
 			fa = fakeAddr{Addr: addr}
 			fc = fakeConn{Addr: fa}
-			ps.Add(New(fc, ps))
+			ps.Add(New(fc, ps, addr))
 			p := ps.Get(addr)
-			if p.Connection.RemoteAddr().String() != addr {
+			if p.ListenAddr != addr {
 				resChan1 <- false
 			}
 		}
@@ -101,7 +116,7 @@ func TestConcurrentPeerStore(t *testing.T) {
 		for _, addr := range addrs1 {
 			fa = fakeAddr{Addr: addr}
 			fc = fakeConn{Addr: fa}
-			ps.Add(New(fc, ps))
+			ps.Add(New(fc, ps, addr))
 			ps.Remove(addr)
 		}
 		resChan2 <- true
@@ -147,7 +162,7 @@ func TestRemoveRandom(t *testing.T) {
 	for _, addr := range addrs1 {
 		fa = fakeAddr{Addr: addr}
 		fc = fakeConn{Addr: fa}
-		ps.Add(New(fc, ps))
+		ps.Add(New(fc, ps, addr))
 	}
 
 	for i := ps.Size(); i > 0; i-- {
@@ -165,7 +180,7 @@ func TestAddrs(t *testing.T) {
 	for _, addr := range addrs1 {
 		fa = fakeAddr{Addr: addr}
 		fc = fakeConn{Addr: fa}
-		ps.Add(New(fc, ps))
+		ps.Add(New(fc, ps, addr))
 	}
 
 	addrs := ps.Addrs()
@@ -181,7 +196,7 @@ func TestSetRequestHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore)
+	p := New(fc, PStore, fa.String())
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
@@ -199,7 +214,7 @@ func TestSetRequestHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore)
+	p2 := New(fc, PStore, fa.String())
 	if p2.requestHandler != nil {
 		t.FailNow()
 	}
@@ -210,7 +225,7 @@ func TestSetPushHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore)
+	p := New(fc, PStore, fa.String())
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
@@ -223,7 +238,7 @@ func TestSetPushHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore)
+	p2 := New(fc, PStore, fa.String())
 	if p2.pushHandler != nil {
 		t.FailNow()
 	}
@@ -234,7 +249,7 @@ func TestSetDefaultRequestHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore)
+	p := New(fc, PStore, fa.String())
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
@@ -252,7 +267,7 @@ func TestSetDefaultRequestHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore)
+	p2 := New(fc, PStore, fa.String())
 	if p2.requestHandler == nil {
 		t.FailNow()
 	}
@@ -263,7 +278,7 @@ func TestSetDefaultPushHandler(t *testing.T) {
 	var fc net.Conn
 	fa = fakeAddr{Addr: "127.0.0.1"}
 	fc = fakeConn{Addr: fa}
-	p := New(fc, PStore)
+	p := New(fc, PStore, fa.String())
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
@@ -276,7 +291,7 @@ func TestSetDefaultPushHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, PStore)
+	p2 := New(fc, PStore, fa.String())
 	if p2.pushHandler == nil {
 		t.FailNow()
 	}

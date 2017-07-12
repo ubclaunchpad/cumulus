@@ -8,97 +8,97 @@ import (
 	"time"
 )
 
-// NewHash produces a hash.
-func NewHash() Hash {
+// NewTestHash produces a hash.
+func NewTestHash() Hash {
 	message := make([]byte, 256)
 	crand.Read(message)
 	return sha256.Sum256(message)
 }
 
-// NewTxHashPointer produces transaction hash pointer.
-func NewTxHashPointer() TxHashPointer {
+// NewTestTxHashPointer produces transaction hash pointer.
+func NewTestTxHashPointer() TxHashPointer {
 	return TxHashPointer{
 		BlockNumber: mrand.Uint32(),
-		Hash:        NewHash(),
+		Hash:        NewTestHash(),
 		Index:       mrand.Uint32(),
 	}
 }
 
-// NewTxOutput random txn output.
-func NewTxOutput() TxOutput {
+// NewTestTxOutput random txn output.
+func NewTestTxOutput() TxOutput {
 	return TxOutput{
 		Amount:    uint64(mrand.Int63()),
 		Recipient: NewWallet().Public(),
 	}
 }
 
-// NewTxBody random txn body.
-func NewTxBody() TxBody {
+// NewTestTxBody random txn body.
+func NewTestTxBody() TxBody {
 	// Uniform distribution on [1, 4]
 	nOutputs := mrand.Intn(4) + 1
 	body := TxBody{
 		Sender:  NewWallet().Public(),
-		Input:   NewTxHashPointer(),
+		Input:   NewTestTxHashPointer(),
 		Outputs: make([]TxOutput, nOutputs),
 	}
 	for i := 0; i < nOutputs; i++ {
-		body.Outputs[i] = NewTxOutput()
+		body.Outputs[i] = NewTestTxOutput()
 	}
 	return body
 }
 
-// NewTransaction prodcues random txn.
-func NewTransaction() *Transaction {
+// NewTestTransaction prodcues random txn.
+func NewTestTransaction() *Transaction {
 	sender := NewWallet()
-	tbody := NewTxBody()
+	tbody := NewTestTxBody()
 	t, _ := tbody.Sign(sender, crand.Reader)
 	return t
 }
 
-// NewBlockHeader prodcues random block header.
-func NewBlockHeader() BlockHeader {
+// NewTestBlockHeader prodcues random block header.
+func NewTestBlockHeader() BlockHeader {
 	return BlockHeader{
 		BlockNumber: mrand.Uint32(),
-		LastBlock:   NewHash(),
-		Target:      NewValidTarget(),
+		LastBlock:   NewTestHash(),
+		Target:      NewValidTestTarget(),
 		Time:        mrand.Uint32(),
 		Nonce:       0,
 	}
 }
 
-// NewBlock prodcues random block.
-func NewBlock() *Block {
+// NewTestBlock prodcues random block.
+func NewTestBlock() *Block {
 	// Uniform distribution on [500, 999]
 	nTransactions := mrand.Intn(500) + 500
 	b := Block{
-		BlockHeader:  NewBlockHeader(),
+		BlockHeader:  NewTestBlockHeader(),
 		Transactions: make([]*Transaction, nTransactions),
 	}
 	for i := 0; i < nTransactions; i++ {
-		b.Transactions[i] = NewTransaction()
+		b.Transactions[i] = NewTestTransaction()
 	}
 	return &b
 }
 
-// NewBlockChain produces random blockchain.
-func NewBlockChain() *BlockChain {
+// NewTestBlockChain produces random blockchain.
+func NewTestBlockChain() *BlockChain {
 	// Uniform distribution on [10, 50]
 	nBlocks := mrand.Intn(40) + 10
 	bc := BlockChain{Blocks: make([]*Block, nBlocks)}
 	for i := 0; i < nBlocks; i++ {
-		bc.Blocks[i] = NewBlock()
+		bc.Blocks[i] = NewTestBlock()
 	}
 	bc.Head = HashSum(bc.Blocks[nBlocks-1])
 	return &bc
 }
 
-// NewInputBlock produces new block with given transactions.
-func NewInputBlock(t []*Transaction) *Block {
+// NewTestInputBlock produces new block with given transactions.
+func NewTestInputBlock(t []*Transaction) *Block {
 	return &Block{
 		BlockHeader: BlockHeader{
 			BlockNumber: 0,
-			LastBlock:   NewHash(),
-			Target:      NewValidTarget(),
+			LastBlock:   NewTestHash(),
+			Target:      NewValidTestTarget(),
 			Time:        uint32(time.Now().Unix()),
 			Nonce:       0,
 		},
@@ -106,14 +106,14 @@ func NewInputBlock(t []*Transaction) *Block {
 	}
 }
 
-// NewOutputBlock produces new block with given transactions and given input
+// NewTestOutputBlock produces new block with given transactions and given input
 // block.
-func NewOutputBlock(t []*Transaction, input *Block) *Block {
+func NewTestOutputBlock(t []*Transaction, input *Block) *Block {
 	return &Block{
 		BlockHeader: BlockHeader{
 			BlockNumber: input.BlockNumber + 1,
 			LastBlock:   HashSum(input),
-			Target:      NewValidTarget(),
+			Target:      NewValidTestTarget(),
 			Time:        uint32(time.Now().Unix()),
 			Nonce:       0,
 		},
@@ -121,13 +121,13 @@ func NewOutputBlock(t []*Transaction, input *Block) *Block {
 	}
 }
 
-// NewTransactionValue creates a new transaction with specific value a.
-func NewTransactionValue(s, r Wallet, a uint64, i uint32) (*Transaction, error) {
+// NewTestTransactionValue creates a new transaction with specific value a.
+func NewTestTransactionValue(s, r Wallet, a uint64, i uint32) (*Transaction, error) {
 	tbody := TxBody{
 		Sender: s.Public(),
 		Input: TxHashPointer{
 			BlockNumber: 0,
-			Hash:        NewHash(),
+			Hash:        NewTestHash(),
 			Index:       i,
 		},
 		Outputs: make([]TxOutput, 1),
@@ -145,34 +145,34 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	sender := NewWallet()
 	recipient := NewWallet()
 
-	trA, _ := NewTransactionValue(original, sender, 2, 1)
+	trA, _ := NewTestTransactionValue(original, sender, 2, 1)
 	trA.Outputs = append(trA.Outputs, TxOutput{
 		Amount:    2,
 		Recipient: sender.Public(),
 	})
 
-	trB, _ := NewTransactionValue(sender, recipient, 4, 1)
+	trB, _ := NewTestTransactionValue(sender, recipient, 4, 1)
 	trB.Input.Hash = HashSum(trA)
 
 	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
 
-	cbA, _ := NewValidCloudBaseTransaction()
-	cbB, _ := NewValidCloudBaseTransaction()
+	cbA, _ := NewValidCloudBaseTestTransaction()
+	cbB, _ := NewValidCloudBaseTestTransaction()
 	inputTransactions := []*Transaction{cbA, trA}
 	outputTransactions := []*Transaction{cbB, trB}
 
-	inputBlock := NewInputBlock(inputTransactions)
-	outputBlock := NewOutputBlock(outputTransactions, inputBlock)
+	inputBlock := NewTestInputBlock(inputTransactions)
+	outputBlock := NewTestOutputBlock(outputTransactions, inputBlock)
 
 	return &BlockChain{
 		Blocks: []*Block{inputBlock, outputBlock},
-		Head:   NewHash(),
+		Head:   NewTestHash(),
 	}, recipient
 }
 
-// NewValidChainAndBlock creates a valid BlockChain and a Block that is valid
+// NewValidTestChainAndBlock creates a valid BlockChain and a Block that is valid
 // with respect to the BlockChain.
-func NewValidChainAndBlock() (*BlockChain, *Block) {
+func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 	bc, s := NewValidBlockChainFixture()
 	inputBlock := bc.Blocks[1]
 	inputTransaction := inputBlock.Transactions[0]
@@ -194,14 +194,14 @@ func NewValidChainAndBlock() (*BlockChain, *Block) {
 	}
 
 	tr, _ := tbody.Sign(s, crand.Reader)
-	cb, _ := NewValidCloudBaseTransaction()
-	newBlock := NewOutputBlock([]*Transaction{cb, tr}, inputBlock)
+	cb, _ := NewValidCloudBaseTestTransaction()
+	newBlock := NewTestOutputBlock([]*Transaction{cb, tr}, inputBlock)
 	return bc, newBlock
 }
 
-// NewValidTarget creates a new valid target that is a random value between the
+// NewValidTestTarget creates a new valid target that is a random value between the
 // max and min difficulties
-func NewValidTarget() Hash {
+func NewValidTestTarget() Hash {
 	r := new(big.Int).Rand(
 		mrand.New(mrand.NewSource(time.Now().Unix())),
 		new(big.Int).Add(MaxTarget, big.NewInt(1)),
@@ -210,9 +210,9 @@ func NewValidTarget() Hash {
 	return BigIntToHash(r)
 }
 
-// NewValidCloudBaseTransaction returns a new valid CloudBase transaction and
+// NewValidCloudBaseTestTransaction returns a new valid CloudBase transaction and
 // the address of the recipient of the transaction
-func NewValidCloudBaseTransaction() (*Transaction, Address) {
+func NewValidCloudBaseTestTransaction() (*Transaction, Address) {
 	w := NewWallet()
 	cbInput := TxHashPointer{
 		BlockNumber: 0,

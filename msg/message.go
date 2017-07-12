@@ -3,6 +3,8 @@ package msg
 import (
 	"encoding/gob"
 	"io"
+
+	"github.com/ubclaunchpad/cumulus/blockchain"
 )
 
 type (
@@ -38,6 +40,8 @@ func init() {
 	gob.Register(&Request{})
 	gob.Register(&Response{})
 	gob.Register(&Push{})
+	gob.Register(&blockchain.Transaction{})
+	gob.Register(&blockchain.Block{})
 }
 
 // ProtocolError is an error that occured during a request.

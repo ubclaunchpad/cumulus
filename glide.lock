@@ -1,6 +1,14 @@
 hash: 338e5ac0b385f380b7d42f2b6d1f80449b3bf77a2c3cfee3ac34a0afac0ef973
 updated: 2017-07-09T10:45:43.507620923-07:00
 imports:
+- name: github.com/abiosoft/ishell
+  version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
+- name: github.com/chzyer/readline
+  version: 41eea22f717c616615e1e59aa06cf831f9901f35
+- name: github.com/fatih/color
+  version: 62e9147c64a1ed519147b62a56a14e83e2be02c1
+- name: github.com/flynn-archive/go-shlex
+  version: 3f9db97f856818214da2e1057f8ad84803971cff
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/google/uuid
@@ -20,49 +28,18 @@ imports:
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/magiconair/properties
   version: 51463bfca2576e06c62a8504b5c0f06d61312647
+- name: github.com/mattn/go-colorable
+  version: 5411d3eea5978e6cdc258b30de592b60df6aba96
+  repo: https://github.com/mattn/go-colorable
+- name: github.com/mattn/go-isatty
+  version: 57fdcb988a5c543893cc61bce354a6e24ab70022
+  repo: https://github.com/mattn/go-isatty
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
-- name: github.com/onsi/ginkgo
-  version: 77a8c1e5c40d6bb6c5eb4dd4bdce9763564f6298
-  subpackages:
-  - ginkgo
-  - config
-  - internal/codelocation
-  - internal/failer
-  - internal/remote
-  - internal/suite
-  - internal/testingtproxy
-  - internal/writer
-  - reporters
-  - reporters/stenographer
-  - types
-  - internal/spec_iterator
-  - internal/containernode
-  - internal/leafnodes
-  - internal/spec
-  - internal/specrunner
-  - reporters/stenographer/support/go-colorable
-  - reporters/stenographer/support/go-isatty
-- name: github.com/onsi/gomega
-  version: 334b8f472b3af5d541c5642701c1e29e2126f486
-  subpackages:
-  - internal/assertion
-  - internal/asyncassertion
-  - internal/testingtsupport
-  - matchers
-  - types
-  - internal/oraclematcher
-  - format
-  - matchers/support/goraph/bipartitegraph
-  - matchers/support/goraph/edge
-  - matchers/support/goraph/node
-  - matchers/support/goraph/util
-- name: github.com/pelletier/go-buffruneio
-  version: c37440a7cf42ac63b919c752ca73a85067e05992
 - name: github.com/pelletier/go-toml
-  version: fe7536c3dee2596cdd23ee9976a17c22bdaae286
+  version: 69d355db5304c0f7f809a2edc054553e7142f016
 - name: github.com/Sirupsen/logrus
-  version: 85b1699d505667d13f8ac4478c1debbf85d6c5de
+  version: 7dd06bf38e1e13df288d471a57d5adbac106be9e
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
@@ -70,7 +47,7 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: b4dbd37a01839e0653eec12aa4bbb2a2ce7b2a37
+  version: 8c6fa02d2225de0f9bdcb7ca912556f68d172d8c
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
@@ -82,11 +59,11 @@ imports:
   subpackages:
   - assert
 - name: golang.org/x/sys
-  version: fb4cac33e3196ff7f507ab9b2d2a44b0142f5b5a
+  version: 4ed4d404df456f81e878683a0363ed3013a59003
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 9e2f80a6ba7ed4ba13e0cd4b1f094bf916875735
+  version: 2bf8f2a19ec09c670e931282edfe6567f6be21c9
   subpackages:
   - transform
   - unicode/norm
