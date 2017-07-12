@@ -73,7 +73,7 @@ const (
 	BadGenesisBlockNumber
 	// BadGenesisTarget is returned when the genesis block's target is invalid.
 	BadGenesisTarget
-	// BadGenesisTime is returned when teh gensis block's time is invalid.
+	// BadGenesisTime is returned when the genesis block's time is invalid.
 	BadGenesisTime
 	// NilGenesisBlock is returned when the genesis block is equal to nil.
 	NilGenesisBlock
@@ -190,6 +190,7 @@ func ValidCloudBase(t *Transaction) (bool, CloudBaseTransactionCode) {
 
 // ValidGenesisBlock checks whether a block is a valid genesis block.
 func (bc *BlockChain) ValidGenesisBlock(gb *Block) (bool, GenesisBlockCode) {
+
 	// Check if the genesis block is equal to nil.
 	if gb == nil {
 		return false, NilGenesisBlock
@@ -234,12 +235,12 @@ func (bc *BlockChain) ValidGenesisBlock(gb *Block) (bool, GenesisBlockCode) {
 // ValidBlock checks whether a block is valid.
 func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 
-	// Check if the block is equal to nil
+	// Check if the block is equal to nil.
 	if b == nil {
 		return false, NilBlock
 	}
 
-	// Check if the block is the genesis block
+	// Check if the block is the genesis block.
 	if b.BlockHeader.BlockNumber == 0 || bc.Blocks[0] == b {
 		if valid, code := bc.ValidGenesisBlock(b); !valid {
 			log.Errorf("Invalid GenesisBlock, GenesisBlockCode: %d", code)

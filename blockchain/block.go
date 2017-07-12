@@ -8,13 +8,6 @@ import (
 	"io"
 )
 
-const (
-	// BlockSize is the maximum size of a block in bytes when marshaled (about 250K).
-	BlockSize = 1 << 18
-	// BlockHeaderLen is the length in bytes of a block header.
-	BlockHeaderLen = 2*(32/8) + 64/8 + 2*HashLen
-)
-
 // BlockHeader contains metadata about a block
 type BlockHeader struct {
 	// BlockNumber is the position of the block within the blockchain
@@ -28,6 +21,9 @@ type BlockHeader struct {
 	Time uint32
 	// Nonce starts at 0 and increments by 1 for every hash when mining
 	Nonce uint64
+	// ExtraData is an extra field that can be filled with arbitrary data to
+	// be stored in the block
+	ExtraData []byte
 }
 
 // Marshal converts a BlockHeader to a byte slice
@@ -48,8 +44,14 @@ func (bh *BlockHeader) Marshal() []byte {
 	buf = append(buf, bh.Target.Marshal()...)
 	buf = append(buf, tempBufTime...)
 	buf = append(buf, tempBufNonce...)
+	buf = append(buf, bh.ExtraData...)
 
 	return buf
+}
+
+// Len returns the length in bytes of the BlockHeader.
+func (bh *BlockHeader) Len() int {
+	return len(bh.Marshal())
 }
 
 // Block represents a block in the blockchain. Contains transactions and header metadata.
@@ -60,16 +62,12 @@ type Block struct {
 
 // Len returns the length in bytes of the Block.
 func (b *Block) Len() int {
-	l := BlockHeaderLen
-	for _, t := range b.Transactions {
-		l += t.Len()
-	}
-	return l
+	return len(b.Marshal())
 }
 
 // Marshal converts a Block to a byte slice.
 func (b *Block) Marshal() []byte {
-	buf := make([]byte, 0, b.Len())
+	var buf []byte
 	buf = append(buf, b.BlockHeader.Marshal()...)
 	for _, t := range b.Transactions {
 		buf = append(buf, t.Marshal()...)

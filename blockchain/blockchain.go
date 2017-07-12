@@ -14,16 +14,12 @@ type BlockChain struct {
 
 // Len returns the length of the BlockChain when marshalled
 func (bc *BlockChain) Len() int {
-	l := 0
-	for _, b := range bc.Blocks {
-		l += b.Len()
-	}
-	return l + HashLen
+	return len(bc.Marshal())
 }
 
 // Marshal converts the BlockChain to a byte slice.
 func (bc *BlockChain) Marshal() []byte {
-	buf := make([]byte, 0, bc.Len())
+	var buf []byte
 	for _, b := range bc.Blocks {
 		buf = append(buf, b.Marshal()...)
 	}

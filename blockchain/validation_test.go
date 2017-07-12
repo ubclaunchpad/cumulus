@@ -115,7 +115,7 @@ func TestValidBlockBadGenesisBlock(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	gb.Target = BigIntToHash(BigExp(2, 255))
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
@@ -407,7 +407,7 @@ func TestValidGenesisBlock(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),
@@ -446,7 +446,7 @@ func TestValidGenesisBlockBadGenesisBlockNumber(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	gb.BlockHeader.BlockNumber = 1
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
@@ -484,8 +484,9 @@ func TestValidGenesisBlockBadGenesisLastBlock(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	gb.LastBlock = NewTestHash()
+
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),
@@ -506,7 +507,7 @@ func TestValidGenesisBlockBadGenesisTransactions(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	gb.Transactions = append(gb.Transactions, NewTestTransaction())
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
@@ -528,7 +529,7 @@ func TestValidGenesisBlockBadGenesisCloudBaseTransaction(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	gb.Transactions[0] = NewTestTransaction()
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
@@ -550,7 +551,7 @@ func TestValidGenesisBlockBadGenesisTarget(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	gb.Target = BigIntToHash(BigExp(2, 255))
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
@@ -572,7 +573,7 @@ func TestValidGenesisBlockBadGenesisTime(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	gb.Time = 0
 	bc := &BlockChain{
 		Blocks: []*Block{gb},

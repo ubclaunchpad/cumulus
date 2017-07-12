@@ -11,7 +11,7 @@ import (
 // 	- LastBlock = 0
 // 	- There is only one transaction in the block, the CloudBase transaction that
 // 	  awards the miner with the block reward.
-func Genesis(miner Address, target Hash, blockReward uint64) *Block {
+func Genesis(miner Address, target Hash, blockReward uint64, extraData []byte) *Block {
 
 	cbReward := TxOutput{
 		Amount:    blockReward,
@@ -38,6 +38,7 @@ func Genesis(miner Address, target Hash, blockReward uint64) *Block {
 			Target:      target,
 			Time:        uint32(time.Now().Unix()),
 			Nonce:       0,
+			ExtraData:   extraData,
 		},
 		Transactions: []*Transaction{cbTx},
 	}

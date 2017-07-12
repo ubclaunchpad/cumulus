@@ -33,7 +33,7 @@ type Address struct {
 
 // Marshal converts an Address to a byte slice.
 func (a Address) Marshal() []byte {
-	buf := make([]byte, AddrLen)
+	buf := make([]byte, 0, AddrLen)
 	buf = append(buf, a.X.Bytes()...)
 	buf = append(buf, a.Y.Bytes()...)
 	return buf

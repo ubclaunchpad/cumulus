@@ -9,7 +9,7 @@ func TestGenesis(t *testing.T) {
 	miner := NewWallet()
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
-	gb := Genesis(miner.Public(), currentTarget, currentBlockReward)
+	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 
 	// Check if the genesis block is equal to nil
 	if gb == nil {
