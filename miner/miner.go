@@ -2,6 +2,7 @@ package miner
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -9,22 +10,90 @@ import (
 	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
+// currentlyMining is a flag to control the miner.
+var currentlyMining bool
+
+// currentlyMiningLock is a read/write lock to change the Mining flag.
+var currentlyMiningLock sync.RWMutex
+
+const (
+	// MiningSuccessful is returned when the miner mines a block.
+	MiningSuccessful = iota
+	// MiningNeverStarted is returned when the block header is invalid.
+	MiningNeverStarted
+	// MiningHalted is returned when the app halts the miner.
+	MiningHalted
+)
+
+// MiningResult contains the result of the mining operation.
+type MiningResult struct {
+	Complete bool
+	Info     int
+}
+
+// RestartMiner restarts the miner with a new block.
+func RestartMiner(bc *blockchain.BlockChain, b *blockchain.Block) {
+	StopMining()
+	Mine(bc, b)
+}
+
 // Mine continuously increases the nonce and tries to verify the proof of work
 // until the puzzle is solved
-func Mine(bc *blockchain.BlockChain, b *blockchain.Block) bool {
+// TODO: Make Mine take an interface with a callback as an arguement.
+func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
+	setStart()
 	if valid, _ := bc.ValidBlock(b); !valid {
-		log.Error("Invalid block")
-		return false
+		log.Error("miner given invalid block")
+		return &MiningResult{
+			Complete: false,
+			Info:     MiningNeverStarted,
+		}
 	}
 
 	for !VerifyProofOfWork(b) {
+		// Check if we should keep mining.
+		if !IsMining() {
+			return &MiningResult{
+				Complete: false,
+				Info:     MiningHalted,
+			}
+		}
+
+		// Check if we should reset the nonce.
 		if b.Nonce == math.MaxUint64 {
 			b.Nonce = 0
 		}
+
+		// Timestamp and increase the nonce.
 		b.Time = uint32(time.Now().Unix())
 		b.Nonce++
 	}
-	return true
+
+	return &MiningResult{
+		Complete: true,
+		Info:     MiningSuccessful,
+	}
+}
+
+func setStart() {
+	currentlyMiningLock.Lock()
+	defer currentlyMiningLock.Unlock()
+	currentlyMining = true
+}
+
+// StopMining stops the miner from mining.
+func StopMining() {
+	currentlyMiningLock.Lock()
+	defer currentlyMiningLock.Unlock()
+	currentlyMining = false
+}
+
+// IsMining returns the mining status of the miner.
+// Many threads can read this status, only one can write.
+func IsMining() bool {
+	currentlyMiningLock.RLock()
+	defer currentlyMiningLock.RUnlock()
+	return currentlyMining
 }
 
 // CloudBase prepends the cloudbase transaction to the front of a list of

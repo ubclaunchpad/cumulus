@@ -1,5 +1,5 @@
-hash: e90c96231747294a39d039788f986f98fd2dd2c272a85cb54fe7978e699404b8
-updated: 2017-07-01T13:58:10.618927736-07:00
+hash: 338e5ac0b385f380b7d42f2b6d1f80449b3bf77a2c3cfee3ac34a0afac0ef973
+updated: 2017-07-09T10:45:43.507620923-07:00
 imports:
 - name: github.com/abiosoft/ishell
   version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
@@ -53,7 +53,11 @@ imports:
 - name: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
 - name: github.com/spf13/viper
-  version: c1de95864d73a5465492829d7cb2dd422b19ac96
+  version: a1ecfa6a20bd4ef9e9caded262ee1b1b26847675
+- name: github.com/stretchr/testify
+  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
+  subpackages:
+  - assert
 - name: golang.org/x/sys
   version: 4ed4d404df456f81e878683a0363ed3013a59003
   subpackages:
@@ -65,4 +69,12 @@ imports:
   - unicode/norm
 - name: gopkg.in/yaml.v2
   version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
-testImports: []
+testImports:
+- name: github.com/davecgh/go-spew
+  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  subpackages:
+  - spew
+- name: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
