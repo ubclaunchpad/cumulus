@@ -14,10 +14,13 @@
 * ...
 
 ## Todos
+
+General:
 - [ ] Tests
 - [ ] Documentation
 - [ ] Wiki
-- Other (links to TODOs in code):
+
+Other (links to TODOs in code):
 * [link]()
 * [link]()
 * ...
