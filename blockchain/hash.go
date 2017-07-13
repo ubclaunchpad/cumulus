@@ -60,7 +60,8 @@ func HashToBigInt(h Hash) *big.Int {
 	return new(big.Int).SetBytes(h[:])
 }
 
-// BigIntToHash converts a big integer to a hash
+// BigIntToHash converts a big integer to a hash. If the size of the big int
+// is larger than the size of hash, the function will return a hash set to 0.
 func BigIntToHash(x *big.Int) Hash {
 	bytes := x.Bytes()
 
