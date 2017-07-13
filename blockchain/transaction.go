@@ -3,6 +3,8 @@ package blockchain
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/ubclaunchpad/cumulus/common"
 )
 
 // TxHashPointer is a reference to a transaction on the blockchain.
@@ -14,12 +16,10 @@ type TxHashPointer struct {
 
 // Marshal converts a TxHashPointer to a byte slice
 func (thp TxHashPointer) Marshal() []byte {
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, thp.BlockNumber)
+	var buf []byte
+	buf = common.AppendUint32(buf, thp.BlockNumber)
 	buf = append(buf, thp.Hash.Marshal()...)
-	tempBufIndex := make([]byte, 4)
-	binary.LittleEndian.PutUint32(tempBufIndex, thp.Index)
-	buf = append(buf, tempBufIndex...)
+	buf = common.AppendUint32(buf, thp.Index)
 	return buf
 }
 

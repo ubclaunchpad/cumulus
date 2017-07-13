@@ -6,6 +6,9 @@ import (
 	"math/big"
 	mrand "math/rand"
 	"time"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/common/math"
 )
 
 // NewTestHash produces a hash.
@@ -204,9 +207,9 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 func NewValidTestTarget() Hash {
 	r := new(big.Int).Rand(
 		mrand.New(mrand.NewSource(time.Now().Unix())),
-		new(big.Int).Add(MaxTarget, big.NewInt(1)),
+		math.BigAdd(MaxTarget, c.Big1),
 	)
-	r.Add(r, big.NewInt(1))
+	r.Add(r, c.Big1)
 	return BigIntToHash(r)
 }
 

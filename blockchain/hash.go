@@ -3,6 +3,8 @@ package blockchain
 import (
 	"crypto/sha256"
 	"math/big"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
 )
 
 const (
@@ -12,7 +14,7 @@ const (
 
 var (
 	// NilHash represents a nil hash
-	NilHash = BigIntToHash(big.NewInt(0))
+	NilHash = BigIntToHash(c.Big0)
 )
 
 // Hash represents a 256-bit hash of a block or transaction

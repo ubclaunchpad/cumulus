@@ -1,11 +1,11 @@
 package miner
 
 import (
-	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
@@ -15,10 +15,7 @@ func TestMine(t *testing.T) {
 
 	// Set min difficulty to be equal to the target so that the block validation
 	// passes
-	blockchain.MaxTarget = new(big.Int).Sub(
-		blockchain.BigExp(2, 256),
-		big.NewInt(1),
-	)
+	blockchain.MaxTarget = c.MaxUint256
 
 	// Set target to be as easy as possible so that we find a hash
 	// below the target straight away (2**256 - 1)
@@ -74,10 +71,7 @@ func TestCloudBase(t *testing.T) {
 func TestVerifyProofOfWork(t *testing.T) {
 	_, b := blockchain.NewValidTestChainAndBlock()
 	b.Target = blockchain.BigIntToHash(
-		new(big.Int).Sub(
-			blockchain.BigExp(2, 256),
-			big.NewInt(1),
-		),
+		c.MaxUint256,
 	)
 
 	if !VerifyProofOfWork(b) {

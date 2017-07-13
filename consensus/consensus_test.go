@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"math/big"
 	"math/rand"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	c "github.com/ubclaunchpad/cumulus/common/constants"
 )
 
 func TestHalveReward(t *testing.T) {
@@ -88,7 +88,7 @@ func TestValidMinedBlockBadTarget(t *testing.T) {
 
 func TestValidMinedBlockBadNonce(t *testing.T) {
 	bc, b, a := newValidBlockChainAndCloudBaseBlock()
-	b.Target = blockchain.BigIntToHash(big.NewInt(1))
+	b.Target = blockchain.BigIntToHash(c.Big1)
 	tempCurrentDifficulty := CurrentDifficulty
 	CurrentDifficulty = blockchain.MaxTarget
 
@@ -123,10 +123,7 @@ func TestValidMinedBlock(t *testing.T) {
 	tempMaxTarget := blockchain.MaxTarget
 	tempCurrentDifficulty := CurrentDifficulty
 
-	blockchain.MaxTarget = new(big.Int).Sub(
-		blockchain.BigExp(2, 256),
-		big.NewInt(1),
-	)
+	blockchain.MaxTarget = c.MaxUint256
 	CurrentDifficulty = blockchain.MinTarget
 
 	bc, b, a := newValidBlockChainAndCloudBaseBlock()
