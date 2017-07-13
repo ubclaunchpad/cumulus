@@ -2,11 +2,11 @@ package consensus
 
 import (
 	"testing"
-	"time"
 
 	"math/rand"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/common"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 )
 
@@ -154,7 +154,7 @@ func newValidBlockChainAndCloudBaseBlock() (
 			BlockNumber: bcSize,
 			LastBlock:   blockchain.HashSum(bc.Blocks[bcSize-1]),
 			Target:      CurrentTarget(),
-			Time:        uint32(time.Now().Unix()),
+			Time:        common.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: make([]*blockchain.Transaction, 1),

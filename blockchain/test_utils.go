@@ -7,6 +7,7 @@ import (
 	mrand "math/rand"
 	"time"
 
+	"github.com/ubclaunchpad/cumulus/common"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/common/math"
 )
@@ -102,7 +103,7 @@ func NewTestInputBlock(t []*Transaction) *Block {
 			BlockNumber: 0,
 			LastBlock:   NewTestHash(),
 			Target:      NewValidTestTarget(),
-			Time:        uint32(time.Now().Unix()),
+			Time:        common.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: t,
@@ -117,7 +118,7 @@ func NewTestOutputBlock(t []*Transaction, input *Block) *Block {
 			BlockNumber: input.BlockNumber + 1,
 			LastBlock:   HashSum(input),
 			Target:      NewValidTestTarget(),
-			Time:        uint32(time.Now().Unix()),
+			Time:        common.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: t,

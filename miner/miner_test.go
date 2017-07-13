@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/common"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/consensus"
 )
@@ -21,7 +22,7 @@ func TestMine(t *testing.T) {
 	// Set target to be as easy as possible so that we find a hash
 	// below the target straight away (2**256 - 1)
 	b.Target = blockchain.BigIntToHash(blockchain.MaxTarget)
-	b.Time = uint32(time.Now().Unix())
+	b.Time = common.UnixNow()
 	mineResult := Mine(bc, b)
 	blockchain.MaxTarget = tempMaxTarget
 
@@ -42,7 +43,7 @@ func TestMineHaltMiner(t *testing.T) {
 
 	// Set target to be as hard as possible so that we stall.
 	b.Target = blockchain.BigIntToHash(blockchain.MinTarget)
-	b.Time = uint32(time.Now().Unix())
+	b.Time = common.UnixNow()
 
 	// Use a thread to stop the miner a few moments after starting.
 	go func() {
@@ -66,7 +67,7 @@ func TestCloudBase(t *testing.T) {
 			BlockNumber: bcSize,
 			LastBlock:   blockchain.HashSum(bc.Blocks[bcSize-1]),
 			Target:      consensus.CurrentTarget(),
-			Time:        uint32(time.Now().Unix()),
+			Time:        common.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: make([]*blockchain.Transaction, 0),

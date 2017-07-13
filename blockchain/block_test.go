@@ -3,7 +3,8 @@ package blockchain
 import (
 	"bytes"
 	"testing"
-	"time"
+
+	"github.com/ubclaunchpad/cumulus/common"
 )
 
 func TestEncodeDecodeBlock(t *testing.T) {
@@ -32,7 +33,7 @@ func TestBlockHeaderLen(t *testing.T) {
 		0,
 		NewTestHash(),
 		NewValidTestTarget(),
-		uint32(time.Now().Unix()),
+		common.UnixNow(),
 		0,
 		[]byte{0x00, 0x01, 0x02},
 	}
@@ -47,7 +48,7 @@ func TestBlockHeaderLen(t *testing.T) {
 		0,
 		NewTestHash(),
 		NewValidTestTarget(),
-		uint32(time.Now().Unix()),
+		common.UnixNow(),
 		0,
 		[]byte{},
 	}
