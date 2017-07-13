@@ -107,20 +107,51 @@ func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
 	return true
 }
 
-// PopTxns returns the the largest of l or size of pool transactions.
-// It selects the highest priority transactions, and removes them from the pool.
-func (p *Pool) PopTxns(l int) []*blockchain.Transaction {
-	if p.Len() == 0 {
-		return make([]*blockchain.Transaction, 0)
+// Pop returns the next transaction and removes it from the pool.
+func (p *Pool) Pop() *blockchain.Transaction {
+	if p.Len() > 0 {
+		next := p.GetN(0)
+		p.Delete(next)
+		return next
 	}
-	if p.Len() < l {
-		l = p.Len()
+	return nil
+}
+
+// Peek returns the next transaction and does not remove it from the pool.
+func (p *Pool) Peek() *blockchain.Transaction {
+	if p.Len() > 0 {
+		return p.GetN(0)
 	}
-	txns := make([]*blockchain.Transaction, l)
-	for i := 0; i < l; i++ {
-		t := p.GetN(i)
-		txns[i] = t
-		p.Delete(t)
+	return nil
+}
+
+// NextBlock produces a new block from the pool for mining.
+func (p *Pool) NextBlock(chain *blockchain.BlockChain) *blockchain.Block {
+	var txns []*blockchain.Transaction
+
+	// Hash the last block in the chain.
+	ix := len(chain.Blocks) - 1
+	lastHash := blockchain.HashSum(chain.Blocks[ix])
+
+	// Build a new block for mining.
+	b := &blockchain.Block{
+		BlockHeader: blockchain.BlockHeader{
+			BlockNumber: uint32(len(chain.Blocks)),
+			LastBlock:   lastHash,
+			Time:        uint32(time.Now().Second()),
+			Nonce:       0,
+		}, Transactions: txns,
 	}
-	return txns
+
+	// Try to grab as many transactions as the block will allow.
+	// Test each transaction to see if we break size before adding.
+	for p.Len() > 0 {
+		if b.Len()+p.Peek().Len() < blockchain.BlockSize {
+			b.Transactions = append(b.Transactions, p.Pop())
+		} else {
+			break
+		}
+	}
+
+	return b
 }

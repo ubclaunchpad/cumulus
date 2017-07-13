@@ -72,13 +72,18 @@ func (w *AppWorker) HandleTransaction(work TransactionWork) {
 	}
 }
 
-// HandleBlock handles TransactionWork.
+// HandleBlock handles new instance of BlockWork.
 func (w *AppWorker) HandleBlock(work BlockWork) {
-	ok, _ := chain.ValidBlock(work.Block)
+	ok := tpool.Update(work.Block, chain)
+
 	if ok {
+		// Append to the chain before requesting
+		// the next block so that the block
+		// numbers make sense.
 		chain.AppendBlock(work.Block)
+		blk := tpool.NextBlock(chain)
 		if miner.IsMining() {
-			miner.RestartMiner(chain, work.Block)
+			miner.RestartMiner(chain, blk)
 		}
 	}
 

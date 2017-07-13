@@ -125,6 +125,8 @@ func ConnectAndDiscover(target string) {
 // on peers whos RequestHandlers have been overridden.
 func RequestHandler(req *msg.Request) msg.Response {
 	res := msg.Response{ID: req.ID}
+
+	// Build some error types.
 	typeErr := msg.NewProtocolError(msg.InvalidResourceType,
 		"Invalid resource type")
 	paramErr := msg.NewProtocolError(msg.InvalidResourceType,
@@ -134,18 +136,23 @@ func RequestHandler(req *msg.Request) msg.Response {
 	case msg.ResourcePeerInfo:
 		res.Resource = peer.PStore.Addrs()
 	case msg.ResourceBlock:
+		// Block is requested by number.
 		blockNumber, ok := req.Params["blockNumber"].(uint32)
 		if ok {
+			// If its ok, we make try to a copy of it.
 			blk, err := chain.CopyBlockByIndex(blockNumber)
 			if err != nil {
+				// Bad index parameter.
 				res.Error = paramErr
 			} else {
 				res.Resource = blk
 			}
 		} else {
+			// No index parameter.
 			res.Error = paramErr
 		}
 	default:
+		// Return err by default.
 		res.Error = typeErr
 	}
 
