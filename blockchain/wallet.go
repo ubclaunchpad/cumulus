@@ -6,6 +6,8 @@ import (
 	crand "crypto/rand"
 	"io"
 	"math/big"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
 )
 
 const (
@@ -21,9 +23,9 @@ var (
 	// The curve we use for our ECC crypto.
 	curve = elliptic.P256()
 	// NilSig is a signature representing a failed Sign operation
-	NilSig = Signature{big.NewInt(0), big.NewInt(0)}
+	NilSig = Signature{c.Big0, c.Big0}
 	// NilAddr is an address representing no address
-	NilAddr = Address{big.NewInt(0), big.NewInt(0)}
+	NilAddr = Address{c.Big0, c.Big0}
 )
 
 // Address represents a wallet that can be a recipient in a transaction.
@@ -34,8 +36,23 @@ type Address struct {
 // Marshal converts an Address to a byte slice.
 func (a Address) Marshal() []byte {
 	buf := make([]byte, 0, AddrLen)
-	buf = append(buf, a.X.Bytes()...)
-	buf = append(buf, a.Y.Bytes()...)
+	xBytes := a.X.Bytes()
+	yBytes := a.Y.Bytes()
+
+	if len(xBytes) < CoordLen {
+		for i := len(xBytes); i < CoordLen; i++ {
+			xBytes = append(xBytes, 0)
+		}
+	}
+
+	if len(yBytes) < CoordLen {
+		for i := len(yBytes); i < CoordLen; i++ {
+			yBytes = append(yBytes, 0)
+		}
+	}
+
+	buf = append(buf, xBytes...)
+	buf = append(buf, yBytes...)
 	return buf
 }
 
@@ -82,8 +99,23 @@ type Signature struct {
 // Marshal converts a signature to a byte slice. Should be 64 bytes long.
 func (s *Signature) Marshal() []byte {
 	buf := make([]byte, 0, SigLen)
-	buf = append(buf, s.R.Bytes()...)
-	buf = append(buf, s.S.Bytes()...)
+	rBytes := s.R.Bytes()
+	sBytes := s.S.Bytes()
+
+	if len(rBytes) < CoordLen {
+		for i := len(rBytes); i < CoordLen; i++ {
+			rBytes = append(rBytes, 0)
+		}
+	}
+
+	if len(sBytes) < CoordLen {
+		for i := len(sBytes); i < CoordLen; i++ {
+			rBytes = append(sBytes, 0)
+		}
+	}
+
+	buf = append(buf, rBytes...)
+	buf = append(buf, sBytes...)
 	return buf
 }
 

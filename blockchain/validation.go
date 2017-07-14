@@ -3,9 +3,10 @@ package blockchain
 // ValidTransaction checks whether a transaction is valid, assuming the
 import (
 	"crypto/ecdsa"
-	"math/big"
 
 	log "github.com/Sirupsen/logrus"
+	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 // TransactionCode is returned from ValidTransaction.
@@ -110,9 +111,9 @@ const (
 
 var (
 	// MaxTarget is the minimum difficulty
-	MaxTarget = new(big.Int).Sub(BigExp(2, 232), big.NewInt(1))
+	MaxTarget = util.BigSub(util.BigExp(2, 232), c.Big1)
 	// MinTarget is the maximum difficulty value
-	MinTarget = big.NewInt(1)
+	MinTarget = c.Big1
 )
 
 // ValidTransaction tests whether a transaction valid.
@@ -203,7 +204,7 @@ func (bc *BlockChain) ValidGenesisBlock(gb *Block) (bool, GenesisBlockCode) {
 	}
 
 	// Check if the genesis block's last block hash is equal to 0.
-	if HashToBigInt(gb.BlockHeader.LastBlock).Cmp(big.NewInt(0)) != 0 {
+	if HashToBigInt(gb.BlockHeader.LastBlock).Cmp(c.Big0) != 0 {
 		return false, BadGenesisLastBlock
 	}
 
@@ -303,10 +304,4 @@ func (bc *BlockChain) ValidBlock(b *Block) (bool, BlockCode) {
 	}
 
 	return true, ValidBlock
-}
-
-// BigExp returns an big int pointer with the result set to base**exp,
-// if exp <= 0, the result is 1
-func BigExp(base, exp int) *big.Int {
-	return new(big.Int).Exp(big.NewInt(int64(base)), big.NewInt(int64(exp)), nil)
 }

@@ -6,6 +6,9 @@ import (
 	"math/big"
 	mrand "math/rand"
 	"time"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 // NewTestHash produces a hash.
@@ -99,7 +102,7 @@ func NewTestInputBlock(t []*Transaction) *Block {
 			BlockNumber: 0,
 			LastBlock:   NewTestHash(),
 			Target:      NewValidTestTarget(),
-			Time:        uint32(time.Now().Unix()),
+			Time:        util.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: t,
@@ -114,7 +117,7 @@ func NewTestOutputBlock(t []*Transaction, input *Block) *Block {
 			BlockNumber: input.BlockNumber + 1,
 			LastBlock:   HashSum(input),
 			Target:      NewValidTestTarget(),
-			Time:        uint32(time.Now().Unix()),
+			Time:        util.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: t,
@@ -204,9 +207,9 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 func NewValidTestTarget() Hash {
 	r := new(big.Int).Rand(
 		mrand.New(mrand.NewSource(time.Now().Unix())),
-		new(big.Int).Add(MaxTarget, big.NewInt(1)),
+		util.BigAdd(MaxTarget, c.Big1),
 	)
-	r.Add(r, big.NewInt(1))
+	r.Add(r, c.Big1)
 	return BigIntToHash(r)
 }
 

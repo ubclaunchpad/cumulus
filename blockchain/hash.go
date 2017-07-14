@@ -3,6 +3,8 @@ package blockchain
 import (
 	"crypto/sha256"
 	"math/big"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
 )
 
 const (
@@ -12,7 +14,7 @@ const (
 
 var (
 	// NilHash represents a nil hash
-	NilHash = BigIntToHash(big.NewInt(0))
+	NilHash = BigIntToHash(c.Big0)
 )
 
 // Hash represents a 256-bit hash of a block or transaction
@@ -58,7 +60,8 @@ func HashToBigInt(h Hash) *big.Int {
 	return new(big.Int).SetBytes(h[:])
 }
 
-// BigIntToHash converts a big integer to a hash
+// BigIntToHash converts a big integer to a hash. If the size of the big int
+// is larger than the size of hash, the function will return a hash set to 0.
 func BigIntToHash(x *big.Int) Hash {
 	bytes := x.Bytes()
 
