@@ -1,6 +1,6 @@
 package blockchain
 
-import "github.com/ubclaunchpad/cumulus/common"
+import "github.com/ubclaunchpad/cumulus/common/util"
 
 // Genesis creates the Genesis block and returns is.
 //
@@ -34,7 +34,7 @@ func Genesis(miner Address, target Hash, blockReward uint64, extraData []byte) *
 			BlockNumber: 0,
 			LastBlock:   NilHash,
 			Target:      target,
-			Time:        common.UnixNow(),
+			Time:        util.UnixNow(),
 			Nonce:       0,
 			ExtraData:   extraData,
 		},

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ubclaunchpad/cumulus/common"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 func TestEncodeDecodeBlock(t *testing.T) {
@@ -33,7 +33,7 @@ func TestBlockHeaderLen(t *testing.T) {
 		0,
 		NewTestHash(),
 		NewValidTestTarget(),
-		common.UnixNow(),
+		util.UnixNow(),
 		0,
 		[]byte{0x00, 0x01, 0x02},
 	}
@@ -48,7 +48,7 @@ func TestBlockHeaderLen(t *testing.T) {
 		0,
 		NewTestHash(),
 		NewValidTestTarget(),
-		common.UnixNow(),
+		util.UnixNow(),
 		0,
 		[]byte{},
 	}

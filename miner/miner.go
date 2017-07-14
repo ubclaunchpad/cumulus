@@ -6,7 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/blockchain"
-	"github.com/ubclaunchpad/cumulus/common"
+	"github.com/ubclaunchpad/cumulus/common/util"
 	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
@@ -65,7 +65,7 @@ func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
 		}
 
 		// Timestamp and increase the nonce.
-		b.Time = common.UnixNow()
+		b.Time = util.UnixNow()
 		b.Nonce++
 	}
 

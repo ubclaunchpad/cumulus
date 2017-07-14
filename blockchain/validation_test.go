@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	c "github.com/ubclaunchpad/cumulus/common/constants"
-	"github.com/ubclaunchpad/cumulus/common/math"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 func TestValidTransactionNilTransaction(t *testing.T) {
@@ -118,7 +118,7 @@ func TestValidBlockBadGenesisBlock(t *testing.T) {
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
-	gb.Target = BigIntToHash(math.BigExp(2, 255))
+	gb.Target = BigIntToHash(util.BigExp(2, 255))
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),
@@ -193,7 +193,7 @@ func TestValidBlockBadTime(t *testing.T) {
 
 func TestValidBlockBadTarget(t *testing.T) {
 	bc, b := NewValidTestChainAndBlock()
-	b.Target = BigIntToHash(math.BigAdd(MaxTarget, c.Big1))
+	b.Target = BigIntToHash(util.BigAdd(MaxTarget, c.Big1))
 	valid, code := bc.ValidBlock(b)
 
 	if valid {
@@ -203,7 +203,7 @@ func TestValidBlockBadTarget(t *testing.T) {
 		t.Fail()
 	}
 
-	b.Target = BigIntToHash(math.BigSub(MinTarget, c.Big1))
+	b.Target = BigIntToHash(util.BigSub(MinTarget, c.Big1))
 	valid, code = bc.ValidBlock(b)
 
 	if valid {
@@ -554,7 +554,7 @@ func TestValidGenesisBlockBadGenesisTarget(t *testing.T) {
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
-	gb.Target = BigIntToHash(math.BigExp(2, 255))
+	gb.Target = BigIntToHash(util.BigExp(2, 255))
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),

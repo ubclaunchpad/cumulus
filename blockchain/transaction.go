@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/ubclaunchpad/cumulus/common"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 // TxHashPointer is a reference to a transaction on the blockchain.
@@ -17,9 +17,9 @@ type TxHashPointer struct {
 // Marshal converts a TxHashPointer to a byte slice
 func (thp TxHashPointer) Marshal() []byte {
 	var buf []byte
-	buf = common.AppendUint32(buf, thp.BlockNumber)
+	buf = util.AppendUint32(buf, thp.BlockNumber)
 	buf = append(buf, thp.Hash.Marshal()...)
-	buf = common.AppendUint32(buf, thp.Index)
+	buf = util.AppendUint32(buf, thp.Index)
 	return buf
 }
 

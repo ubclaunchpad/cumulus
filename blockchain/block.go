@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ubclaunchpad/cumulus/common"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 // BlockHeader contains metadata about a block
@@ -30,11 +30,11 @@ type BlockHeader struct {
 // Marshal converts a BlockHeader to a byte slice
 func (bh *BlockHeader) Marshal() []byte {
 	var buf []byte
-	buf = common.AppendUint32(buf, bh.BlockNumber)
+	buf = util.AppendUint32(buf, bh.BlockNumber)
 	buf = append(buf, bh.LastBlock.Marshal()...)
 	buf = append(buf, bh.Target.Marshal()...)
-	buf = common.AppendUint32(buf, bh.Time)
-	buf = common.AppendUint64(buf, bh.Nonce)
+	buf = util.AppendUint32(buf, bh.Time)
+	buf = util.AppendUint64(buf, bh.Nonce)
 	buf = append(buf, bh.ExtraData...)
 
 	return buf

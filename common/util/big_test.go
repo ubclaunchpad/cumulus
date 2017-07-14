@@ -1,4 +1,4 @@
-package math
+package util
 
 import (
 	"math/big"

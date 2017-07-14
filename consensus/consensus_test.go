@@ -6,8 +6,8 @@ import (
 	"math/rand"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
-	"github.com/ubclaunchpad/cumulus/common"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 func TestHalveReward(t *testing.T) {
@@ -154,7 +154,7 @@ func newValidBlockChainAndCloudBaseBlock() (
 			BlockNumber: bcSize,
 			LastBlock:   blockchain.HashSum(bc.Blocks[bcSize-1]),
 			Target:      CurrentTarget(),
-			Time:        common.UnixNow(),
+			Time:        util.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: make([]*blockchain.Transaction, 1),

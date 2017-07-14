@@ -6,7 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
-	"github.com/ubclaunchpad/cumulus/common/math"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 // TransactionCode is returned from ValidTransaction.
@@ -111,7 +111,7 @@ const (
 
 var (
 	// MaxTarget is the minimum difficulty
-	MaxTarget = math.BigSub(math.BigExp(2, 232), c.Big1)
+	MaxTarget = util.BigSub(util.BigExp(2, 232), c.Big1)
 	// MinTarget is the maximum difficulty value
 	MinTarget = c.Big1
 )

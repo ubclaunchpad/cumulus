@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	c "github.com/ubclaunchpad/cumulus/common/constants"
-	"github.com/ubclaunchpad/cumulus/common/math"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 func TestBigIntToHash(t *testing.T) {
-	x := math.BigAdd(math.BigExp(2, 256), c.Big1)
+	x := util.BigAdd(util.BigExp(2, 256), c.Big1)
 	h := BigIntToHash(x)
 
 	for i := 0; i < HashLen; i++ {
