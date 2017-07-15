@@ -76,12 +76,13 @@ func (w *AppWorker) HandleTransaction(work TransactionWork) {
 func (w *AppWorker) HandleBlock(work BlockWork) {
 	validBlock := tpool.Update(work.Block, chain)
 
-	if ok {
+	if validBlock {
 		// Append to the chain before requesting
 		// the next block so that the block
 		// numbers make sense.
 		chain.AppendBlock(work.Block)
-		blk := tpool.NextBlock(chain)
+		address := GetCurrentUser().Wallet.Public()
+		blk := tpool.NextBlock(chain, address)
 		if miner.IsMining() {
 			miner.RestartMiner(chain, blk)
 		}
@@ -91,6 +92,6 @@ func (w *AppWorker) HandleBlock(work BlockWork) {
 	if work.Responder != nil {
 		work.Responder.Lock()
 		defer work.Responder.Unlock()
-		work.Responder.Send(ok)
+		work.Responder.Send(validBlock)
 	}
 }

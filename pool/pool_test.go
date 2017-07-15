@@ -100,11 +100,13 @@ func TestNextBlock(t *testing.T) {
 	for i := 0; i < numTxns; i++ {
 		p.SetUnsafe(blockchain.NewTestTransaction())
 	}
-	b := p.NextBlock(chain)
+	b := p.NextBlock(chain, blockchain.NewWallet().Public())
 	assert.NotNil(t, b)
 	assert.True(t, b.Len() < blockchain.UserBlockSize)
 	assert.True(t, b.Len() > 0)
-	assert.Equal(t, len(b.Transactions), numTxns-p.Len())
+
+	// The difference is off by one thanks to cloud transaction.
+	assert.Equal(t, len(b.Transactions), numTxns-p.Len()+1)
 	assert.Equal(t, blockchain.HashSum(lastBlk), b.LastBlock)
 	assert.Equal(t, uint64(0), b.Nonce)
 	assert.Equal(t, uint32(nBlks), b.BlockNumber)

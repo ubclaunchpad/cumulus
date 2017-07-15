@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/miner"
 )
 
 // PooledTransaction is a Transaction with a timetamp.
@@ -126,7 +127,8 @@ func (p *Pool) Peek() *blockchain.Transaction {
 }
 
 // NextBlock produces a new block from the pool for mining.
-func (p *Pool) NextBlock(chain *blockchain.BlockChain) *blockchain.Block {
+func (p *Pool) NextBlock(chain *blockchain.BlockChain,
+	address blockchain.Address) *blockchain.Block {
 	var txns []*blockchain.Transaction
 
 	// Hash the last block in the chain.
@@ -142,6 +144,9 @@ func (p *Pool) NextBlock(chain *blockchain.BlockChain) *blockchain.Block {
 			Nonce:       0,
 		}, Transactions: txns,
 	}
+
+	// Prepend the cloudbase transaction for this miner.
+	miner.CloudBase(b, chain, address)
 
 	// Try to grab as many transactions as the block will allow.
 	// Test each transaction to see if we break size before adding.
