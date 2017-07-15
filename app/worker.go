@@ -62,19 +62,19 @@ func (w AppWorker) Start() {
 
 // HandleTransaction handles new instance of TransactionWork.
 func (w *AppWorker) HandleTransaction(work TransactionWork) {
-	ok := tpool.Set(work.Transaction, chain)
+	validTransaction := tpool.Set(work.Transaction, chain)
 
 	// Respond to the request if a response method was provided.
 	if work.Responder != nil {
 		work.Responder.Lock()
 		defer work.Responder.Unlock()
-		work.Responder.Send(ok)
+		work.Responder.Send(validTransaction)
 	}
 }
 
 // HandleBlock handles new instance of BlockWork.
 func (w *AppWorker) HandleBlock(work BlockWork) {
-	ok := tpool.Update(work.Block, chain)
+	validBlock := tpool.Update(work.Block, chain)
 
 	if ok {
 		// Append to the chain before requesting
