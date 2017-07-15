@@ -27,6 +27,9 @@ var runCmd = &cobra.Command{
 			Console:   console,
 		}
 		app.Run(config)
+
+		// Hang main thread. Everything happens in goroutines from here
+		select {}
 	},
 }
 

@@ -82,6 +82,9 @@ func Run(cfg conf.Config) {
 	}()
 
 	// If the console flag was passed, redirect logs to a file and run the console
+	// NOTE: if the log file already exists we will exit with a fatal error here!
+	// This should stop people from running multiple Cumulus nodes that will try
+	// to log to the same file.
 	if cfg.Console {
 		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
 		if err != nil {
@@ -106,9 +109,6 @@ func Run(cfg conf.Config) {
 		log.Info("Request blockchain from peers not yet implemented.")
 		initializeChain()
 	}
-
-	// Hang main thread. Everything happens in goroutines from here
-	select {}
 }
 
 // ConnectAndDiscover tries to connect to a target and discover its peers.
