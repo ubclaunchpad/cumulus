@@ -100,7 +100,7 @@ func TestNextBlock(t *testing.T) {
 	for i := 0; i < numTxns; i++ {
 		p.SetUnsafe(blockchain.NewTestTransaction())
 	}
-	b := p.NextBlock(chain, blockchain.NewWallet().Public())
+	b := p.NextBlock(chain, blockchain.NewWallet().Public(), 1<<18)
 	assert.NotNil(t, b)
 	assert.True(t, b.Len() < blockchain.UserBlockSize)
 	assert.True(t, b.Len() > 0)

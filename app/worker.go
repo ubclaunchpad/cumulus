@@ -77,12 +77,13 @@ func (w *AppWorker) HandleBlock(work BlockWork) {
 	validBlock := tpool.Update(work.Block, chain)
 
 	if validBlock {
+		user := GetCurrentUser()
 		// Append to the chain before requesting
 		// the next block so that the block
 		// numbers make sense.
 		chain.AppendBlock(work.Block)
-		address := GetCurrentUser().Wallet.Public()
-		blk := tpool.NextBlock(chain, address)
+		address := user.Wallet.Public()
+		blk := tpool.NextBlock(chain, address, user.BlockSize)
 		if miner.IsMining() {
 			miner.RestartMiner(chain, blk)
 		}
