@@ -129,8 +129,8 @@ func RequestHandler(req *msg.Request) msg.Response {
 	// Build some error types.
 	typeErr := msg.NewProtocolError(msg.InvalidResourceType,
 		"Invalid resource type")
-	paramErr := msg.NewProtocolError(msg.InvalidResourceType,
-		"Invalid request parameter, blockNumber must be uint32.")
+	notFoundErr := msg.NewProtocolError(msg.ResourceNotFound,
+		"Resource not found.")
 
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
@@ -143,13 +143,13 @@ func RequestHandler(req *msg.Request) msg.Response {
 			blk, err := chain.CopyBlockByIndex(blockNumber)
 			if err != nil {
 				// Bad index parameter.
-				res.Error = paramErr
+				res.Error = notFoundErr
 			} else {
 				res.Resource = blk
 			}
 		} else {
 			// No index parameter.
-			res.Error = paramErr
+			res.Error = notFoundErr
 		}
 	default:
 		// Return err by default.

@@ -102,7 +102,7 @@ func TestNextBlock(t *testing.T) {
 	}
 	b := p.NextBlock(chain, blockchain.NewWallet().Public(), 1<<18)
 	assert.NotNil(t, b)
-	assert.True(t, b.Len() < blockchain.UserBlockSize)
+	assert.True(t, b.Len() < 1<<18)
 	assert.True(t, b.Len() > 0)
 
 	// The difference is off by one thanks to cloud transaction.
