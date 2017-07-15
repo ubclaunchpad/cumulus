@@ -9,10 +9,6 @@ import (
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
-// UserBlockSize is the maximum size of a block in bytes when marshaled
-// as specifiedd by the user (about 250K by default).
-const UserBlockSize = 1 << 18
-
 // BlockHeader contains metadata about a block
 type BlockHeader struct {
 	// BlockNumber is the position of the block within the blockchain
