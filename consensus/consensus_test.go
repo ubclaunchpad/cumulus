@@ -2,12 +2,12 @@ package consensus
 
 import (
 	"testing"
-	"time"
 
-	"math/big"
 	"math/rand"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 func TestHalveReward(t *testing.T) {
@@ -88,7 +88,7 @@ func TestValidMinedBlockBadTarget(t *testing.T) {
 
 func TestValidMinedBlockBadNonce(t *testing.T) {
 	bc, b, a := newValidBlockChainAndCloudBaseBlock()
-	b.Target = blockchain.BigIntToHash(big.NewInt(1))
+	b.Target = blockchain.BigIntToHash(c.Big1)
 	tempCurrentDifficulty := CurrentDifficulty
 	CurrentDifficulty = blockchain.MaxTarget
 
@@ -123,10 +123,7 @@ func TestValidMinedBlock(t *testing.T) {
 	tempMaxTarget := blockchain.MaxTarget
 	tempCurrentDifficulty := CurrentDifficulty
 
-	blockchain.MaxTarget = new(big.Int).Sub(
-		blockchain.BigExp(2, 256),
-		big.NewInt(1),
-	)
+	blockchain.MaxTarget = c.MaxUint256
 	CurrentDifficulty = blockchain.MinTarget
 
 	bc, b, a := newValidBlockChainAndCloudBaseBlock()
@@ -157,7 +154,7 @@ func newValidBlockChainAndCloudBaseBlock() (
 			BlockNumber: bcSize,
 			LastBlock:   blockchain.HashSum(bc.Blocks[bcSize-1]),
 			Target:      CurrentTarget(),
-			Time:        uint32(time.Now().Unix()),
+			Time:        util.UnixNow(),
 			Nonce:       0,
 		},
 		Transactions: make([]*blockchain.Transaction, 1),

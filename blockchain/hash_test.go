@@ -3,11 +3,41 @@ package blockchain
 import (
 	"math/big"
 	"testing"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
+
+func TestBigIntToHash(t *testing.T) {
+	x := util.BigAdd(util.BigExp(2, 256), c.Big1)
+	h := BigIntToHash(x)
+
+	for i := 0; i < HashLen; i++ {
+		if h[i] != 0 {
+			t.Fail()
+		}
+	}
+
+	h = BigIntToHash(c.Big0)
+
+	for i := 0; i < HashLen; i++ {
+		if h[i] != 0 {
+			t.Fail()
+		}
+	}
+
+	h = BigIntToHash(c.MaxUint256)
+
+	for i := 0; i < HashLen; i++ {
+		if h[i] != 255 {
+			t.Fail()
+		}
+	}
+}
 
 func TestHashToBigInt(t *testing.T) {
 	// Max hash value
-	x := new(big.Int).Sub(new(big.Int).Exp(big.NewInt(int64(2)), big.NewInt(int64(256)), big.NewInt(0)), big.NewInt(1))
+	x := c.MaxUint256
 	h := BigIntToHash(x)
 
 	if HashToBigInt(h).Cmp(x) != 0 {

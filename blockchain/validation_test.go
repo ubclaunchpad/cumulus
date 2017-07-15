@@ -3,8 +3,10 @@ package blockchain
 import (
 	"crypto/rand"
 	"fmt"
-	"math/big"
 	"testing"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 func TestValidTransactionNilTransaction(t *testing.T) {
@@ -116,7 +118,7 @@ func TestValidBlockBadGenesisBlock(t *testing.T) {
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
-	gb.Target = BigIntToHash(BigExp(2, 255))
+	gb.Target = BigIntToHash(util.BigExp(2, 255))
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),
@@ -191,7 +193,7 @@ func TestValidBlockBadTime(t *testing.T) {
 
 func TestValidBlockBadTarget(t *testing.T) {
 	bc, b := NewValidTestChainAndBlock()
-	b.Target = BigIntToHash(new(big.Int).Add(MaxTarget, big.NewInt(1)))
+	b.Target = BigIntToHash(util.BigAdd(MaxTarget, c.Big1))
 	valid, code := bc.ValidBlock(b)
 
 	if valid {
@@ -201,7 +203,7 @@ func TestValidBlockBadTarget(t *testing.T) {
 		t.Fail()
 	}
 
-	b.Target = BigIntToHash(new(big.Int).Sub(MinTarget, big.NewInt(1)))
+	b.Target = BigIntToHash(util.BigSub(MinTarget, c.Big1))
 	valid, code = bc.ValidBlock(b)
 
 	if valid {
@@ -552,7 +554,7 @@ func TestValidGenesisBlockBadGenesisTarget(t *testing.T) {
 	currentTarget := BigIntToHash(MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
-	gb.Target = BigIntToHash(BigExp(2, 255))
+	gb.Target = BigIntToHash(util.BigExp(2, 255))
 	bc := &BlockChain{
 		Blocks: []*Block{gb},
 		Head:   HashSum(gb),
@@ -587,33 +589,6 @@ func TestValidGenesisBlockBadGenesisTime(t *testing.T) {
 	}
 
 	if code != BadGenesisTime {
-		t.Fail()
-	}
-}
-
-func TestBigExp(t *testing.T) {
-	a := big.NewInt(1)
-	b := BigExp(0, 0)
-
-	if a.Cmp(b) != 0 {
-		t.Fail()
-	}
-
-	a = big.NewInt(1)
-	b = BigExp(10, -2)
-
-	if a.Cmp(b) != 0 {
-		t.Fail()
-	}
-
-	a = new(big.Int).Exp(
-		big.NewInt(int64(2)),
-		big.NewInt(int64(256)),
-		big.NewInt(0),
-	)
-	b = BigExp(2, 256)
-
-	if a.Cmp(b) != 0 {
 		t.Fail()
 	}
 }
