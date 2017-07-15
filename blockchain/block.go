@@ -2,10 +2,11 @@ package blockchain
 
 // BlockHeader contains metadata about a block
 import (
-	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"io"
+
+	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 // BlockHeader contains metadata about a block
@@ -29,21 +30,11 @@ type BlockHeader struct {
 // Marshal converts a BlockHeader to a byte slice
 func (bh *BlockHeader) Marshal() []byte {
 	var buf []byte
-
-	tempBufBlockNumber := make([]byte, 4)
-	binary.LittleEndian.PutUint32(tempBufBlockNumber, bh.BlockNumber)
-
-	tempBufTime := make([]byte, 4)
-	binary.LittleEndian.PutUint32(tempBufTime, bh.Time)
-
-	tempBufNonce := make([]byte, 8)
-	binary.LittleEndian.PutUint64(tempBufNonce, bh.Nonce)
-
-	buf = append(buf, tempBufBlockNumber...)
+	buf = util.AppendUint32(buf, bh.BlockNumber)
 	buf = append(buf, bh.LastBlock.Marshal()...)
 	buf = append(buf, bh.Target.Marshal()...)
-	buf = append(buf, tempBufTime...)
-	buf = append(buf, tempBufNonce...)
+	buf = util.AppendUint32(buf, bh.Time)
+	buf = util.AppendUint64(buf, bh.Nonce)
 	buf = append(buf, bh.ExtraData...)
 
 	return buf

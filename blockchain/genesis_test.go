@@ -1,8 +1,9 @@
 package blockchain
 
 import (
-	"math/big"
 	"testing"
+
+	c "github.com/ubclaunchpad/cumulus/common/constants"
 )
 
 func TestGenesis(t *testing.T) {
@@ -22,7 +23,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Check if the genesis block's last block hash is equal to 0
-	if HashToBigInt(gb.BlockHeader.LastBlock).Cmp(big.NewInt(0)) != 0 {
+	if HashToBigInt(gb.BlockHeader.LastBlock).Cmp(c.Big0) != 0 {
 		t.Fail()
 	}
 
