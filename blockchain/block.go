@@ -9,14 +9,9 @@ import (
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
-const (
-	// BlockSize is the maximum size of a block in bytes when marshaled (about 250K).
-	BlockSize = 1 << 18
-	// BlockHeaderLen is the length in bytes of a block header.
-	BlockHeaderLen = 2*(32/8) + 64/8 + 2*HashLen
-	// MaxTransactionsPerBlock is the maximum number of transactions in a block.
-	MaxTransactionsPerBlock = BlockSize / MinTxnLen
-)
+// UserBlockSize is the maximum size of a block in bytes when marshaled
+// as specifiedd by the user (about 250K by default).
+const UserBlockSize = 1 << 18
 
 // BlockHeader contains metadata about a block
 type BlockHeader struct {

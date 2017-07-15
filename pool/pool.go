@@ -146,7 +146,7 @@ func (p *Pool) NextBlock(chain *blockchain.BlockChain) *blockchain.Block {
 	// Try to grab as many transactions as the block will allow.
 	// Test each transaction to see if we break size before adding.
 	for p.Len() > 0 {
-		if b.Len()+p.Peek().Len() < blockchain.BlockSize {
+		if b.Len()+p.Peek().Len() < blockchain.UserBlockSize {
 			b.Transactions = append(b.Transactions, p.Pop())
 		} else {
 			break

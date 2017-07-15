@@ -102,7 +102,7 @@ func TestNextBlock(t *testing.T) {
 	}
 	b := p.NextBlock(chain)
 	assert.NotNil(t, b)
-	assert.True(t, b.Len() < blockchain.BlockSize)
+	assert.True(t, b.Len() < blockchain.UserBlockSize)
 	assert.True(t, b.Len() > 0)
 	assert.Equal(t, len(b.Transactions), numTxns-p.Len())
 	assert.Equal(t, blockchain.HashSum(lastBlk), b.LastBlock)

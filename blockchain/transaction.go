@@ -7,15 +7,6 @@ import (
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
-const (
-	// TxHashPointerLen is the length in bytes of a hash pointer.
-	TxHashPointerLen = 32/8 + HashLen
-	// TxOutputLen is the length in bytes of a transaction output.
-	TxOutputLen = 64/8 + AddrLen
-	// MinTxnLen is the minimum length in bytes of a transaction.
-	MinTxnLen = TxHashPointerLen + TxOutputLen + SigLen + AddrLen
-)
-
 // TxHashPointer is a reference to a transaction on the blockchain.
 type TxHashPointer struct {
 	BlockNumber uint32
