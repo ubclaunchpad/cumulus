@@ -131,27 +131,34 @@ func (a App) ConnectAndDiscover(target string) {
 // on peers whos PushHandlers have been overridden.
 func (a App) RequestHandler(req *msg.Request) msg.Response {
 	res := msg.Response{ID: req.ID}
+
+	// Build some error types.
 	typeErr := msg.NewProtocolError(msg.InvalidResourceType,
 		"Invalid resource type")
-	paramErr := msg.NewProtocolError(msg.InvalidResourceType,
-		"Invalid request parameter, blockNumber must be uint32.")
+	notFoundErr := msg.NewProtocolError(msg.ResourceNotFound,
+		"Resource not found.")
 
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
 		res.Resource = a.PeerStore.Addrs()
 	case msg.ResourceBlock:
+		// Block is requested by number.
 		blockNumber, ok := req.Params["blockNumber"].(uint32)
 		if ok {
+			// If its ok, we make try to a copy of it.
 			blk, err := chain.CopyBlockByIndex(blockNumber)
 			if err != nil {
-				res.Error = paramErr
+				// Bad index parameter.
+				res.Error = notFoundErr
 			} else {
 				res.Resource = blk
 			}
 		} else {
-			res.Error = paramErr
+			// No index parameter.
+			res.Error = notFoundErr
 		}
 	default:
+		// Return err by default.
 		res.Error = typeErr
 	}
 

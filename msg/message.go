@@ -27,6 +27,8 @@ const (
 	// InvalidResourceType occurs when a request is received with an unknown
 	// ResourceType value.
 	InvalidResourceType = 401
+	// ResourceNotFound occurs when a node reports the requested resource missing.
+	ResourceNotFound = 404
 	// NotImplemented occurs when a message or request is received whos response
 	// requires functionality that does not yet exist.
 	NotImplemented = 501

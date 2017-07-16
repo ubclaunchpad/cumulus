@@ -62,23 +62,30 @@ func (w AppWorker) Start() {
 
 // HandleTransaction handles new instance of TransactionWork.
 func (w *AppWorker) HandleTransaction(work TransactionWork) {
-	ok := tpool.Set(work.Transaction, chain)
+	validTransaction := tpool.Set(work.Transaction, chain)
 
 	// Respond to the request if a response method was provided.
 	if work.Responder != nil {
 		work.Responder.Lock()
 		defer work.Responder.Unlock()
-		work.Responder.Send(ok)
+		work.Responder.Send(validTransaction)
 	}
 }
 
-// HandleBlock handles TransactionWork.
+// HandleBlock handles new instance of BlockWork.
 func (w *AppWorker) HandleBlock(work BlockWork) {
-	ok, _ := chain.ValidBlock(work.Block)
-	if ok {
+	validBlock := tpool.Update(work.Block, chain)
+
+	if validBlock {
+		user := GetCurrentUser()
+		// Append to the chain before requesting
+		// the next block so that the block
+		// numbers make sense.
 		chain.AppendBlock(work.Block)
+		address := user.Wallet.Public()
+		blk := tpool.NextBlock(chain, address, user.BlockSize)
 		if miner.IsMining() {
-			miner.RestartMiner(chain, work.Block)
+			miner.RestartMiner(chain, blk)
 		}
 	}
 
@@ -86,6 +93,6 @@ func (w *AppWorker) HandleBlock(work BlockWork) {
 	if work.Responder != nil {
 		work.Responder.Lock()
 		defer work.Responder.Unlock()
-		work.Responder.Send(ok)
+		work.Responder.Send(validBlock)
 	}
 }

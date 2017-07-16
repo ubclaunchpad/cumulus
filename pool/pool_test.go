@@ -3,6 +3,7 @@ package pool
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 )
 
@@ -66,32 +67,10 @@ func TestUpdatePool(t *testing.T) {
 	}
 }
 
-func TestGetTxns(t *testing.T) {
-	p := New()
-	bc, b := blockchain.NewValidTestChainAndBlock()
-	for _, tr := range b.Transactions[1:] {
-		if !p.Set(tr, bc) {
-			t.FailNow()
-		}
-	}
-	nTxns := len(b.Transactions[1:]) + 12 // arbitrary.
-	txns := p.PopTxns(nTxns)
-	for _, tr := range txns {
-		if ok, _ := b.ContainsTransaction(tr); !ok {
-			t.FailNow()
-		}
-	}
-	if p.Len() != 0 {
-		t.FailNow()
-	}
-}
-
 func TestGetNewBlockEmpty(t *testing.T) {
 	p := New()
-	txns := p.PopTxns(305)
-	if len(txns) != 0 {
-		t.FailNow()
-	}
+	txn := p.Pop()
+	assert.Nil(t, txn)
 }
 
 func TestGetIndex(t *testing.T) {
@@ -110,4 +89,35 @@ func TestGetIndex(t *testing.T) {
 			t.FailNow()
 		}
 	}
+}
+
+func TestNextBlock(t *testing.T) {
+	p := New()
+	chain, _ := blockchain.NewValidTestChainAndBlock()
+	nBlks := len(chain.Blocks)
+	lastBlk := chain.Blocks[nBlks-1]
+	numTxns := 1000
+	for i := 0; i < numTxns; i++ {
+		p.SetUnsafe(blockchain.NewTestTransaction())
+	}
+	b := p.NextBlock(chain, blockchain.NewWallet().Public(), 1<<18)
+	assert.NotNil(t, b)
+	assert.True(t, b.Len() < 1<<18)
+	assert.True(t, b.Len() > 0)
+
+	// The difference is off by one thanks to cloud transaction.
+	assert.Equal(t, len(b.Transactions), numTxns-p.Len()+1)
+	assert.Equal(t, blockchain.HashSum(lastBlk), b.LastBlock)
+	assert.Equal(t, uint64(0), b.Nonce)
+	assert.Equal(t, uint32(nBlks), b.BlockNumber)
+}
+
+func TestPeek(t *testing.T) {
+	p := New()
+	assert.Nil(t, p.Peek())
+}
+
+func TestPop(t *testing.T) {
+	p := New()
+	assert.Nil(t, p.Pop())
 }
