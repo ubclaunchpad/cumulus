@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"sync"
+
 	"github.com/spf13/cobra"
 	"github.com/ubclaunchpad/cumulus/app"
 	"github.com/ubclaunchpad/cumulus/conf"
@@ -26,7 +28,14 @@ var runCmd = &cobra.Command{
 			Verbose:   verbose,
 			Console:   console,
 		}
-		app.Run(config)
+
+		// Set up wait group to signal when we have started listening and
+		// maintaining connections
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+
+		// Start the application
+		app.Run(config, wg)
 
 		// Hang main thread. Everything happens in goroutines from here
 		select {}

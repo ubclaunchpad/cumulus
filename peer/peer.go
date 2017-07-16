@@ -178,7 +178,9 @@ func (p *Peer) Push(push msg.Push) error {
 // connections as possible by requesting PeerInfo from peers in the PeerStore
 // and establishing connections with newly discovered peers.
 // NOTE: this should be called only once and should be run as a goroutine.
-func (ps *PeerStore) MaintainConnections() {
+func (ps *PeerStore) MaintainConnections(wg *sync.WaitGroup) {
+	// Signal that we MaintainConnections is running
+	wg.Done()
 	for {
 		peerAddrs := ps.Addrs()
 		for i := 0; i < len(peerAddrs); i++ {

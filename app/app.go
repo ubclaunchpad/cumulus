@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
@@ -32,7 +33,7 @@ type App struct {
 
 // Run sets up and starts a new Cumulus node with the
 // given configuration. This should only be called once (except in tests)
-func Run(cfg conf.Config) {
+func Run(cfg conf.Config, wg *sync.WaitGroup) {
 	log.Info("Starting Cumulus node")
 	config = &cfg
 
@@ -75,7 +76,7 @@ func Run(cfg conf.Config) {
 	log.Infof("Starting listener on %s:%d", cfg.Interface, cfg.Port)
 	a.PeerStore.ListenAddr = addr
 	go func() {
-		err := conn.Listen(addr, a.PeerStore.ConnectionHandler)
+		err := conn.Listen(addr, a.PeerStore.ConnectionHandler, wg)
 		if err != nil {
 			log.WithError(err).Fatalf("Failed to listen on %s", addr)
 		}
@@ -92,7 +93,7 @@ func Run(cfg conf.Config) {
 		}
 		log.Warn("Redirecting logs to file")
 		log.SetOutput(logFile)
-		go RunConsole(a.PeerStore)
+		go RunConsole(a.PeerStore, wg)
 	}
 
 	if len(config.Target) > 0 {
@@ -102,7 +103,7 @@ func Run(cfg conf.Config) {
 
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
-	go a.PeerStore.MaintainConnections()
+	go a.PeerStore.MaintainConnections(wg)
 
 	// Request the blockchain.
 	if chain == nil {
