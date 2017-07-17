@@ -2,7 +2,6 @@ package peer
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -223,78 +222,6 @@ func (p *Peer) getResponseHandler(id string) ResponseHandler {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	return p.responseHandlers[id]
-}
-
-// Performs a handshake over the given connection allowing us to send our
-// listen address to the remote peer and to receive its litsten address.
-// On success returns remote peer listen address, on failure returns error. If
-// the given duration passes and we havn't received a listen address we return
-// an error.
-func exchangeListenAddrs(c net.Conn, d time.Duration, listenAddr string) (string, error) {
-	addrChan := make(chan string)
-	errChan := make(chan error)
-
-	req := msg.Request{
-		ID:           uuid.New().String(),
-		ResourceType: msg.ResourcePeerInfo,
-	}
-	err := req.Write(c)
-	if err != nil {
-		return "", err
-	}
-
-	// Wait for peer to request our listen address and send us its listen address.
-	go func() {
-		receivedAddr := false
-		sentAddr := false
-		var addr string
-
-		for !receivedAddr || !sentAddr {
-			message, err := msg.Read(c)
-			if err == io.EOF {
-				continue
-			} else if err != nil {
-				errChan <- err
-			}
-
-			switch message.(type) {
-			case *msg.Response:
-				// We got the listen address back
-				addr = message.(*msg.Response).Resource.(string)
-				if validAddress(addr) || addr != listenAddr {
-					receivedAddr = true
-				}
-			case *msg.Request:
-				if message.(*msg.Request).ResourceType != msg.ResourcePeerInfo {
-					continue
-				}
-				// We got a listen address request.
-				// Send the remote peer our listen address
-				res := msg.Response{
-					ID:       uuid.New().String(),
-					Resource: listenAddr,
-				}
-				err = res.Write(c)
-				if err != nil {
-					errChan <- err
-				}
-				sentAddr = true
-			default:
-			}
-		}
-
-		addrChan <- addr
-	}()
-
-	select {
-	case addr := <-addrChan:
-		return addr, nil
-	case err := <-errChan:
-		return "", err
-	case <-time.After(d):
-		return "", fmt.Errorf("Failed to exchange listen addresses with %s",
-			c.RemoteAddr().String())
-	}
 }
 
 // validAddress checks if the given TCP/IP address is valid
