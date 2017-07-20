@@ -1,10 +1,11 @@
 package msg
 
 import (
-	"encoding/gob"
+	"encoding/json"
+	"fmt"
 	"io"
 
-	"github.com/ubclaunchpad/cumulus/blockchain"
+	log "github.com/Sirupsen/logrus"
 )
 
 type (
@@ -37,19 +38,10 @@ const (
 	SubnetFull = 503
 )
 
-// Initializes all the types we need to encode.
-func init() {
-	gob.Register(&Request{})
-	gob.Register(&Response{})
-	gob.Register(&Push{})
-	gob.Register(&blockchain.Transaction{})
-	gob.Register(&blockchain.Block{})
-}
-
 // ProtocolError is an error that occured during a request.
 type ProtocolError struct {
-	Code    ErrorCode
-	Message string
+	Code    ErrorCode `json:"Code"`
+	Message string    `json:"Message"`
 }
 
 // NewProtocolError returns a new error struct.
@@ -62,10 +54,13 @@ func (e *ProtocolError) Error() string {
 	return e.Message
 }
 
-// Message is a container for messages, containing a type and either a Request,
-// Response, or Push in the payload.
-type Message interface {
-	Write(io.Writer) error
+// Message is a wrapper for requests, responses, and pushes.
+// Type must be one of a "Request", "Response", or "Push"
+// Payload must be a marshalled representation of a Request, Response, or Push
+// when the message is sent.
+type Message struct {
+	Type    string `json:"Type"`
+	Payload []byte `json:"Payload"`
 }
 
 // Request is a container for a request payload, containing a unique request ID,
@@ -73,49 +68,99 @@ type Message interface {
 // parameters. PeerInfo requests should send all info of all peers. Block requests
 // should specify block number in parameters.
 type Request struct {
-	ID           string
-	ResourceType ResourceType
-	Params       map[string]interface{}
+	ID           string                 `json:"ID"`
+	ResourceType ResourceType           `json:""`
+	Params       map[string]interface{} `json:"Params"`
 }
 
 // Response is a container for a response payload, containing the unique request
 // ID of the request prompting it, an Error (if one occurred), and the requested
 // resource (if no error occurred).
 type Response struct {
-	ID       string
-	Error    *ProtocolError
-	Resource interface{}
+	ID       string         `json:"ID"`
+	Error    *ProtocolError `json:"Error"`
+	Resource interface{}    `json:"Resource"`
 }
 
 // Push is a container for a push payload, containing a resource proactively sent
 // to us by another peer.
 type Push struct {
-	ResourceType ResourceType
-	Resource     interface{}
+	ResourceType ResourceType `json:"ResourceType"`
+	Resource     interface{}  `json:"Resource"`
 }
 
 // Write encodes and writes the Message into the given Writer.
 func (r *Request) Write(w io.Writer) error {
-	var m Message = r
-	return gob.NewEncoder(w).Encode(&m)
+	payload, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	msg := Message{
+		Type:    "Request",
+		Payload: payload,
+	}
+	return json.NewEncoder(w).Encode(msg)
 }
 
 func (r *Response) Write(w io.Writer) error {
-	var m Message = r
-	return gob.NewEncoder(w).Encode(&m)
+	payload, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	msg := Message{
+		Type:    "Response",
+		Payload: payload,
+	}
+	return json.NewEncoder(w).Encode(msg)
 }
 
 func (p *Push) Write(w io.Writer) error {
-	var m Message = p
-	return gob.NewEncoder(w).Encode(&m)
+	payload, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	msg := Message{
+		Type:    "Push",
+		Payload: payload,
+	}
+	return json.NewEncoder(w).Encode(msg)
 }
 
-// Read decodes a message from a Reader and returns it.
-func Read(r io.Reader) (Message, error) {
+// Read decodes a message from a Reader and returns the message, or an error
+// if the read fails. On success, the message payload will be either a Request,
+// Response, or Push.
+func Read(r io.Reader) (*Request, *Response, *Push, error) {
 	var m Message
-	err := gob.NewDecoder(r).Decode(&m)
+	err := json.NewDecoder(r).Decode(&m)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-	return m, nil
+
+	switch m.Type {
+	case "Request":
+		var req Request
+		err = json.Unmarshal([]byte(m.Payload), &req)
+		if err == nil {
+			log.Debug("Read request ", req)
+			return &req, nil, nil, nil
+		}
+	case "Response":
+		var res Response
+		err = json.Unmarshal([]byte(m.Payload), &res)
+		if err == nil {
+			log.Debug("Read response ", res)
+			return nil, &res, nil, nil
+		}
+	case "Push":
+		var push Push
+		err = json.Unmarshal([]byte(m.Payload), &push)
+		if err == nil {
+			log.Debug("Read push ", push)
+			return nil, nil, &push, nil
+		}
+	default:
+		err = fmt.Errorf("Received message with invalid type %s", m.Type)
+	}
+
+	return nil, nil, nil, err
 }

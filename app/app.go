@@ -118,6 +118,9 @@ func ConnectAndDiscover(target string) {
 	}
 	peer.ConnectionHandler(c)
 	p := peer.PStore.Get(c.RemoteAddr().String())
+	if p == nil {
+		log.Fatal("Failed to exchange listen addresses with target peer")
+	}
 	p.Request(peerInfoRequest, peer.PeerInfoHandler)
 }
 
