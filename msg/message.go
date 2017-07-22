@@ -33,9 +33,6 @@ const (
 	// NotImplemented occurs when a message or request is received whos response
 	// requires functionality that does not yet exist.
 	NotImplemented = 501
-	// SubnetFull occurs when a stream is opened with a peer whose Subnet is
-	// already full.
-	SubnetFull = 503
 )
 
 // ProtocolError is an error that occured during a request.
@@ -61,6 +58,13 @@ func (e *ProtocolError) Error() string {
 type Message struct {
 	Type    string `json:"Type"`
 	Payload []byte `json:"Payload"`
+}
+
+// MessagePayload is an interface that is implemented by Request, Response, and
+// Push. It is used to generally refer to these 3 payload types so we can
+// return only a single value from Read().
+type MessagePayload interface {
+	Write(io.Writer) error
 }
 
 // Request is a container for a request payload, containing a unique request ID,
@@ -126,41 +130,44 @@ func (p *Push) Write(w io.Writer) error {
 	return json.NewEncoder(w).Encode(msg)
 }
 
-// Read decodes a message from a Reader and returns the message, or an error
-// if the read fails. On success, the message payload will be either a Request,
-// Response, or Push.
-func Read(r io.Reader) (*Request, *Response, *Push, error) {
+// Read decodes a message from a Reader and returns the message payload, or an
+// error if the read fails. On success, the payload returned will be either a
+// Request, Response, or Push.
+func Read(r io.Reader) (MessagePayload, error) {
 	var m Message
 	err := json.NewDecoder(r).Decode(&m)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
+	var returnPayload MessagePayload
+
+	// Check the message type and use it to unmarshal the payload
 	switch m.Type {
 	case "Request":
 		var req Request
 		err = json.Unmarshal([]byte(m.Payload), &req)
 		if err == nil {
 			log.Debug("Read request ", req)
-			return &req, nil, nil, nil
+			returnPayload = &req
 		}
 	case "Response":
 		var res Response
 		err = json.Unmarshal([]byte(m.Payload), &res)
 		if err == nil {
 			log.Debug("Read response ", res)
-			return nil, &res, nil, nil
+			returnPayload = &res
 		}
 	case "Push":
 		var push Push
 		err = json.Unmarshal([]byte(m.Payload), &push)
 		if err == nil {
 			log.Debug("Read push ", push)
-			return nil, nil, &push, nil
+			returnPayload = &push
 		}
 	default:
 		err = fmt.Errorf("Received message with invalid type %s", m.Type)
 	}
 
-	return nil, nil, nil, err
+	return returnPayload, err
 }

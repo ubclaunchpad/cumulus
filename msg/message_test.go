@@ -22,13 +22,14 @@ func TestRequest(t *testing.T) {
 		t.Fail()
 	}
 
-	req, _, _, err := Read(&buf)
+	payload, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
 		t.Fail()
 	}
 
-	if req.ID != id {
+	req, ok := payload.(*Request)
+	if !ok || req.ID != id {
 		t.Fail()
 	}
 }
@@ -48,13 +49,14 @@ func TestResponse(t *testing.T) {
 		t.Fail()
 	}
 
-	_, res, _, err := Read(&buf)
+	payload, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
 		t.Fail()
 	}
 
-	if res.ID != id {
+	res, ok := payload.(*Response)
+	if !ok || res.ID != id {
 		t.Fail()
 	}
 
@@ -82,9 +84,14 @@ func TestPush(t *testing.T) {
 		t.Fail()
 	}
 
-	_, _, push, err := Read(&buf)
+	payload, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
+		t.Fail()
+	}
+
+	push, ok := payload.(*Push)
+	if !ok {
 		t.Fail()
 	}
 

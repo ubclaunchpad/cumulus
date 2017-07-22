@@ -201,7 +201,7 @@ func (p *Peer) Dispatch() {
 	errCount := 0
 
 	for {
-		req, res, push, err := msg.Read(p.Connection)
+		payload, err := msg.Read(p.Connection)
 		if err != nil {
 			if err == io.EOF {
 				// This just means the peer hasn't sent anything
@@ -223,7 +223,9 @@ func (p *Peer) Dispatch() {
 		}
 		errCount = 0
 
-		if req != nil {
+		switch payload.(type) {
+		case *msg.Request:
+			req := payload.(*msg.Request)
 			if p.requestHandler == nil {
 				log.Errorf("Request received but no request handler set for peer %s",
 					p.Connection.RemoteAddr().String())
@@ -231,7 +233,8 @@ func (p *Peer) Dispatch() {
 				response := p.requestHandler(req)
 				response.Write(p.Connection)
 			}
-		} else if res != nil {
+		case *msg.Response:
+			res := payload.(*msg.Response)
 			rh := p.getResponseHandler(res.ID)
 			if rh == nil {
 				log.Error("Dispatcher could not find response handler for response")
@@ -239,7 +242,8 @@ func (p *Peer) Dispatch() {
 				rh(res)
 				p.removeResponseHandler(res.ID)
 			}
-		} else {
+		case *msg.Push:
+			push := payload.(*msg.Push)
 			if p.pushHandler == nil {
 				log.Errorf("Push message received but no push handler set for peer %s",
 					p.Connection.RemoteAddr().String())
@@ -372,7 +376,7 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 		var ok bool
 
 		for !receivedAddr || !sentAddr {
-			req, res, _, err := msg.Read(c)
+			payload, err := msg.Read(c)
 			if err == io.EOF {
 				continue
 			} else if err != nil {
@@ -380,13 +384,16 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 				return
 			}
 
-			if res != nil {
+			switch payload.(type) {
+			case *msg.Response:
 				// We got the listen address back
+				res := payload.(*msg.Response)
 				addr, ok = res.Resource.(string)
 				if ok && validAddress(addr) && addr != ListenAddr {
 					receivedAddr = true
 				}
-			} else if req != nil {
+			case *msg.Request:
+				req := payload.(*msg.Request)
 				if req.ResourceType != msg.ResourcePeerInfo {
 					continue
 				}
