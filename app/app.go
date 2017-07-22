@@ -19,7 +19,6 @@ import (
 )
 
 var (
-	config  *conf.Config
 	chain   *blockchain.BlockChain
 	logFile = os.Stdout
 	// A reference to the transaction pool
@@ -33,9 +32,9 @@ type App struct {
 
 // Run sets up and starts a new Cumulus node with the
 // given configuration. This should only be called once (except in tests)
-func Run(cfg conf.Config, wg *sync.WaitGroup) {
+func Run(cfg conf.Config) {
 	log.Info("Starting Cumulus node")
-	config = &cfg
+	config := &cfg
 
 	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
 	a := App{
@@ -46,6 +45,11 @@ func Run(cfg conf.Config, wg *sync.WaitGroup) {
 	if cfg.Verbose {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	// We'll need to wait on at least 2 goroutines (Listen and
+	// MaintainConnections) to start before returning
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
 
 	// Start a goroutine that waits for program termination. Before the program
 	// exits it will flush logs and save the blockchain.
@@ -93,6 +97,7 @@ func Run(cfg conf.Config, wg *sync.WaitGroup) {
 		}
 		log.Warn("Redirecting logs to file")
 		log.SetOutput(logFile)
+		wg.Add(1)
 		go RunConsole(a.PeerStore, wg)
 	}
 
@@ -110,6 +115,9 @@ func Run(cfg conf.Config, wg *sync.WaitGroup) {
 		log.Info("Request blockchain from peers not yet implemented.")
 		initializeChain()
 	}
+
+	// Wait for goroutines to start
+	wg.Wait()
 }
 
 // ConnectAndDiscover tries to connect to a target and discover its peers.
