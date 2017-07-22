@@ -73,7 +73,7 @@ type MessagePayload interface {
 // should specify block number in parameters.
 type Request struct {
 	ID           string                 `json:"ID"`
-	ResourceType ResourceType           `json:""`
+	ResourceType ResourceType           `json:"ResourceType"`
 	Params       map[string]interface{} `json:"Params"`
 }
 
