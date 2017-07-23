@@ -39,7 +39,7 @@ type Address struct {
 
 // Repr returns a string representation of the address. We follow
 // ethereums protocol, replacing Keccak hash with SHA256.
-// Where pr is the private key.
+// Where pr is the private key,
 //    	A(pr) = SHA256(ECDSAPUBLICKEY(pr))[96:255],
 // Resources:
 // http://gavwood.com/paper.pdf (fig 213)
