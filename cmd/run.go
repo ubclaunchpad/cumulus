@@ -26,7 +26,12 @@ var runCmd = &cobra.Command{
 			Verbose:   verbose,
 			Console:   console,
 		}
+
+		// Start the application
 		app.Run(config)
+
+		// Hang main thread. Everything happens in goroutines from here
+		select {}
 	},
 }
 

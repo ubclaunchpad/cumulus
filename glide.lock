@@ -1,5 +1,5 @@
-hash: 338e5ac0b385f380b7d42f2b6d1f80449b3bf77a2c3cfee3ac34a0afac0ef973
-updated: 2017-07-09T10:45:43.507620923-07:00
+hash: 00eff548e3fa93ce1f0993837ab114a04132c04182ffeddef1e503c9e0f8026b
+updated: 2017-07-11T21:51:51.426419168-07:00
 imports:
 - name: github.com/abiosoft/ishell
   version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
@@ -24,6 +24,15 @@ imports:
   - hcl/strconv
   - json/scanner
   - json/token
+- name: github.com/huin/goupnp
+  version: 73053506a919bb1af6beb97feb0d53a1eb814eb1
+  subpackages:
+  - dcps/internetgateway1
+  - dcps/internetgateway2
+  - soap
+  - httpu
+  - scpd
+  - ssdp
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/magiconair/properties
@@ -36,6 +45,12 @@ imports:
   repo: https://github.com/mattn/go-isatty
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
+- name: github.com/onsi/ginkgo
+  version: 77a8c1e5c40d6bb6c5eb4dd4bdce9763564f6298
+  subpackages:
+  - ginkgo
+- name: github.com/onsi/gomega
+  version: 334b8f472b3af5d541c5642701c1e29e2126f486
 - name: github.com/pelletier/go-toml
   version: 69d355db5304c0f7f809a2edc054553e7142f016
 - name: github.com/Sirupsen/logrus
@@ -58,6 +73,12 @@ imports:
   version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
+- name: golang.org/x/net
+  version: f01ecb60fe3835d80d9a0b7b2bf24b228c89260e
+  subpackages:
+  - html/charset
+  - html
+  - html/atom
 - name: golang.org/x/sys
   version: 4ed4d404df456f81e878683a0363ed3013a59003
   subpackages:
@@ -67,11 +88,25 @@ imports:
   subpackages:
   - transform
   - unicode/norm
+  - encoding
+  - encoding/charmap
+  - encoding/htmlindex
+  - encoding/internal/identifier
+  - encoding/internal
+  - encoding/japanese
+  - encoding/korean
+  - encoding/simplifiedchinese
+  - encoding/traditionalchinese
+  - encoding/unicode
+  - language
+  - internal/utf8internal
+  - runes
+  - internal/tag
 - name: gopkg.in/yaml.v2
   version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
 testImports:
 - name: github.com/davecgh/go-spew
-  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib

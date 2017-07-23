@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/msg"
+	"github.com/ubclaunchpad/cumulus/peer"
 )
 
 func init() {
@@ -68,7 +69,10 @@ func TestPushHandlerNewBlock(t *testing.T) {
 		ResourceType: msg.ResourceBlock,
 		Resource:     b,
 	}
-	PushHandler(&push)
+	a := App{
+		PeerStore: peer.NewPeerStore("127.0.0.1:8000"),
+	}
+	a.PushHandler(&push)
 	select {
 	case work, ok := <-BlockWorkQueue:
 		if !ok {
@@ -88,7 +92,10 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 		ResourceType: msg.ResourceTransaction,
 		Resource:     txn,
 	}
-	PushHandler(&push)
+	a := App{
+		PeerStore: peer.NewPeerStore("127.0.0.1:8000"),
+	}
+	a.PushHandler(&push)
 	select {
 	case work, ok := <-TransactionWorkQueue:
 		if !ok {
@@ -103,12 +110,13 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 
 func TestRequestHandlerNewBlockOK(t *testing.T) {
 	initializeChain()
+	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
 
 	// Set up a request (requesting block 0)
 	blockNumber := uint32(0)
 	req := createNewBlockRequest(blockNumber)
 
-	resp := RequestHandler(req)
+	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
 
 	// Assertion time!
@@ -119,12 +127,13 @@ func TestRequestHandlerNewBlockOK(t *testing.T) {
 
 func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 	initializeChain()
+	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
 
 	// Set up a request.
 	blockNumber := "definitelynotanindex"
 	req := createNewBlockRequest(blockNumber)
 
-	resp := RequestHandler(req)
+	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
 
 	// Make sure request failed.
@@ -134,12 +143,13 @@ func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 
 func TestRequestHandlerNewBlockBadType(t *testing.T) {
 	initializeChain()
+	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
 
 	// Set up a request.
 	req := createNewBlockRequest("doesntmatter")
 	req.ResourceType = 25
 
-	resp := RequestHandler(req)
+	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
 
 	// Make sure request failed.
@@ -149,12 +159,13 @@ func TestRequestHandlerNewBlockBadType(t *testing.T) {
 
 func TestRequestHandlerPeerInfo(t *testing.T) {
 	initializeChain()
+	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
 
 	// Set up a request.
 	req := createNewBlockRequest("doesntmatter")
 	req.ResourceType = msg.ResourcePeerInfo
 
-	resp := RequestHandler(req)
+	resp := a.RequestHandler(req)
 	res := resp.Resource
 
 	// Make sure request did not fail.

@@ -5,7 +5,6 @@ import (
 	"net"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestConnect(t *testing.T) {
@@ -18,7 +17,7 @@ func TestConnect(t *testing.T) {
 
 func TestListen(t *testing.T) {
 	wg := sync.WaitGroup{}
-	wg.Add(5)
+	wg.Add(1)
 
 	handler := func(c net.Conn) {
 		defer c.Close()
@@ -33,9 +32,9 @@ func TestListen(t *testing.T) {
 		wg.Done()
 	}
 
-	go Listen(":8080", handler)
-	// Sleep to guarantee that our listener is ready when we start making connections
-	time.Sleep(time.Millisecond)
+	go Listen(":8080", handler, &wg)
+	wg.Wait()
+	wg.Add(5)
 
 	for i := 0; i < 5; i++ {
 		go func() {
