@@ -2,7 +2,6 @@ package app
 
 import (
 	"strconv"
-	"sync"
 
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
@@ -18,10 +17,7 @@ var (
 // goroutine, and logging should be redirected away from stdout before it is run.
 // It takes a pointer to a PeerStore so we can use the PeerStore to interact
 // with other peers and give the user info about the running instance.
-func RunConsole(ps *peer.PeerStore, wg *sync.WaitGroup) {
-	// Wait for services to start before we star the console
-	wg.Wait()
-
+func RunConsole(ps *peer.PeerStore) {
 	peerStore = ps
 	shell = ishell.New()
 

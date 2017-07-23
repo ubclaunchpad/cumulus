@@ -86,26 +86,6 @@ func Run(cfg conf.Config) {
 		}
 	}()
 
-	// If the console flag was passed, redirect logs to a file and run the console
-	// NOTE: if the log file already exists we will exit with a fatal error here!
-	// This should stop people from running multiple Cumulus nodes that will try
-	// to log to the same file.
-	if cfg.Console {
-		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
-		if err != nil {
-			log.WithError(err).Fatal("Failed to redirect logs to file")
-		}
-		log.Warn("Redirecting logs to file")
-		log.SetOutput(logFile)
-		wg.Add(1)
-		go RunConsole(a.PeerStore, wg)
-	}
-
-	if len(config.Target) > 0 {
-		// Connect to the target and discover its peers.
-		a.ConnectAndDiscover(cfg.Target)
-	}
-
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
 	go a.PeerStore.MaintainConnections(wg)
@@ -118,6 +98,25 @@ func Run(cfg conf.Config) {
 
 	// Wait for goroutines to start
 	wg.Wait()
+
+	// If the console flag was passed, redirect logs to a file and run the console
+	// NOTE: if the log file already exists we will exit with a fatal error here!
+	// This should stop people from running multiple Cumulus nodes that will try
+	// to log to the same file.
+	if cfg.Console {
+		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to redirect logs to file")
+		}
+		log.Warn("Redirecting logs to file")
+		log.SetOutput(logFile)
+		go RunConsole(a.PeerStore)
+	}
+
+	if len(config.Target) > 0 {
+		// Connect to the target and discover its peers.
+		a.ConnectAndDiscover(cfg.Target)
+	}
 }
 
 // ConnectAndDiscover tries to connect to a target and discover its peers.
