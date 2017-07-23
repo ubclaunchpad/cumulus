@@ -121,7 +121,7 @@ func Run(cfg conf.Config) {
 }
 
 // ConnectAndDiscover tries to connect to a target and discover its peers.
-func (a App) ConnectAndDiscover(target string) {
+func (a *App) ConnectAndDiscover(target string) {
 	peerInfoRequest := msg.Request{
 		ID:           uuid.New().String(),
 		ResourceType: msg.ResourcePeerInfo,
@@ -137,7 +137,7 @@ func (a App) ConnectAndDiscover(target string) {
 
 // RequestHandler is called every time a peer sends us a request message expect
 // on peers whos PushHandlers have been overridden.
-func (a App) RequestHandler(req *msg.Request) msg.Response {
+func (a *App) RequestHandler(req *msg.Request) msg.Response {
 	res := msg.Response{ID: req.ID}
 
 	// Build some error types.
@@ -175,7 +175,7 @@ func (a App) RequestHandler(req *msg.Request) msg.Response {
 
 // PushHandler is called every time a peer sends us a Push message except on
 // peers whos PushHandlers have been overridden.
-func (a App) PushHandler(push *msg.Push) {
+func (a *App) PushHandler(push *msg.Push) {
 	switch push.ResourceType {
 	case msg.ResourceBlock:
 		blk, ok := push.Resource.(*blockchain.Block)
