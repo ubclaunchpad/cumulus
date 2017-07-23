@@ -4,10 +4,7 @@ import "github.com/ubclaunchpad/cumulus/blockchain"
 
 // User holds basic user information.
 type User struct {
-	// Account holds the users wallet(s).
 	HotWallet
-	// UserBlockSize is the maximum size of a block in bytes when marshaled
-	// as specified by the user.
 	BlockSize uint32
 }
 
