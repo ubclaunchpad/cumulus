@@ -37,8 +37,8 @@ const (
 
 // ProtocolError is an error that occured during a request.
 type ProtocolError struct {
-	Code    ErrorCode `json:"Code"`
-	Message string    `json:"Message"`
+	Code    ErrorCode
+	Message string
 }
 
 // NewProtocolError returns a new error struct.
@@ -56,8 +56,8 @@ func (e *ProtocolError) Error() string {
 // Payload must be a marshalled representation of a Request, Response, or Push
 // when the message is sent.
 type Message struct {
-	Type    string `json:"Type"`
-	Payload []byte `json:"Payload"`
+	Type    string
+	Payload []byte
 }
 
 // MessagePayload is an interface that is implemented by Request, Response, and
@@ -72,25 +72,25 @@ type MessagePayload interface {
 // parameters. PeerInfo requests should send all info of all peers. Block requests
 // should specify block number in parameters.
 type Request struct {
-	ID           string                 `json:"ID"`
-	ResourceType ResourceType           `json:"ResourceType"`
-	Params       map[string]interface{} `json:"Params"`
+	ID           string
+	ResourceType ResourceType
+	Params       map[string]interface{}
 }
 
 // Response is a container for a response payload, containing the unique request
 // ID of the request prompting it, an Error (if one occurred), and the requested
 // resource (if no error occurred).
 type Response struct {
-	ID       string         `json:"ID"`
-	Error    *ProtocolError `json:"Error"`
-	Resource interface{}    `json:"Resource"`
+	ID       string
+	Error    *ProtocolError
+	Resource interface{}
 }
 
 // Push is a container for a push payload, containing a resource proactively sent
 // to us by another peer.
 type Push struct {
-	ResourceType ResourceType `json:"ResourceType"`
-	Resource     interface{}  `json:"Resource"`
+	ResourceType ResourceType
+	Resource     interface{}
 }
 
 // Write encodes and writes the Message into the given Writer.
