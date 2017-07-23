@@ -127,11 +127,12 @@ func (p *Peer) Dispatch() {
 
 		switch message.(type) {
 		case *msg.Request:
+			req := message.(*msg.Request)
 			if p.requestHandler == nil {
 				log.Errorf("Request received but no request handler set for peer %s",
 					p.ListenAddr)
 			} else {
-				response := p.requestHandler(message.(*msg.Request))
+				response := p.requestHandler(req)
 				response.Write(p.Connection)
 			}
 		case *msg.Response:
@@ -145,15 +146,13 @@ func (p *Peer) Dispatch() {
 				p.removeResponseHandler(res.ID)
 			}
 		case *msg.Push:
+			push := message.(*msg.Push)
 			if p.pushHandler == nil {
 				log.Error("Dispatcher could not find push handler for push message on peer",
 					p.ListenAddr)
 			} else {
-				p.pushHandler(message.(*msg.Push))
+				p.pushHandler(push)
 			}
-		default:
-			// Invalid messgae type. Ignore
-			log.Debug("Dispatcher received message with invalid type")
 		}
 	}
 }

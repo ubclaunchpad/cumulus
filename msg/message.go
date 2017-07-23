@@ -1,10 +1,11 @@
 package msg
 
 import (
-	"encoding/gob"
+	"encoding/json"
+	"fmt"
 	"io"
 
-	"github.com/ubclaunchpad/cumulus/blockchain"
+	log "github.com/Sirupsen/logrus"
 )
 
 type (
@@ -32,19 +33,7 @@ const (
 	// NotImplemented occurs when a message or request is received whos response
 	// requires functionality that does not yet exist.
 	NotImplemented = 501
-	// SubnetFull occurs when a stream is opened with a peer whose Subnet is
-	// already full.
-	SubnetFull = 503
 )
-
-// Initializes all the types we need to encode.
-func init() {
-	gob.Register(&Request{})
-	gob.Register(&Response{})
-	gob.Register(&Push{})
-	gob.Register(&blockchain.Transaction{})
-	gob.Register(&blockchain.Block{})
-}
 
 // ProtocolError is an error that occured during a request.
 type ProtocolError struct {
@@ -62,9 +51,19 @@ func (e *ProtocolError) Error() string {
 	return e.Message
 }
 
-// Message is a container for messages, containing a type and either a Request,
-// Response, or Push in the payload.
-type Message interface {
+// Message is a wrapper for requests, responses, and pushes.
+// Type must be one of a "Request", "Response", or "Push"
+// Payload must be a marshalled representation of a Request, Response, or Push
+// when the message is sent.
+type Message struct {
+	Type    string
+	Payload []byte
+}
+
+// MessagePayload is an interface that is implemented by Request, Response, and
+// Push. It is used to generally refer to these 3 payload types so we can
+// return only a single value from Read().
+type MessagePayload interface {
 	Write(io.Writer) error
 }
 
@@ -96,26 +95,79 @@ type Push struct {
 
 // Write encodes and writes the Message into the given Writer.
 func (r *Request) Write(w io.Writer) error {
-	var m Message = r
-	return gob.NewEncoder(w).Encode(&m)
+	payload, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	msg := Message{
+		Type:    "Request",
+		Payload: payload,
+	}
+	return json.NewEncoder(w).Encode(msg)
 }
 
 func (r *Response) Write(w io.Writer) error {
-	var m Message = r
-	return gob.NewEncoder(w).Encode(&m)
+	payload, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	msg := Message{
+		Type:    "Response",
+		Payload: payload,
+	}
+	return json.NewEncoder(w).Encode(msg)
 }
 
 func (p *Push) Write(w io.Writer) error {
-	var m Message = p
-	return gob.NewEncoder(w).Encode(&m)
+	payload, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	msg := Message{
+		Type:    "Push",
+		Payload: payload,
+	}
+	return json.NewEncoder(w).Encode(msg)
 }
 
-// Read decodes a message from a Reader and returns it.
-func Read(r io.Reader) (Message, error) {
+// Read decodes a message from a Reader and returns the message payload, or an
+// error if the read fails. On success, the payload returned will be either a
+// Request, Response, or Push.
+func Read(r io.Reader) (MessagePayload, error) {
 	var m Message
-	err := gob.NewDecoder(r).Decode(&m)
+	err := json.NewDecoder(r).Decode(&m)
 	if err != nil {
 		return nil, err
 	}
-	return m, nil
+
+	var returnPayload MessagePayload
+
+	// Check the message type and use it to unmarshal the payload
+	switch m.Type {
+	case "Request":
+		var req Request
+		err = json.Unmarshal([]byte(m.Payload), &req)
+		if err == nil {
+			log.Debug("Read request ", req)
+			returnPayload = &req
+		}
+	case "Response":
+		var res Response
+		err = json.Unmarshal([]byte(m.Payload), &res)
+		if err == nil {
+			log.Debug("Read response ", res)
+			returnPayload = &res
+		}
+	case "Push":
+		var push Push
+		err = json.Unmarshal([]byte(m.Payload), &push)
+		if err == nil {
+			log.Debug("Read push ", push)
+			returnPayload = &push
+		}
+	default:
+		err = fmt.Errorf("Received message with invalid type %s", m.Type)
+	}
+
+	return returnPayload, err
 }

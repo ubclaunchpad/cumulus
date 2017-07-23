@@ -1,7 +1,6 @@
 package peer
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -192,18 +191,22 @@ func (ps *PeerStore) Broadcast(push msg.Push) {
 // PeerInfoHandler will handle the response to a PeerInfo request by attempting
 // to establish connections with all new peers in the given response Resource.
 func (ps *PeerStore) PeerInfoHandler(res *msg.Response) {
-	peers := res.Resource.([]string)
-	strPeers, _ := json.Marshal(peers)
-	log.Debugf("Found peers %s", string(strPeers))
+	peers := res.Resource.([]interface{})
+
+	log.Debugf("Found peers %s", peers)
 	for i := 0; i < len(peers) && ps.Size() < MaxPeers; i++ {
-		if ps.Get(peers[i]) != nil || peers[i] == ps.ListenAddr {
+		addr, ok := peers[i].(string)
+		if !ok {
+			continue
+		}
+		if ps.Get(addr) != nil || addr == ps.ListenAddr {
 			// We are already connected to this peer. Skip it.
 			continue
 		}
 
-		p, err := Connect(peers[i], ps)
+		p, err := Connect(addr, ps)
 		if err != nil {
-			log.WithError(err).Errorf("Failed to dial peer %s", peers[i])
+			log.WithError(err).Errorf("Failed to dial peer %s", addr)
 		}
 		log.Infof("Connected to %s", p.ListenAddr)
 	}

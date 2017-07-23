@@ -22,18 +22,14 @@ func TestRequest(t *testing.T) {
 		t.Fail()
 	}
 
-	out, err := Read(&buf)
+	payload, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
 		t.Fail()
 	}
 
-	outReq, ok := out.(*Request)
-	if !ok {
-		t.Fail()
-	}
-
-	if outReq.ID != id {
+	req, ok := payload.(*Request)
+	if !ok || req.ID != id {
 		t.Fail()
 	}
 }
@@ -53,27 +49,23 @@ func TestResponse(t *testing.T) {
 		t.Fail()
 	}
 
-	out, err := Read(&buf)
+	payload, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
 		t.Fail()
 	}
 
-	outRes, ok := out.(*Response)
+	res, ok := payload.(*Response)
+	if !ok || res.ID != id {
+		t.Fail()
+	}
+
+	resource, ok := res.Resource.(string)
 	if !ok {
 		t.Fail()
 	}
 
-	if outRes.ID != id {
-		t.Fail()
-	}
-
-	res, ok := outRes.Resource.(string)
-	if !ok {
-		t.Fail()
-	}
-
-	if res != "resource" {
+	if resource != "resource" {
 		t.Fail()
 	}
 }
@@ -92,23 +84,23 @@ func TestPush(t *testing.T) {
 		t.Fail()
 	}
 
-	out, err := Read(&buf)
+	payload, err := Read(&buf)
 	if err != nil {
 		t.Log(err.Error())
 		t.Fail()
 	}
 
-	outPush, ok := out.(*Push)
+	push, ok := payload.(*Push)
 	if !ok {
 		t.Fail()
 	}
 
-	res, ok := outPush.Resource.(string)
+	resource, ok := push.Resource.(string)
 	if !ok {
 		t.Fail()
 	}
 
-	if res != "transaction" {
+	if resource != "transaction" {
 		t.Fail()
 	}
 }
