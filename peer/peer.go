@@ -225,11 +225,12 @@ func (p *Peer) Dispatch() {
 
 		switch message.(type) {
 		case *msg.Request:
+			req := message.(*msg.Request)
 			if p.requestHandler == nil {
 				log.Errorf("Request received but no request handler set for peer %s",
 					p.Connection.RemoteAddr().String())
 			} else {
-				response := p.requestHandler(message.(*msg.Request))
+				response := p.requestHandler(req)
 				response.Write(p.Connection)
 			}
 		case *msg.Response:
@@ -242,15 +243,13 @@ func (p *Peer) Dispatch() {
 				p.removeResponseHandler(res.ID)
 			}
 		case *msg.Push:
+			push := message.(*msg.Push)
 			if p.pushHandler == nil {
 				log.Errorf("Push message received but no push handler set for peer %s",
 					p.Connection.RemoteAddr().String())
 			} else {
-				p.pushHandler(message.(*msg.Push))
+				p.pushHandler(push)
 			}
-		default:
-			// Invalid messgae type. Ignore
-			log.Debug("Dispatcher received message with invalid type")
 		}
 	}
 }
@@ -316,15 +315,19 @@ func MaintainConnections() {
 // PeerInfoHandler will handle the response to a PeerInfo request by attempting
 // to establish connections with all new peers in the given response Resource.
 func PeerInfoHandler(res *msg.Response) {
-	peers := res.Resource.([]string)
+	peers := res.Resource.([]interface{})
 	log.Debugf("Found peers %s", peers)
 	for i := 0; i < len(peers) && PStore.Size() < MaxPeers; i++ {
-		p := PStore.Get(peers[i])
-		if p != nil || peers[i] == ListenAddr {
+		peerAddr, ok := peers[i].(string)
+		if !ok {
+			continue
+		}
+		p := PStore.Get(peerAddr)
+		if p != nil || peerAddr == ListenAddr {
 			// We are already connected to this peer. Skip it.
 			continue
 		}
-		newConn, err := conn.Dial(peers[i])
+		newConn, err := conn.Dial(peerAddr)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to dial peer %s", peers[i])
 			continue
@@ -370,6 +373,7 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 		receivedAddr := false
 		sentAddr := false
 		var addr string
+		var ok bool
 
 		for !receivedAddr || !sentAddr {
 			message, err := msg.Read(c)
@@ -377,17 +381,20 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 				continue
 			} else if err != nil {
 				errChan <- err
+				return
 			}
 
 			switch message.(type) {
 			case *msg.Response:
 				// We got the listen address back
-				addr = message.(*msg.Response).Resource.(string)
-				if validAddress(addr) || addr != ListenAddr {
+				res := message.(*msg.Response)
+				addr, ok = res.Resource.(string)
+				if ok && validAddress(addr) && addr != ListenAddr {
 					receivedAddr = true
 				}
 			case *msg.Request:
-				if message.(*msg.Request).ResourceType != msg.ResourcePeerInfo {
+				req := message.(*msg.Request)
+				if req.ResourceType != msg.ResourcePeerInfo {
 					continue
 				}
 				// We got a listen address request.
@@ -401,7 +408,6 @@ func exchangeListenAddrs(c net.Conn, d time.Duration) (string, error) {
 					errChan <- err
 				}
 				sentAddr = true
-			default:
 			}
 		}
 
