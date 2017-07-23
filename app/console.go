@@ -6,6 +6,7 @@ import (
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/peer"
+	"gopkg.in/kyokomi/emoji.v1"
 )
 
 var (
@@ -48,7 +49,7 @@ func RunConsole(ps *peer.PeerStore) {
 	})
 
 	shell.Start()
-	shell.Println("Cumulus Console")
+	emoji.Println(":cloud: Welcome to the :sunny: Cumulus console :cloud:")
 }
 
 func create(ctx *ishell.Context) {
@@ -57,7 +58,7 @@ func create(ctx *ishell.Context) {
 		"Transaction",
 	}, "What would you like to create?")
 	if choice == 0 {
-		ctx.Println("New Wallet:", blockchain.NewWallet().Public())
+		createHotWallet(ctx)
 	} else {
 		shell.Print("Sender wallet ID: ")
 		senderID := shell.ReadLine()
@@ -109,4 +110,14 @@ func connect(ctx *ishell.Context) {
 	} else {
 		shell.Println("Connected to", addr)
 	}
+}
+
+func createHotWallet(ctx *ishell.Context) {
+	shell.Print("Enter wallet name: ")
+	walletName := shell.ReadLine()
+	wallet := HotWallet{walletName, blockchain.NewWallet()}
+	currentUser.HotWallet = wallet
+	emoji.Println(":credit_card: New hot wallet created!")
+	emoji.Println(":raising_hand: Name: " + wallet.Name)
+	emoji.Println(":mailbox: Address: " + wallet.Wallet.Public().Repr())
 }

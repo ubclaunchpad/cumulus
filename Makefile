@@ -10,11 +10,14 @@ cumulus:
 test:
 	go test $(PACKAGES) --cover
 
+run-console:
+	make clean && make cumulus && ./cumulus run -c
+
 deps:
 	glide install
 
 clean:
-	rm cumulus
+	rm cumulus || true
 
 install-glide:
 	sh scripts/install_glide.sh
