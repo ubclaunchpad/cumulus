@@ -18,14 +18,16 @@ var (
 // goroutine, and logging should be redirected away from stdout before it is run.
 // It takes a pointer to a PeerStore so we can use the PeerStore to interact
 // with other peers and give the user info about the running instance.
-func RunConsole(ps *peer.PeerStore) {
+func RunConsole(ps *peer.PeerStore, app *App) {
 	peerStore = ps
 	shell = ishell.New()
 
 	shell.AddCmd(&ishell.Cmd{
 		Name: "create",
 		Help: "create a new wallet hash or transaction",
-		Func: create,
+		Func: func(ctx *ishell.Context) {
+			create(ctx, app)
+		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "check",
@@ -35,30 +37,36 @@ func RunConsole(ps *peer.PeerStore) {
 	shell.AddCmd(&ishell.Cmd{
 		Name: "address",
 		Help: "show the address this host is listening on",
-		Func: listenAddr,
+		Func: func(ctx *ishell.Context) {
+			listenAddr(ctx, peerStore)
+		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "peers",
 		Help: "show the peers this host is connected to",
-		Func: peers,
+		Func: func(ctx *ishell.Context) {
+			peers(ctx, peerStore)
+		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "connect",
 		Help: "connect to another peer",
-		Func: connect,
+		Func: func(ctx *ishell.Context) {
+			connect(ctx, peerStore)
+		},
 	})
 
 	shell.Start()
 	emoji.Println(":cloud: Welcome to the :sunny: Cumulus console :cloud:")
 }
 
-func create(ctx *ishell.Context) {
+func create(ctx *ishell.Context, app *App) {
 	choice := ctx.MultiChoice([]string{
 		"Wallet",
 		"Transaction",
 	}, "What would you like to create?")
 	if choice == 0 {
-		createHotWallet(ctx)
+		createHotWallet(ctx, app)
 	} else {
 		shell.Print("Sender wallet ID: ")
 		senderID := shell.ReadLine()
@@ -89,15 +97,15 @@ func check(ctx *ishell.Context) {
 	}
 }
 
-func listenAddr(ctx *ishell.Context) {
+func listenAddr(ctx *ishell.Context, peerStore *peer.PeerStore) {
 	shell.Println("Listening on", peerStore.ListenAddr)
 }
 
-func peers(tcx *ishell.Context) {
+func peers(tcx *ishell.Context, peerStore *peer.PeerStore) {
 	shell.Println("Connected to", peerStore.Addrs())
 }
 
-func connect(ctx *ishell.Context) {
+func connect(ctx *ishell.Context, peerStore *peer.PeerStore) {
 	if len(ctx.Args) == 0 {
 		shell.Println("Usage: connect [IP address]:[TCP port]")
 		return
@@ -112,11 +120,11 @@ func connect(ctx *ishell.Context) {
 	}
 }
 
-func createHotWallet(ctx *ishell.Context) {
+func createHotWallet(ctx *ishell.Context, app *App) {
 	shell.Print("Enter wallet name: ")
 	walletName := shell.ReadLine()
 	wallet := HotWallet{walletName, blockchain.NewWallet()}
-	currentUser.HotWallet = wallet
+	app.CurrentUser.HotWallet = wallet
 	emoji.Println(":credit_card: New hot wallet created!")
 	emoji.Println(":raising_hand: Name: " + wallet.Name)
 	emoji.Println(":mailbox: Address: " + wallet.Wallet.Public().Repr())

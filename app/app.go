@@ -27,7 +27,8 @@ var (
 
 // App contains information about a running instance of a Cumulus node
 type App struct {
-	PeerStore *peer.PeerStore
+	PeerStore   *peer.PeerStore
+	CurrentUser *User
 }
 
 // Run sets up and starts a new Cumulus node with the
@@ -38,7 +39,8 @@ func Run(cfg conf.Config) {
 
 	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
 	a := App{
-		PeerStore: peer.NewPeerStore(addr),
+		PeerStore:   peer.NewPeerStore(addr),
+		CurrentUser: NewUser(),
 	}
 
 	// Set logging level
@@ -65,9 +67,9 @@ func Run(cfg conf.Config) {
 	}()
 
 	// Below we'll connect to peers. After which, requests could begin to
-	// stream in. We should first initalize our pool, workers to handle
+	// stream in. We should first initalize our pool, worker to handle
 	// incoming messages.
-	initializeNode()
+	initializeNode(&a)
 
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
@@ -110,7 +112,7 @@ func Run(cfg conf.Config) {
 		}
 		log.Info("Redirecting logs to logfile")
 		log.SetOutput(logFile)
-		go RunConsole(a.PeerStore)
+		go RunConsole(a.PeerStore, &a)
 	}
 
 	if len(config.Target) > 0 {
@@ -180,7 +182,7 @@ func (a *App) PushHandler(push *msg.Push) {
 		blk, ok := push.Resource.(*blockchain.Block)
 		if ok {
 			log.Info("Adding block to work queue.")
-			BlockWorkQueue <- BlockWork{blk, nil}
+			blockWorkQueue <- BlockWork{blk, nil}
 		} else {
 			log.Error("Could not cast resource to block.")
 		}
@@ -188,7 +190,7 @@ func (a *App) PushHandler(push *msg.Push) {
 		txn, ok := push.Resource.(*blockchain.Transaction)
 		if ok {
 			log.Info("Adding transaction to work queue.")
-			TransactionWorkQueue <- TransactionWork{txn, nil}
+			transactionWorkQueue <- TransactionWork{txn, nil}
 		} else {
 			log.Error("Could not cast resource to transaction.")
 		}
@@ -199,27 +201,9 @@ func (a *App) PushHandler(push *msg.Push) {
 
 // initializeNode creates a transaction pool, workers and queues to handle
 // incoming messages.
-func initializeNode() {
+func initializeNode(app *App) {
 	tpool = pool.New()
-	intializeQueues()
-	initializeWorkers()
-}
-
-// intializeQueues makes all necessary queues.
-func intializeQueues() {
-	BlockWorkQueue = make(chan BlockWork, BlockQueueSize)
-	TransactionWorkQueue = make(chan TransactionWork, TransactionQueueSize)
-	QuitChan = make(chan int)
-}
-
-// initializeWorkers kicks off workers to handle incoming requests.
-func initializeWorkers() {
-	for i := 0; i < nWorkers; i++ {
-		log.WithFields(log.Fields{"id": i}).Debug("Starting worker. ")
-		worker := NewWorker(i)
-		worker.Start()
-		workers[i] = &worker
-	}
+	go HandleWork(app)
 }
 
 // initializeChain creates the blockchain for the node.
@@ -227,12 +211,4 @@ func initializeChain() {
 	chain, _ = blockchain.NewValidTestChainAndBlock()
 	// TODO: Check if chain exists on disk.
 	// TODO: If not, request chain from peers.
-}
-
-// killWorkers kills all workers.
-func killWorkers() {
-	for i := 0; i < nWorkers; i++ {
-		QuitChan <- i
-		workers[i] = nil
-	}
 }

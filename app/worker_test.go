@@ -51,7 +51,8 @@ func reset() {
 	tpool = pool.New()
 	chain, legitBlock = bc.NewValidTestChainAndBlock()
 	legitTransaction = legitBlock.Transactions[1]
-	realWorker = NewWorker(7)
+	a := App{nil, NewUser()}
+	realWorker = NewWorker(0, a)
 	mockResponder = MockResponder{
 		Mutex:  &sync.Mutex{},
 		Result: false,
@@ -77,7 +78,7 @@ func reset() {
 
 func TestNewWorker(t *testing.T) {
 	reset()
-	if realWorker.ID != 7 {
+	if realWorker.ID != 0 {
 		t.FailNow()
 	}
 }
