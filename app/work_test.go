@@ -76,15 +76,8 @@ func reset() {
 	QuitChan = make(chan int)
 }
 
-func TestNewWorker(t *testing.T) {
-	reset()
-	if realWorker.ID != 0 {
-		t.FailNow()
-	}
-}
-
 func TestHandleTransactionOK(t *testing.T) {
-	reset()
+	a := createNewApp()
 	realWorker.HandleTransaction(goodTxnWork)
 	if mockResponder.Result != true {
 		t.FailNow()

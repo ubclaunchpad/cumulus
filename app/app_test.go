@@ -2,148 +2,100 @@ package app
 
 import (
 	"testing"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/msg"
 	"github.com/ubclaunchpad/cumulus/peer"
+	"github.com/ubclaunchpad/cumulus/pool"
 )
 
 func init() {
 	log.SetLevel(log.InfoLevel)
 }
 
-func createNewBlockRequest(blockNumber interface{}) *msg.Request {
+func createNewBlockRequest(lastBlock interface{}) *msg.Request {
 	params := make(map[string]interface{}, 1)
-	params["blockNumber"] = blockNumber
+	params["lastBlock"] = lastBlock
 	return &msg.Request{
 		ResourceType: msg.ResourceBlock,
 		Params:       params,
 	}
 }
 
-func TestKillWorkers(t *testing.T) {
-	intializeQueues()
-	time.Sleep(20 * time.Millisecond)
-	for i := 0; i < nWorkers; i++ {
-		if workers[i] != nil {
-			t.FailNow()
-		}
+func createNewApp() *App {
+	chain, _ := blockchain.NewValidTestChainAndBlock()
+	return &App{
+		PeerStore:   peer.NewPeerStore("127.0.0.1:8000"),
+		CurrentUser: NewUser(),
+		Chain:       chain,
+		Pool:        pool.New(),
 	}
-	initializeWorkers()
-	time.Sleep(20 * time.Millisecond)
-	for i := 0; i < nWorkers; i++ {
-		if workers[i] == nil {
-			t.FailNow()
-		}
-	}
-	killWorkers()
-	time.Sleep(20 * time.Millisecond)
-	for i := 0; i < nWorkers; i++ {
-		if workers[i] != nil {
-			t.FailNow()
-		}
-	}
-}
-
-func TestInitializeNode(t *testing.T) {
-	initializeNode()
-	if tpool == nil {
-		t.FailNow()
-	}
-	if BlockWorkQueue == nil {
-		t.FailNow()
-	}
-	if TransactionWorkQueue == nil {
-		t.FailNow()
-	}
-	killWorkers()
 }
 
 func TestPushHandlerNewBlock(t *testing.T) {
-	intializeQueues()
+	// Should put a block in the blockWorkQueue.
+	a := createNewApp()
 	_, b := blockchain.NewValidTestChainAndBlock()
 	push := msg.Push{
 		ResourceType: msg.ResourceBlock,
 		Resource:     b,
 	}
-	a := App{
-		PeerStore: peer.NewPeerStore("127.0.0.1:8000"),
-	}
 	a.PushHandler(&push)
 	select {
-	case work, ok := <-BlockWorkQueue:
-		if !ok {
-			t.FailNow()
-		}
-		if work.Block != b {
-			t.FailNow()
-		}
+	case work, ok := <-blockWorkQueue:
+		assert.True(t, ok)
+		assert.Equal(t, work.Block, b)
 	}
-	// Add more here...
 }
 
 func TestPushHandlerNewTestTransaction(t *testing.T) {
-	intializeQueues()
+	// Should put a transaction in the transactionWorkQueue.
+	a := createNewApp()
 	txn := blockchain.NewTestTransaction()
 	push := msg.Push{
 		ResourceType: msg.ResourceTransaction,
 		Resource:     txn,
 	}
-	a := App{
-		PeerStore: peer.NewPeerStore("127.0.0.1:8000"),
-	}
 	a.PushHandler(&push)
 	select {
-	case work, ok := <-TransactionWorkQueue:
-		if !ok {
-			t.FailNow()
-		}
-		if work.Transaction != txn {
-			t.FailNow()
-		}
+	case work, ok := <-transactionWorkQueue:
+		assert.True(t, ok)
+		assert.Equal(t, work.Transaction, txn)
 	}
-	// Add more here...
 }
 
 func TestRequestHandlerNewBlockOK(t *testing.T) {
-	initializeChain()
-	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
+	// Request a new block by hash and verify we get the right one.
+	a := createNewApp()
 
-	// Set up a request (requesting block 0)
-	blockNumber := uint32(0)
-	req := createNewBlockRequest(blockNumber)
-
+	req := createNewBlockRequest(a.Chain.Blocks[1].LastBlock)
 	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
 
 	// Assertion time!
 	assert.True(t, ok, "resource should contain block")
-	assert.Equal(t, block.BlockNumber, blockNumber,
-		"block number should be "+string(blockNumber))
+	assert.Equal(t, block, a.Chain.Blocks[1])
 }
 
 func TestRequestHandlerNewBlockBadParams(t *testing.T) {
-	initializeChain()
-	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
+	a := createNewApp()
 
 	// Set up a request.
-	blockNumber := "definitelynotanindex"
-	req := createNewBlockRequest(blockNumber)
+	hash := "definitelynotahash"
+	req := createNewBlockRequest(hash)
 
 	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
 
 	// Make sure request failed.
 	assert.False(t, ok, "resource should not contain block")
-	assert.Nil(t, block, "resource should not contain block")
+	assert.Equal(t, resp.Error.Code, msg.ResourceNotFound, resp.Error.Message)
 }
 
 func TestRequestHandlerNewBlockBadType(t *testing.T) {
-	initializeChain()
-	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
+	a := createNewApp()
 
 	// Set up a request.
 	req := createNewBlockRequest("doesntmatter")
@@ -154,12 +106,11 @@ func TestRequestHandlerNewBlockBadType(t *testing.T) {
 
 	// Make sure request failed.
 	assert.False(t, ok, "resource should not contain block")
-	assert.Nil(t, block, "resource should not contain block")
+	assert.Equal(t, resp.Error.Code, msg.InvalidResourceType, resp.Error.Message)
 }
 
 func TestRequestHandlerPeerInfo(t *testing.T) {
-	initializeChain()
-	a := App{PeerStore: peer.NewPeerStore("127.0.0.1:8000")}
+	a := createNewApp()
 
 	// Set up a request.
 	req := createNewBlockRequest("doesntmatter")

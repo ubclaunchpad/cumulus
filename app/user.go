@@ -24,3 +24,10 @@ func NewUser() *User {
 		BlockSize: blockchain.DefaultBlockSize,
 	}
 }
+
+// getCurrentUser gets the current user.
+func getCurrentUser() *User {
+	// TODO: Check for local user information on disk,
+	// If doesnt exist, create new user.
+	return NewUser()
+}

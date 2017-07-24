@@ -19,16 +19,15 @@ import (
 )
 
 var (
-	chain   *blockchain.BlockChain
 	logFile = os.Stdout
-	// A reference to the transaction pool
-	tpool *pool.Pool
 )
 
 // App contains information about a running instance of a Cumulus node
 type App struct {
-	PeerStore   *peer.PeerStore
 	CurrentUser *User
+	PeerStore   *peer.PeerStore
+	Chain       *blockchain.BlockChain
+	Pool        *pool.Pool
 }
 
 // Run sets up and starts a new Cumulus node with the
@@ -40,7 +39,9 @@ func Run(cfg conf.Config) {
 	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
 	a := App{
 		PeerStore:   peer.NewPeerStore(addr),
-		CurrentUser: NewUser(),
+		CurrentUser: getCurrentUser(),
+		Chain:       getLocalChain(),
+		Pool:        getLocalPool(),
 	}
 
 	// Set logging level
@@ -67,9 +68,8 @@ func Run(cfg conf.Config) {
 	}()
 
 	// Below we'll connect to peers. After which, requests could begin to
-	// stream in. We should first initalize our pool, worker to handle
-	// incoming messages.
-	initializeNode(&a)
+	// stream in. Kick off a worker to handle requests and pushes.
+	go HandleWork(&a)
 
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
@@ -91,12 +91,6 @@ func Run(cfg conf.Config) {
 	// Try maintain as close to peer.MaxPeers connections as possible while this
 	// peer is running
 	go a.PeerStore.MaintainConnections(wg)
-
-	// Request the blockchain.
-	if chain == nil {
-		log.Info("Request blockchain from peers not yet implemented.")
-		initializeChain()
-	}
 
 	// Wait for goroutines to start
 	wg.Wait()
@@ -155,7 +149,7 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 		blockNumber, ok := req.Params["blockNumber"].(uint32)
 		if ok {
 			// If its ok, we make try to a copy of it.
-			blk, err := chain.CopyBlockByIndex(blockNumber)
+			blk, err := a.Chain.CopyBlockByIndex(blockNumber)
 			if err != nil {
 				// Bad index parameter.
 				res.Error = notFoundErr
@@ -199,16 +193,16 @@ func (a *App) PushHandler(push *msg.Push) {
 	}
 }
 
-// initializeNode creates a transaction pool, workers and queues to handle
-// incoming messages.
-func initializeNode(app *App) {
-	tpool = pool.New()
-	go HandleWork(app)
+// getLocalChain returns an instance of the blockchain.
+func getLocalChain() *blockchain.BlockChain {
+	// TODO: Look for local chain on disk. If doesn't exist, go rummaging
+	// around on the internets for one.
+	bc, _ := blockchain.NewValidTestChainAndBlock()
+	return bc
 }
 
-// initializeChain creates the blockchain for the node.
-func initializeChain() {
-	chain, _ = blockchain.NewValidTestChainAndBlock()
-	// TODO: Check if chain exists on disk.
-	// TODO: If not, request chain from peers.
+// getLocalPool returns an instance of the pool.
+func getLocalPool() *pool.Pool {
+	// TODO: Look for local pool on disk. If doesn't exist,  make a new one.
+	return pool.New()
 }
