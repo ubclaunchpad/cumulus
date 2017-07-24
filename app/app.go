@@ -104,11 +104,11 @@ func Run(cfg conf.Config) {
 	// This should stop people from running multiple Cumulus nodes that will try
 	// to log to the same file.
 	if cfg.Console {
-		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
+		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to redirect logs to file")
 		}
-		log.Warn("Redirecting logs to file")
+		log.Info("Redirecting logs to logfile")
 		log.SetOutput(logFile)
 		go RunConsole(a.PeerStore)
 	}

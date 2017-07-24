@@ -4,6 +4,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	crand "crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"math/big"
 
@@ -17,6 +19,8 @@ const (
 	AddrLen = 2 * CoordLen
 	// SigLen is the length in bytes of signatures.
 	SigLen = AddrLen
+	// AddressVersion is the version of the address shortening protocol.
+	AddressVersion = 0
 )
 
 var (
@@ -31,6 +35,28 @@ var (
 // Address represents a wallet that can be a recipient in a transaction.
 type Address struct {
 	X, Y *big.Int
+}
+
+// Repr returns a string representation of the address. We follow
+// ethereums protocol, replacing Keccak hash with SHA256.
+// Where pr is the private key,
+//    	A(pr) = SHA256(ECDSAPUBLICKEY(pr))[96:255],
+// Resources:
+// http://gavwood.com/paper.pdf (fig 213)
+func (a Address) Repr() string {
+	// 1. Concatenate X and Y and version the result.
+	concat := a.Marshal()
+	prefix := append([]byte{AddressVersion}, concat...)
+
+	// 2. Perform SHA-256 on result.
+	hash := sha256.Sum256(prefix) // 256 bit
+
+	return hex.EncodeToString(hash[96/8 : 256/8])
+}
+
+// Emoji returns the users address as a string of emojis (TODO).
+func (a Address) Emoji() string {
+	return a.Repr()
 }
 
 // Marshal converts an Address to a byte slice.

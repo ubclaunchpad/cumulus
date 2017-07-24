@@ -10,6 +10,9 @@ cumulus:
 test:
 	go test $(PACKAGES) --cover
 
+run-console: cumulus
+	./cumulus run -c
+
 deps:
 	glide install
 

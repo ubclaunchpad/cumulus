@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMain(t *testing.T) {
@@ -37,4 +38,9 @@ func TestCopyBlock(t *testing.T) {
 	if b == bc.Blocks[0] {
 		t.FailNow()
 	}
+}
+
+func TestWalletRepr(t *testing.T) {
+	w := NewWallet()
+	assert.Equal(t, len(w.Public().Repr()), 40)
 }

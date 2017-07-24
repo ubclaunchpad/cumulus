@@ -17,3 +17,5 @@ import:
   subpackages:
   - assert
 - package: github.com/abiosoft/ishell
+- package: gopkg.in/kyokomi/emoji.v1
+  version: ^1.5.0
