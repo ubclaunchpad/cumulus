@@ -33,6 +33,11 @@ func (p *Pool) Len() int {
 	return len(p.ValidTransactions)
 }
 
+// Empty returns true if the pool has exactly zero transactions in it.
+func (p *Pool) Empty() bool {
+	return p.Len() == 0
+}
+
 // Get returns the tranasction with input transaction Hash h.
 func (p *Pool) Get(h blockchain.Hash) *blockchain.Transaction {
 	return p.ValidTransactions[h].Transaction

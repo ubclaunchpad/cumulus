@@ -2,14 +2,11 @@ package app
 
 import (
 	"testing"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/msg"
-	"github.com/ubclaunchpad/cumulus/peer"
-	"github.com/ubclaunchpad/cumulus/pool"
 )
 
 func init() {
@@ -26,9 +23,9 @@ func TestPushHandlerNewBlock(t *testing.T) {
 	}
 	a.PushHandler(&push)
 	select {
-	case work, ok := <-blockWorkQueue:
+	case blk, ok := <-blockQueue:
 		assert.True(t, ok)
-		assert.Equal(t, work.Block, b)
+		assert.Equal(t, blk, b)
 	}
 }
 
@@ -42,9 +39,9 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 	}
 	a.PushHandler(&push)
 	select {
-	case work, ok := <-transactionWorkQueue:
+	case tr, ok := <-transactionQueue:
 		assert.True(t, ok)
-		assert.Equal(t, work.Transaction, txn)
+		assert.Equal(t, tr, txn)
 	}
 }
 
@@ -69,7 +66,7 @@ func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 	req := createNewTestBlockRequest(hash)
 
 	resp := a.RequestHandler(req)
-	block, ok := resp.Resource.(*blockchain.Block)
+	_, ok := resp.Resource.(*blockchain.Block)
 
 	// Make sure request failed.
 	assert.False(t, ok, "resource should not contain block")
@@ -84,7 +81,7 @@ func TestRequestHandlerNewBlockBadType(t *testing.T) {
 	req.ResourceType = 25
 
 	resp := a.RequestHandler(req)
-	block, ok := resp.Resource.(*blockchain.Block)
+	_, ok := resp.Resource.(*blockchain.Block)
 
 	// Make sure request failed.
 	assert.False(t, ok, "resource should not contain block")
@@ -108,68 +105,50 @@ func TestRequestHandlerPeerInfo(t *testing.T) {
 
 func TestHandleTransactionOK(t *testing.T) {
 	a := createNewTestApp()
-	HandleTransaction(goodTxnWork)
-	if mockResponder.Result != true {
-		t.FailNow()
-	}
+	bc, blk := blockchain.NewValidTestChainAndBlock()
+	a.Chain = bc
+	txn := blk.Transactions[0]
+	a.HandleTransaction(txn)
+	assert.Equal(t, a.Pool.Peek(), txn)
 }
 
 func TestHandleTransactionNotOK(t *testing.T) {
-	reset()
-	realWorker.HandleTransaction(badTxnWork)
-	if mockResponder.Result != false {
-		t.FailNow()
-	}
+	a := createNewTestApp()
+	a.HandleTransaction(blockchain.NewTestTransaction())
+	assert.True(t, a.Pool.Empty())
 }
 
 func TestHandleBlockOK(t *testing.T) {
-	reset()
-	realWorker.HandleBlock(goodBlkWork)
-	if mockResponder.Result != true {
-		t.FailNow()
+	a := createNewTestApp()
+	i := 0
+
+	// TODO: Start miner.
+
+	for i < 1000 {
+		a.Pool.SetUnsafe(blockchain.NewTestTransaction())
+		i++
 	}
+
+	bc, blk := blockchain.NewValidTestChainAndBlock()
+	a.Chain = bc
+	a.HandleBlock(blk)
+	assert.Equal(t, blk, a.Chain.Blocks[2])
+
+	// TODO: Assert miner restarted.
+	// TODO: Assert pool appropriately emptied.
 }
 
 func TestHandleBlockNotOK(t *testing.T) {
-	reset()
-	realWorker.HandleBlock(badBlkWork)
-	if mockResponder.Result != false {
-		t.FailNow()
-	}
-}
+	a := createNewTestApp()
+	i := 0
 
-func TestStartTxn(t *testing.T) {
-	reset()
-	realWorker.Start()
-	TransactionWorkQueue <- goodTxnWork
-	time.Sleep(50 * time.Millisecond)
-	mockResponder.Lock()
-	if !mockResponder.Result {
-		t.FailNow()
-	}
-	mockResponder.Unlock()
-}
-
-func TestStartBlk(t *testing.T) {
-	reset()
-	realWorker.Start()
-	BlockWorkQueue <- goodBlkWork
-	time.Sleep(50 * time.Millisecond)
-	mockResponder.Lock()
-	if !mockResponder.Result {
-		t.FailNow()
-	}
-	mockResponder.Unlock()
-}
-
-func TestQuitWorker(t *testing.T) {
-	reset()
-	for i := 0; i < nWorkers; i++ {
-		NewWorker(i).Start()
+	// TODO: Start miner.
+	for i < 1000 {
+		a.Pool.SetUnsafe(blockchain.NewTestTransaction())
+		i++
 	}
 
-	// Would hang if quit call fails, and travis would fail.
-	for i := 0; i < nWorkers; i++ {
-		QuitChan <- i
-	}
+	a.HandleBlock(blockchain.NewTestBlock())
+	// TODO: Assert miner not restarted.
+	// TODO: Assert pool untouched.
 }

@@ -250,7 +250,9 @@ func (a *App) HandleWork() {
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 	validTransaction := a.Pool.Set(txn, a.Chain)
 	if !validTransaction {
-		log.Info("added transaction to pool from: " + txn.Sender)
+		log.Debug("added transaction to pool from address: " + txn.Sender.Repr())
+	} else {
+		log.Debug("bad transaction rejected from sender: " + txn.Sender.Repr())
 	}
 }
 
@@ -268,5 +270,6 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 		if miner.IsMining() {
 			miner.RestartMiner(a.Chain, blk)
 		}
+		log.Debug("added blk number %d to chain with hash", blk.BlockNumber)
 	}
 }
