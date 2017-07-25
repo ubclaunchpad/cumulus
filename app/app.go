@@ -13,6 +13,7 @@ import (
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/miner"
 	"github.com/ubclaunchpad/cumulus/msg"
 	"github.com/ubclaunchpad/cumulus/peer"
 	"github.com/ubclaunchpad/cumulus/pool"
@@ -22,6 +23,13 @@ var (
 	logFile = os.Stdout
 )
 
+const (
+	// BlockQueueSize is the size of the BlockQueue channel.
+	blockQueueSize = 100
+	// TransactionQueueSize is the size of the BlockQueue channel.
+	transactionQueueSize = 100
+)
+
 // App contains information about a running instance of a Cumulus node
 type App struct {
 	CurrentUser *User
@@ -29,6 +37,22 @@ type App struct {
 	Chain       *blockchain.BlockChain
 	Pool        *pool.Pool
 }
+
+// Responder is used to handle requests who require a response.
+type Responder interface {
+	Send(ok bool)
+	Lock()
+	Unlock()
+}
+
+// BlockWorkQueue is a queue of blocks to process.
+var blockQueue = make(chan *blockchain.Block, blockQueueSize)
+
+// TransactionWorkQueue is a queue of transactions to process.
+var transactionQueue = make(chan *blockchain.Transaction, transactionQueueSize)
+
+// QuitChan kills the app worker.
+var quitChan = make(chan bool)
 
 // Run sets up and starts a new Cumulus node with the
 // given configuration. This should only be called once (except in tests)
@@ -69,7 +93,7 @@ func Run(cfg conf.Config) {
 
 	// Below we'll connect to peers. After which, requests could begin to
 	// stream in. Kick off a worker to handle requests and pushes.
-	go HandleWork(&a)
+	go a.HandleWork()
 
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
@@ -176,7 +200,7 @@ func (a *App) PushHandler(push *msg.Push) {
 		blk, ok := push.Resource.(*blockchain.Block)
 		if ok {
 			log.Info("Adding block to work queue.")
-			blockWorkQueue <- BlockWork{blk, nil}
+			blockQueue <- blk
 		} else {
 			log.Error("Could not cast resource to block.")
 		}
@@ -184,7 +208,7 @@ func (a *App) PushHandler(push *msg.Push) {
 		txn, ok := push.Resource.(*blockchain.Transaction)
 		if ok {
 			log.Info("Adding transaction to work queue.")
-			transactionWorkQueue <- TransactionWork{txn, nil}
+			transactionQueue <- txn
 		} else {
 			log.Error("Could not cast resource to transaction.")
 		}
@@ -205,4 +229,44 @@ func getLocalChain() *blockchain.BlockChain {
 func getLocalPool() *pool.Pool {
 	// TODO: Look for local pool on disk. If doesn't exist,  make a new one.
 	return pool.New()
+}
+
+// HandleWork continually collects new work from existing work channels.
+func (a *App) HandleWork() {
+	log.Debug("Worker waiting for work.")
+	for {
+		select {
+		case work := <-transactionQueue:
+			a.HandleTransaction(work)
+		case work := <-blockQueue:
+			a.HandleBlock(work)
+		case <-quitChan:
+			return
+		}
+	}
+}
+
+// HandleTransaction handles new instance of TransactionWork.
+func (a *App) HandleTransaction(txn *blockchain.Transaction) {
+	validTransaction := a.Pool.Set(txn, a.Chain)
+	if !validTransaction {
+		log.Info("added transaction to pool from: " + txn.Sender)
+	}
+}
+
+// HandleBlock handles new instance of BlockWork.
+func (a *App) HandleBlock(blk *blockchain.Block) {
+	validBlock := a.Pool.Update(blk, a.Chain)
+
+	if validBlock {
+		// Append to the chain before requesting
+		// the next block so that the block
+		// numbers make sense.
+		a.Chain.AppendBlock(blk)
+		address := a.CurrentUser.Wallet.Public()
+		blk := a.Pool.NextBlock(a.Chain, address, a.CurrentUser.BlockSize)
+		if miner.IsMining() {
+			miner.RestartMiner(a.Chain, blk)
+		}
+	}
 }

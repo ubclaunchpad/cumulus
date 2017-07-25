@@ -2,6 +2,7 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -15,28 +16,9 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 }
 
-func createNewBlockRequest(lastBlock interface{}) *msg.Request {
-	params := make(map[string]interface{}, 1)
-	params["lastBlock"] = lastBlock
-	return &msg.Request{
-		ResourceType: msg.ResourceBlock,
-		Params:       params,
-	}
-}
-
-func createNewApp() *App {
-	chain, _ := blockchain.NewValidTestChainAndBlock()
-	return &App{
-		PeerStore:   peer.NewPeerStore("127.0.0.1:8000"),
-		CurrentUser: NewUser(),
-		Chain:       chain,
-		Pool:        pool.New(),
-	}
-}
-
 func TestPushHandlerNewBlock(t *testing.T) {
 	// Should put a block in the blockWorkQueue.
-	a := createNewApp()
+	a := createNewTestApp()
 	_, b := blockchain.NewValidTestChainAndBlock()
 	push := msg.Push{
 		ResourceType: msg.ResourceBlock,
@@ -52,7 +34,7 @@ func TestPushHandlerNewBlock(t *testing.T) {
 
 func TestPushHandlerNewTestTransaction(t *testing.T) {
 	// Should put a transaction in the transactionWorkQueue.
-	a := createNewApp()
+	a := createNewTestApp()
 	txn := blockchain.NewTestTransaction()
 	push := msg.Push{
 		ResourceType: msg.ResourceTransaction,
@@ -68,9 +50,9 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 
 func TestRequestHandlerNewBlockOK(t *testing.T) {
 	// Request a new block by hash and verify we get the right one.
-	a := createNewApp()
+	a := createNewTestApp()
 
-	req := createNewBlockRequest(a.Chain.Blocks[1].LastBlock)
+	req := createNewTestBlockRequest(a.Chain.Blocks[1].LastBlock)
 	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
 
@@ -80,11 +62,11 @@ func TestRequestHandlerNewBlockOK(t *testing.T) {
 }
 
 func TestRequestHandlerNewBlockBadParams(t *testing.T) {
-	a := createNewApp()
+	a := createNewTestApp()
 
 	// Set up a request.
 	hash := "definitelynotahash"
-	req := createNewBlockRequest(hash)
+	req := createNewTestBlockRequest(hash)
 
 	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
@@ -95,10 +77,10 @@ func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 }
 
 func TestRequestHandlerNewBlockBadType(t *testing.T) {
-	a := createNewApp()
+	a := createNewTestApp()
 
 	// Set up a request.
-	req := createNewBlockRequest("doesntmatter")
+	req := createNewTestBlockRequest("doesntmatter")
 	req.ResourceType = 25
 
 	resp := a.RequestHandler(req)
@@ -110,10 +92,10 @@ func TestRequestHandlerNewBlockBadType(t *testing.T) {
 }
 
 func TestRequestHandlerPeerInfo(t *testing.T) {
-	a := createNewApp()
+	a := createNewTestApp()
 
 	// Set up a request.
-	req := createNewBlockRequest("doesntmatter")
+	req := createNewTestBlockRequest("doesntmatter")
 	req.ResourceType = msg.ResourcePeerInfo
 
 	resp := a.RequestHandler(req)
@@ -122,4 +104,72 @@ func TestRequestHandlerPeerInfo(t *testing.T) {
 	// Make sure request did not fail.
 	assert.NotNil(t, res, "resource should contain peer info")
 	// Assert peer address returned valid.
+}
+
+func TestHandleTransactionOK(t *testing.T) {
+	a := createNewTestApp()
+	HandleTransaction(goodTxnWork)
+	if mockResponder.Result != true {
+		t.FailNow()
+	}
+}
+
+func TestHandleTransactionNotOK(t *testing.T) {
+	reset()
+	realWorker.HandleTransaction(badTxnWork)
+	if mockResponder.Result != false {
+		t.FailNow()
+	}
+}
+
+func TestHandleBlockOK(t *testing.T) {
+	reset()
+	realWorker.HandleBlock(goodBlkWork)
+	if mockResponder.Result != true {
+		t.FailNow()
+	}
+}
+
+func TestHandleBlockNotOK(t *testing.T) {
+	reset()
+	realWorker.HandleBlock(badBlkWork)
+	if mockResponder.Result != false {
+		t.FailNow()
+	}
+}
+
+func TestStartTxn(t *testing.T) {
+	reset()
+	realWorker.Start()
+	TransactionWorkQueue <- goodTxnWork
+	time.Sleep(50 * time.Millisecond)
+	mockResponder.Lock()
+	if !mockResponder.Result {
+		t.FailNow()
+	}
+	mockResponder.Unlock()
+}
+
+func TestStartBlk(t *testing.T) {
+	reset()
+	realWorker.Start()
+	BlockWorkQueue <- goodBlkWork
+	time.Sleep(50 * time.Millisecond)
+	mockResponder.Lock()
+	if !mockResponder.Result {
+		t.FailNow()
+	}
+	mockResponder.Unlock()
+}
+
+func TestQuitWorker(t *testing.T) {
+	reset()
+	for i := 0; i < nWorkers; i++ {
+		NewWorker(i).Start()
+	}
+
+	// Would hang if quit call fails, and travis would fail.
+	for i := 0; i < nWorkers; i++ {
+		QuitChan <- i
+	}
 }
