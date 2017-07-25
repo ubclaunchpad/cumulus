@@ -173,6 +173,7 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 		blockNumber, ok := req.Params["blockNumber"].(uint32)
 		if ok {
 			// If its ok, we make try to a copy of it.
+			// TODO: Make this CopyBlockByHash.
 			blk, err := a.Chain.CopyBlockByIndex(blockNumber)
 			if err != nil {
 				// Bad index parameter.
