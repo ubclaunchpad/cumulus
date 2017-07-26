@@ -36,13 +36,6 @@ type App struct {
 	Pool        *pool.Pool
 }
 
-// Responder is used to handle requests who require a response.
-type Responder interface {
-	Send(ok bool)
-	Lock()
-	Unlock()
-}
-
 // BlockWorkQueue is a queue of blocks to process.
 var blockQueue = make(chan *blockchain.Block, blockQueueSize)
 
