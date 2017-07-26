@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"math/big"
 	mrand "math/rand"
-	"time"
 
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/common/util"
@@ -205,12 +204,12 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 // NewValidTestTarget creates a new valid target that is a random value between the
 // max and min difficulties
 func NewValidTestTarget() Hash {
-	r := new(big.Int).Rand(
-		mrand.New(mrand.NewSource(time.Now().Unix())),
-		util.BigAdd(MaxTarget, c.Big1),
+	return BigIntToHash(
+		new(big.Int).Div(
+			c.MaxTarget,
+			c.MinTarget,
+		),
 	)
-	r.Add(r, c.Big1)
-	return BigIntToHash(r)
 }
 
 // NewValidCloudBaseTestTransaction returns a new valid CloudBase transaction and
