@@ -126,7 +126,7 @@ func TestHandleBlockOK(t *testing.T) {
 	// TODO: Start miner.
 
 	for i < 1000 {
-		a.Pool.SetUnsafe(blockchain.NewTestTransaction())
+		a.Pool.PushUnsafe(blockchain.NewTestTransaction())
 		i++
 	}
 
@@ -145,7 +145,7 @@ func TestHandleBlockNotOK(t *testing.T) {
 
 	// TODO: Start miner.
 	for i < 1000 {
-		a.Pool.SetUnsafe(blockchain.NewTestTransaction())
+		a.Pool.PushUnsafe(blockchain.NewTestTransaction())
 		i++
 	}
 

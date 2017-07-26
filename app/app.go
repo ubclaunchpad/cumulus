@@ -234,7 +234,7 @@ func (a *App) HandleWork() {
 
 // HandleTransaction handles new instance of TransactionWork.
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
-	validTransaction := a.Pool.Set(txn, a.Chain)
+	validTransaction := a.Pool.Push(txn, a.Chain)
 	if validTransaction {
 		log.Debug("added transaction to pool from address: " + txn.Sender.Repr())
 	} else {

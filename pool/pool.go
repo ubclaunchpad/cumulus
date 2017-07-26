@@ -70,7 +70,7 @@ func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
 
 // Set inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
-func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
+func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
 	if ok, err := bc.ValidTransaction(t); ok {
 		p.set(t)
 		return true
@@ -80,8 +80,8 @@ func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
 	}
 }
 
-// SetUnsafe adds a transaction to the pool without validation.
-func (p *Pool) SetUnsafe(t *blockchain.Transaction) {
+// PushUnsafe adds a transaction to the pool without validation.
+func (p *Pool) PushUnsafe(t *blockchain.Transaction) {
 	p.set(t)
 }
 
