@@ -3,6 +3,8 @@ package pool
 import (
 	"time"
 
+	log "github.com/Sirupsen/logrus"
+
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/common/util"
 	"github.com/ubclaunchpad/cumulus/miner"
@@ -69,11 +71,13 @@ func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
 // Set inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
 func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
-	if ok, _ := bc.ValidTransaction(t); ok {
+	if ok, err := bc.ValidTransaction(t); ok {
 		p.set(t)
 		return true
+	} else {
+		log.Debug(err)
+		return false
 	}
-	return false
 }
 
 // SetUnsafe adds a transaction to the pool without validation.
