@@ -86,7 +86,12 @@ func (p *Pool) SetUnsafe(t *blockchain.Transaction) {
 }
 
 // Silently adds a transaction to the pool.
+// Deletes a transaction if it exists from the same
+// input hash.
 func (p *Pool) set(t *blockchain.Transaction) {
+	if txn, ok := p.ValidTransactions[t.Input.Hash]; ok {
+		p.Delete(txn.Transaction)
+	}
 	vt := &PooledTransaction{
 		Transaction: t,
 		Time:        time.Now(),

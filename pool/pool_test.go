@@ -121,3 +121,14 @@ func TestPop(t *testing.T) {
 	p := New()
 	assert.Nil(t, p.Pop())
 }
+
+func TestSetDedupes(t *testing.T) {
+	p := New()
+	t1 := blockchain.NewTestTransaction()
+	t2 := blockchain.NewTestTransaction()
+	t1.Input.Hash = t2.Input.Hash
+	p.SetUnsafe(t1)
+	p.SetUnsafe(t2)
+	assert.Equal(t, p.Peek(), t2)
+	assert.Equal(t, p.Len(), 1)
+}
