@@ -153,3 +153,25 @@ func TestHandleBlockNotOK(t *testing.T) {
 	// TODO: Assert miner not restarted.
 	// TODO: Assert pool untouched.
 }
+
+func TestGetLocalPool(t *testing.T) {
+	assert.NotNil(t, getLocalPool())
+}
+
+func TestGetLocalChain(t *testing.T) {
+	assert.NotNil(t, getLocalChain())
+}
+
+func TestHandleBlock(t *testing.T) {
+	a := createNewTestApp()
+	go a.HandleWork()
+	blockQueue <- blockchain.NewTestBlock()
+	assert.Equal(t, len(blockQueue), 0)
+}
+
+func TestHandleTransaction(t *testing.T) {
+	a := createNewTestApp()
+	go a.HandleWork()
+	transactionQueue <- blockchain.NewTestTransaction()
+	assert.Equal(t, len(transactionQueue), 0)
+}

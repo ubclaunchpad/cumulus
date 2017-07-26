@@ -20,7 +20,10 @@ import (
 )
 
 var (
-	logFile = os.Stdout
+	logFile          = os.Stdout
+	blockQueue       = make(chan *blockchain.Block, blockQueueSize)
+	transactionQueue = make(chan *blockchain.Transaction, transactionQueueSize)
+	quitChan         = make(chan bool)
 )
 
 const (
@@ -35,15 +38,6 @@ type App struct {
 	Chain       *blockchain.BlockChain
 	Pool        *pool.Pool
 }
-
-// BlockWorkQueue is a queue of blocks to process.
-var blockQueue = make(chan *blockchain.Block, blockQueueSize)
-
-// TransactionWorkQueue is a queue of transactions to process.
-var transactionQueue = make(chan *blockchain.Transaction, transactionQueueSize)
-
-// QuitChan kills the app worker.
-var quitChan = make(chan bool)
 
 // Run sets up and starts a new Cumulus node with the
 // given configuration. This should only be called once (except in tests)
@@ -121,7 +115,7 @@ func Run(cfg conf.Config) {
 		}
 		log.Info("Redirecting logs to logfile")
 		log.SetOutput(logFile)
-		go RunConsole(a.PeerStore, &a)
+		go RunConsole(&a)
 	}
 
 	if len(config.Target) > 0 {

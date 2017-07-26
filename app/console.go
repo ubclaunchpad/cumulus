@@ -10,23 +10,21 @@ import (
 )
 
 var (
-	shell     *ishell.Shell
-	peerStore *peer.PeerStore
+	shell *ishell.Shell
 )
 
 // RunConsole starts the Cumulus console. This should be run only once as a
 // goroutine, and logging should be redirected away from stdout before it is run.
 // It takes a pointer to a PeerStore so we can use the PeerStore to interact
 // with other peers and give the user info about the running instance.
-func RunConsole(ps *peer.PeerStore, app *App) {
-	peerStore = ps
+func RunConsole(a *App) {
 	shell = ishell.New()
 
 	shell.AddCmd(&ishell.Cmd{
 		Name: "create",
 		Help: "create a new wallet hash or transaction",
 		Func: func(ctx *ishell.Context) {
-			create(ctx, app)
+			create(ctx, a)
 		},
 	})
 	shell.AddCmd(&ishell.Cmd{
@@ -38,21 +36,21 @@ func RunConsole(ps *peer.PeerStore, app *App) {
 		Name: "address",
 		Help: "show the address this host is listening on",
 		Func: func(ctx *ishell.Context) {
-			listenAddr(ctx, peerStore)
+			listenAddr(ctx, a)
 		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "peers",
 		Help: "show the peers this host is connected to",
 		Func: func(ctx *ishell.Context) {
-			peers(ctx, peerStore)
+			peers(ctx, a)
 		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "connect",
 		Help: "connect to another peer",
 		Func: func(ctx *ishell.Context) {
-			connect(ctx, peerStore)
+			connect(ctx, a)
 		},
 	})
 
@@ -97,22 +95,22 @@ func check(ctx *ishell.Context) {
 	}
 }
 
-func listenAddr(ctx *ishell.Context, peerStore *peer.PeerStore) {
-	shell.Println("Listening on", peerStore.ListenAddr)
+func listenAddr(ctx *ishell.Context, a *App) {
+	shell.Println("Listening on", a.PeerStore.ListenAddr)
 }
 
-func peers(tcx *ishell.Context, peerStore *peer.PeerStore) {
-	shell.Println("Connected to", peerStore.Addrs())
+func peers(tcx *ishell.Context, a *App) {
+	shell.Println("Connected to", a.PeerStore.Addrs())
 }
 
-func connect(ctx *ishell.Context, peerStore *peer.PeerStore) {
+func connect(ctx *ishell.Context, a *App) {
 	if len(ctx.Args) == 0 {
 		shell.Println("Usage: connect [IP address]:[TCP port]")
 		return
 	}
 
 	addr := ctx.Args[0]
-	_, err := peer.Connect(addr, peerStore)
+	_, err := peer.Connect(addr, a.PeerStore)
 	if err != nil {
 		shell.Println("Failed to extablish connection:", err)
 	} else {
