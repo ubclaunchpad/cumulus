@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math"
 	"math/big"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
@@ -24,8 +25,8 @@ var (
 // CurrentBlockReward determines the current block reward using the
 // the length of the blockchain
 func CurrentBlockReward(bc *blockchain.BlockChain) uint64 {
-	return StartingBlockReward /
-		uint64(((len(bc.Blocks) / blockRewardHalvingRate) + 1))
+	timesHalved := float64((len(bc.Blocks) / blockRewardHalvingRate))
+	return StartingBlockReward / uint64(math.Pow(float64(2), timesHalved))
 }
 
 // CurrentTarget returns the current target based on the CurrentDifficulty
