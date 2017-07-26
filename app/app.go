@@ -24,9 +24,7 @@ var (
 )
 
 const (
-	// BlockQueueSize is the size of the BlockQueue channel.
-	blockQueueSize = 100
-	// TransactionQueueSize is the size of the BlockQueue channel.
+	blockQueueSize       = 100
 	transactionQueueSize = 100
 )
 
@@ -271,6 +269,6 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 		if miner.IsMining() {
 			miner.RestartMiner(a.Chain, blk)
 		}
-		log.Debug("added blk number %d to chain with hash", blk.BlockNumber)
+		log.Debug("added blk number %d to chain", blk.BlockNumber)
 	}
 }
