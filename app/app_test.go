@@ -2,6 +2,7 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -165,6 +166,7 @@ func TestGetLocalChain(t *testing.T) {
 func TestHandleBlock(t *testing.T) {
 	a := createNewTestApp()
 	go a.HandleWork()
+	time.Sleep(50 * time.Millisecond)
 	blockQueue <- blockchain.NewTestBlock()
 	assert.Equal(t, len(blockQueue), 0)
 }
@@ -172,6 +174,7 @@ func TestHandleBlock(t *testing.T) {
 func TestHandleTransaction(t *testing.T) {
 	a := createNewTestApp()
 	go a.HandleWork()
+	time.Sleep(50 * time.Millisecond)
 	transactionQueue <- blockchain.NewTestTransaction()
 	assert.Equal(t, len(transactionQueue), 0)
 }

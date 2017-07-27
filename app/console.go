@@ -17,7 +17,7 @@ var (
 // goroutine, and logging should be redirected away from stdout before it is run.
 // It takes a pointer to a PeerStore so we can use the PeerStore to interact
 // with other peers and give the user info about the running instance.
-func RunConsole(a *App) {
+func RunConsole(a *App) *ishell.Shell {
 	shell = ishell.New()
 
 	shell.AddCmd(&ishell.Cmd{
@@ -56,6 +56,7 @@ func RunConsole(a *App) {
 
 	shell.Start()
 	emoji.Println(":cloud: Welcome to the :sunny: Cumulus console :cloud:")
+	return shell
 }
 
 func create(ctx *ishell.Context, app *App) {
