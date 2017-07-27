@@ -7,8 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRunConsoleHasCommands
-(t *testing.T) {
+func TestRunConsoleHasCommands(t *testing.T) {
 	a := createNewTestApp()
 	s := RunConsole(a)
 	expected := []string{
