@@ -19,8 +19,7 @@ func VerifyTransaction(bc *blockchain.BlockChain,
 	}
 
 	// Find the transaction input in the chain (by hash)
-	var input *blockchain.Transaction
-	input = bc.GetInputTransaction(t)
+	input := bc.GetInputTransaction(t)
 	if input == nil || blockchain.HashSum(input) != t.Input.Hash {
 		return false, NoInputTransaction
 	}
@@ -143,7 +142,8 @@ func VerifyGenesisBlock(bc *blockchain.BlockChain,
 	}
 
 	// Check that time is not greater than current time or equal to 0.
-	if uint32(gb.Time) == 0 {
+	// TODO: check if time is the current time
+	if gb.Time == 0 {
 		return false, BadGenesisTime
 	}
 
@@ -168,7 +168,7 @@ func VerifyBlock(bc *blockchain.BlockChain,
 		return true, ValidBlock
 	}
 
-	// Check that block number is between 0 and max blocks.
+	// Check that block number is valid.
 	ix := b.BlockNumber - 1
 	if int(ix) > len(bc.Blocks)-1 || ix < 0 {
 		return false, BadBlockNumber
@@ -200,14 +200,13 @@ func VerifyBlock(bc *blockchain.BlockChain,
 	// cumulus. Once the difficulty is dynamic, the target would need to be
 	// compared to the target calculated for that specific block.
 	target := blockchain.HashToBigInt(b.Target)
-	if target.Cmp(c.MaxTarget) == 1 ||
-		target.Cmp(c.MinTarget) == -1 ||
-		target.Cmp(blockchain.HashToBigInt(CurrentTarget())) != 0 {
+	if target.Cmp(blockchain.HashToBigInt(CurrentTarget())) != 0 {
 		return false, BadTarget
 	}
 
 	// Check that time is not greater than current time or equal to 0
-	if uint32(b.Time) == 0 {
+	// TODO: check if time is the current time
+	if b.Time == 0 {
 		return false, BadTime
 	}
 
