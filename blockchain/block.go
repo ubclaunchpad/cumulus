@@ -9,6 +9,9 @@ import (
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
+// DefaultBlockSize is the default block size, can be augmented by the user.
+const DefaultBlockSize = 1 << 18
+
 // BlockHeader contains metadata about a block
 type BlockHeader struct {
 	// BlockNumber is the position of the block within the blockchain
