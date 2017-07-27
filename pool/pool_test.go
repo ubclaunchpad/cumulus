@@ -14,7 +14,7 @@ func TestGetAndSetTransaction(t *testing.T) {
 		t.FailNow()
 	}
 	tr := b.Transactions[1]
-	if !p.Set(tr, bc) {
+	if !p.Push(tr, bc) {
 		t.FailNow()
 	}
 
@@ -36,7 +36,7 @@ func TestGetAndSetTransaction(t *testing.T) {
 func TestSetBadTransaction(t *testing.T) {
 	p := New()
 	bc := blockchain.NewTestBlockChain()
-	if p.Set(blockchain.NewTestTransaction(), bc) {
+	if p.Push(blockchain.NewTestTransaction(), bc) {
 		t.FailNow()
 	}
 }
@@ -50,7 +50,7 @@ func TestUpdatePool(t *testing.T) {
 	}
 
 	for _, tr := range legitBlk.Transactions[1:] {
-		p.Set(tr, bc)
+		p.Push(tr, bc)
 	}
 	if p.Len() == 0 {
 		t.FailNow()
@@ -77,9 +77,9 @@ func TestGetIndex(t *testing.T) {
 	p := New()
 	numTxns := 1000
 	tr := blockchain.NewTestTransaction()
-	p.SetUnsafe(tr)
+	p.PushUnsafe(tr)
 	for i := 0; i < numTxns; i++ {
-		p.SetUnsafe(blockchain.NewTestTransaction())
+		p.PushUnsafe(blockchain.NewTestTransaction())
 	}
 	if p.GetIndex(tr) != 0 {
 		t.FailNow()
@@ -98,7 +98,7 @@ func TestNextBlock(t *testing.T) {
 	lastBlk := chain.Blocks[nBlks-1]
 	numTxns := 1000
 	for i := 0; i < numTxns; i++ {
-		p.SetUnsafe(blockchain.NewTestTransaction())
+		p.PushUnsafe(blockchain.NewTestTransaction())
 	}
 	b := p.NextBlock(chain, blockchain.NewWallet().Public(), 1<<18)
 	assert.NotNil(t, b)
@@ -120,4 +120,15 @@ func TestPeek(t *testing.T) {
 func TestPop(t *testing.T) {
 	p := New()
 	assert.Nil(t, p.Pop())
+}
+
+func TestSetDedupes(t *testing.T) {
+	p := New()
+	t1 := blockchain.NewTestTransaction()
+	t2 := blockchain.NewTestTransaction()
+	t1.Input.Hash = t2.Input.Hash
+	p.PushUnsafe(t1)
+	p.PushUnsafe(t2)
+	assert.Equal(t, p.Peek(), t2)
+	assert.Equal(t, p.Len(), 1)
 }

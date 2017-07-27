@@ -3,6 +3,8 @@ package pool
 import (
 	"time"
 
+	log "github.com/Sirupsen/logrus"
+
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/common/util"
 	"github.com/ubclaunchpad/cumulus/consensus"
@@ -34,6 +36,11 @@ func (p *Pool) Len() int {
 	return len(p.ValidTransactions)
 }
 
+// Empty returns true if the pool has exactly zero transactions in it.
+func (p *Pool) Empty() bool {
+	return p.Len() == 0
+}
+
 // Get returns the tranasction with input transaction Hash h.
 func (p *Pool) Get(h blockchain.Hash) *blockchain.Transaction {
 	return p.ValidTransactions[h].Transaction
@@ -62,23 +69,30 @@ func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
 	}
 }
 
-// Set inserts a transaction into the pool, returning
+// Push inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
-func (p *Pool) Set(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
-	if ok, _ := consensus.VerifyTransaction(bc, t); ok {
+func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
+	if ok, err := consensus.VerifyTransaction(bc, t); ok {
 		p.set(t)
 		return true
+	} else {
+		log.Debug(err)
+		return false
 	}
-	return false
 }
 
-// SetUnsafe adds a transaction to the pool without validation.
-func (p *Pool) SetUnsafe(t *blockchain.Transaction) {
+// PushUnsafe adds a transaction to the pool without validation.
+func (p *Pool) PushUnsafe(t *blockchain.Transaction) {
 	p.set(t)
 }
 
 // Silently adds a transaction to the pool.
+// Deletes a transaction if it exists from the same
+// input hash.
 func (p *Pool) set(t *blockchain.Transaction) {
+	if txn, ok := p.ValidTransactions[t.Input.Hash]; ok {
+		p.Delete(txn.Transaction)
+	}
 	vt := &PooledTransaction{
 		Transaction: t,
 		Time:        time.Now(),

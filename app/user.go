@@ -14,15 +14,6 @@ type HotWallet struct {
 	blockchain.Wallet
 }
 
-var currentUser *User
-
-const defaultBlockSize = 1 << 18
-
-func init() {
-	// Temporary to create a new user for testing.
-	currentUser = NewUser()
-}
-
 // NewUser creates a new user
 func NewUser() *User {
 	return &User{
@@ -30,11 +21,13 @@ func NewUser() *User {
 			Wallet: blockchain.NewWallet(),
 			Name:   "default",
 		},
-		BlockSize: defaultBlockSize,
+		BlockSize: blockchain.DefaultBlockSize,
 	}
 }
 
-// GetCurrentUser returns the current user.
-func GetCurrentUser() *User {
-	return currentUser
+// getCurrentUser gets the current user.
+func getCurrentUser() *User {
+	// TODO: Check for local user information on disk,
+	// If doesnt exist, create new user.
+	return NewUser()
 }
