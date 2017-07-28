@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -257,5 +258,90 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 			miner.RestartMiner(a.Chain, blk)
 		}
 		log.Debug("added blk number %d to chain", blk.BlockNumber)
+	}
+}
+
+// SyncBlockchain updates the local copy of the blockchain by requesting missing
+// blocks from peers. Returns error if we are not connected to any peers.
+func (a *App) SyncBlockchain() error {
+	newBlockChan := make(chan *blockchain.Block)
+	errChan := make(chan *msg.ProtocolError)
+
+	// Define a handler for responses to our block requests
+	blockResponseHandler := func(blockResponse *msg.Response) {
+		if blockResponse.Error != nil {
+			errChan <- blockResponse.Error
+			return
+		}
+
+		block, ok := blockResponse.Resource.(blockchain.Block)
+		if !ok {
+			newBlockChan <- nil
+			return
+		}
+
+		newBlockChan <- &block
+	}
+
+	// Continually request the block after the latest block in our chain until
+	// we are totally up to date
+	for {
+		reqParams := map[string]interface{}{
+			"blockNumber": len(a.Chain.Blocks) - 1,
+		}
+
+		blockRequest := msg.Request{
+			ID:           uuid.New().String(),
+			ResourceType: msg.ResourceBlock,
+			Params:       reqParams,
+		}
+
+		// Get a list of peer addresses. We will use these to retreive peers from
+		// the PeerStore that we will then send block requests to
+		peerAddrs := a.PeerStore.Addrs()
+		if len(peerAddrs) == 0 {
+			return errors.New("SyncBlockchain failed: no peers to request blocks from")
+		}
+
+		// Pick a peer to send the request to (this won't always be the same one)
+		p := a.PeerStore.Get(a.PeerStore.Addrs()[0])
+		p.Request(blockRequest, blockResponseHandler)
+
+		// Wait for response
+		select {
+		case block := <-newBlockChan:
+			if block == nil {
+				// We received a response with no error but an invalid resource
+				// Try again
+				continue
+			}
+
+			valid, validationCode := a.Chain.ValidBlock(block)
+			if !valid {
+				if validationCode == msg.ResourceNotFound {
+					// We are up to date
+					return nil
+				}
+				// There is something wrong with this block. Try again
+				fields := log.Fields{"validationCode": validationCode}
+				log.WithFields(fields).Debug(
+					"SyncBlockchain received invalid block")
+				continue
+			}
+
+			// Valid block. Append it to the chain
+			a.Chain.AppendBlock(block)
+
+		case err := <-errChan:
+			if err.Code == msg.ResourceNotFound {
+				// We are up to date
+				return nil
+			} else if err.Code == msg.RequestTimeout {
+				log.Debug("SyncBlockchain timed out waiting for a response")
+			}
+
+			// Some other protocol error occurred. Try again
+			log.WithError(err).Debug("SyncBlockchain received error response")
+		}
 	}
 }

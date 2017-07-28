@@ -2,6 +2,7 @@ package peer
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -22,6 +23,9 @@ const (
 	DefaultPort = 8000
 	// DefaultIP is the IP address new hosts will use if none if provided
 	DefaultIP = "127.0.0.1"
+	// DefaultRequestTimeout is the default amount of time we will wait for a
+	// peer to return a response to a request
+	DefaultRequestTimeout = time.Second * 10
 	// MessageWaitTime is the amount of time the dispatcher should wait before
 	// attempting to read from the connection again when no data was received
 	MessageWaitTime = time.Second * 2
@@ -34,6 +38,7 @@ const (
 )
 
 // ResponseHandler is any function that handles a response to a request.
+// NOTE: implementations of this function must handle timeouts!
 type ResponseHandler func(*msg.Response)
 
 // PushHandler is any function that handles a push message.
@@ -100,7 +105,7 @@ func (p *Peer) SetPushHandler(ph PushHandler) {
 // Dispatch listens on this peer's Connection and passes received messages
 // to the appropriate message handlers.
 func (p *Peer) Dispatch() {
-	// After 3 consecutive errors we kill this connection and its associated
+	// After 3 errors we kill this connection and its associated
 	// handlers
 	errCount := 0
 
@@ -123,7 +128,6 @@ func (p *Peer) Dispatch() {
 			}
 			continue
 		}
-		errCount = 0
 
 		switch message.(type) {
 		case *msg.Request:
@@ -143,7 +147,6 @@ func (p *Peer) Dispatch() {
 					p.ListenAddr)
 			} else {
 				rh(res)
-				p.removeResponseHandler(res.ID)
 			}
 		case *msg.Push:
 			push := message.(*msg.Push)
@@ -159,11 +162,52 @@ func (p *Peer) Dispatch() {
 
 // Request sends the given request over this peer's Connection and registers the
 // given response hadnler to be called when the response arrives at the dispatcher.
-// Returns error if request could not be written.
+// implementations. Returns error if request could not be written.
+// Note that if we never received a response from this peer the response handler
+// will not be called.
 func (p *Peer) Request(req msg.Request, rh ResponseHandler) error {
-	p.addResponseHandler(req.ID, rh)
+	responseReceived := make(chan bool)
+
+	// Wrap response handler so we know to stop waiting for a timeout event when
+	// the response is received
+	wrapper := func(response *msg.Response) {
+		responseReceived <- true
+		rh(response)
+	}
+
+	p.addResponseHandler(req.ID, wrapper)
 	err := req.Write(p.Connection)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Wait for timeout or response
+	go func() {
+		select {
+		case <-responseReceived:
+		case <-time.After(DefaultRequestTimeout):
+			// Timeout waiting for response
+			message := fmt.Sprintf("Timed out waiting for response from peer %s", p.ListenAddr)
+			log.Debug(message)
+
+			err := &msg.ProtocolError{
+				Code:    msg.RequestTimeout,
+				Message: message,
+			}
+			timeoutResponse := &msg.Response{
+				ID:    req.ID,
+				Error: err,
+			}
+
+			// Pass the ProtocolError to the actual response handler
+			rh(timeoutResponse)
+		}
+
+		// Remove response handler when we are done waiting
+		p.removeResponseHandler(req.ID)
+	}()
+
+	return nil
 }
 
 // Push sends a push message to this peer. Returns an error if the push message

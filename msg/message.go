@@ -28,6 +28,9 @@ const (
 	// InvalidResourceType occurs when a request is received with an unknown
 	// ResourceType value.
 	InvalidResourceType = 401
+	// RequestTimeout occurs when a peer does not respond to a request within
+	// some predefined period of time (see peer.DefaultRequestTimeout)
+	RequestTimeout = 408
 	// ResourceNotFound occurs when a node reports the requested resource missing.
 	ResourceNotFound = 404
 	// NotImplemented occurs when a message or request is received whos response
