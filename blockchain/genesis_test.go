@@ -8,7 +8,7 @@ import (
 
 func TestGenesis(t *testing.T) {
 	miner := NewWallet()
-	currentTarget := BigIntToHash(MaxTarget)
+	currentTarget := BigIntToHash(c.MaxTarget)
 	currentBlockReward := uint64(25)
 	gb := Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 
@@ -29,11 +29,6 @@ func TestGenesis(t *testing.T) {
 
 	// Check iof the size of the transaction list is equal to 1
 	if len(gb.Transactions) != 1 {
-		t.Fail()
-	}
-
-	// Check if the transaction is a valid cloud base transaction
-	if valid, _ := ValidCloudBase(gb.Transactions[0]); !valid {
 		t.Fail()
 	}
 }
