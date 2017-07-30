@@ -1,13 +1,16 @@
 package peer
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/google/uuid"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -51,11 +54,49 @@ var (
 
 // fakeConn implements net.Conn
 type fakeConn struct {
-	Addr net.Addr
+	Addr         net.Addr
+	Message      **[]byte
+	ReadOnce     bool
+	BytesWritten chan []byte
+	saveOnWrite  bool
+	lock         *sync.RWMutex
 }
 
-func (fc fakeConn) Read(b []byte) (n int, err error)   { return 0, nil }
-func (fc fakeConn) Write(b []byte) (n int, err error)  { return 0, nil }
+func newFakeConn(addr net.Addr, message **[]byte,
+	readOnce bool, saveOnWrite bool) *fakeConn {
+	return &fakeConn{
+		Addr:         addr,
+		Message:      message,
+		ReadOnce:     readOnce,
+		BytesWritten: make(chan []byte),
+		saveOnWrite:  saveOnWrite,
+		lock:         &sync.RWMutex{},
+	}
+}
+
+func (fc fakeConn) Read(b []byte) (n int, err error) {
+	fc.lock.RLock()
+	defer fc.lock.RUnlock()
+
+	message := **fc.Message
+
+	var i int
+	for i = 0; i < len(message) && i < 512; i++ {
+		b[i] = (message)[i]
+	}
+	if fc.ReadOnce {
+		**fc.Message = make([]byte, 0)
+	}
+	return i, nil
+}
+
+func (fc fakeConn) Write(b []byte) (n int, err error) {
+	if fc.saveOnWrite {
+		fc.BytesWritten <- b
+	}
+	return len(b), nil
+}
+
 func (fc fakeConn) Close() error                       { return nil }
 func (fc fakeConn) LocalAddr() net.Addr                { return fc.Addr }
 func (fc fakeConn) RemoteAddr() net.Addr               { return fc.Addr }
@@ -304,5 +345,275 @@ func TestSetDefaultPushHandler(t *testing.T) {
 	p2 := New(fc, ps, fa.String())
 	if p2.pushHandler == nil {
 		t.FailNow()
+	}
+}
+
+func TestRequestTimeout(t *testing.T) {
+	message := make([]byte, 0)
+	messagePtr := &message
+
+	fa := fakeAddr{Addr: "127.0.0.1"}
+	fc := newFakeConn(fa, &messagePtr, false, false)
+
+	ps := NewPeerStore("")
+	p := New(fc, ps, "")
+	responseChan := make(chan *msg.Response)
+
+	responseHandler := func(res *msg.Response) {
+		responseChan <- res
+	}
+
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+
+	p.Request(req, responseHandler)
+	select {
+	case res := <-responseChan:
+		if res.Error == nil || res.Error.Code != msg.RequestTimeout {
+			t.Fail()
+		}
+	}
+
+	if p.getResponseHandler(req.ID) != nil {
+		t.Fail()
+	}
+}
+
+func TestValidAddress(t *testing.T) {
+	if !validAddress("124.53.12.53:8080") {
+		t.Fail()
+	} else if validAddress("132.76.211.0:333") {
+		t.Fail()
+	} else if validAddress("400.12.43.1:8080") {
+		t.Fail()
+	} else if validAddress("222.12.43.1:12") {
+		t.Fail()
+	} else if validAddress("222.12.43.1") {
+		t.Fail()
+	} else if validAddress("lksdjfliosrut8r") {
+		t.Fail()
+	} else if validAddress("") {
+		t.Fail()
+	}
+}
+
+func TestResponse(t *testing.T) {
+	responseChan := make(chan *msg.Response)
+
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+
+	response := msg.Response{
+		ID:       req.ID,
+		Resource: "HI!",
+	}
+
+	responsePayloadBytes, _ := json.Marshal(response)
+	responseMsg := msg.Message{
+		Type:    "Response",
+		Payload: responsePayloadBytes,
+	}
+	responseBytes, err := json.Marshal(responseMsg)
+	if err != nil {
+		panic(err)
+	}
+	rbp := &responseBytes
+
+	var fa net.Addr
+	var fc net.Conn
+
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc = newFakeConn(fa, &rbp, false, false)
+
+	ps := NewPeerStore("")
+	p := New(fc, ps, "")
+
+	responseHandler := func(res *msg.Response) {
+		responseChan <- res
+	}
+
+	go p.Dispatch()
+
+	err = p.Request(req, responseHandler)
+	if err != nil {
+		panic(err)
+	}
+
+	select {
+	case res := <-responseChan:
+		if res.ID != req.ID {
+			t.FailNow()
+		} else if res.Resource.(string) != "HI!" {
+			t.FailNow()
+		}
+	}
+}
+
+func TestPush(t *testing.T) {
+	pushChan := make(chan *msg.Push)
+
+	push := msg.Push{
+		ResourceType: msg.ResourceTransaction,
+		Resource:     "HEY!",
+	}
+
+	pushPayloadBytes, _ := json.Marshal(push)
+
+	pushMsg := msg.Message{
+		Type:    "Push",
+		Payload: pushPayloadBytes,
+	}
+
+	pushBytes, _ := json.Marshal(pushMsg)
+	pbp := &pushBytes
+
+	var fa net.Addr
+	var fc net.Conn
+
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc = newFakeConn(fa, &pbp, false, false)
+
+	ps := NewPeerStore("")
+	p := New(fc, ps, "")
+
+	p.SetPushHandler(func(push *msg.Push) {
+		pushChan <- push
+	})
+
+	go p.Dispatch()
+
+	select {
+	case push := <-pushChan:
+		if push.ResourceType != msg.ResourceTransaction ||
+			push.Resource.(string) != "HEY!" {
+			t.FailNow()
+		}
+	}
+}
+
+func TestRequest(t *testing.T) {
+	requestChan := make(chan *msg.Request)
+
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+
+	requestPayloadBytes, _ := json.Marshal(req)
+
+	requestMsg := msg.Message{
+		Type:    "Request",
+		Payload: requestPayloadBytes,
+	}
+
+	requestBytes, _ := json.Marshal(requestMsg)
+	rbp := &requestBytes
+
+	var fa net.Addr
+	var fc net.Conn
+
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc = newFakeConn(fa, &rbp, false, false)
+
+	ps := NewPeerStore("")
+	p := New(fc, ps, "")
+
+	p.SetRequestHandler(func(req *msg.Request) msg.Response {
+		requestChan <- req
+		return msg.Response{}
+	})
+
+	go p.Dispatch()
+
+	select {
+	case request := <-requestChan:
+		if request.ResourceType != msg.ResourcePeerInfo ||
+			request.ID != req.ID {
+			t.FailNow()
+		}
+	}
+}
+
+func TestConnectionHandler(t *testing.T) {
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+	requestPayloadBytes, _ := json.Marshal(req)
+	requestMsg := msg.Message{
+		Type:    "Request",
+		Payload: requestPayloadBytes,
+	}
+	requestBytes, _ := json.Marshal(requestMsg)
+	rbp := &requestBytes
+
+	var fa net.Addr
+
+	fa = fakeAddr{Addr: "127.0.0.1"}
+	fc := newFakeConn(fa, &rbp, true, true)
+
+	ps := NewPeerStore("")
+	connectionHandlerDone := make(chan bool)
+
+	go func() {
+		ps.ConnectionHandler(fc)
+		connectionHandlerDone <- true
+	}()
+
+	receivedRequest := false
+	receivedResponse := false
+
+	for !receivedRequest || !receivedResponse {
+		select {
+		case receivedMsg := <-fc.BytesWritten:
+			var message msg.Message
+			var request msg.Request
+			var response msg.Response
+
+			json.Unmarshal(receivedMsg, &message)
+
+			switch message.Type {
+			case "Request":
+				err := json.Unmarshal([]byte(message.Payload), &request)
+				if err != nil {
+					panic(err)
+				}
+				receivedRequest = true
+				fc.lock.Lock()
+				**fc.Message = requestBytes
+				fc.lock.Unlock()
+			case "Response":
+				err := json.Unmarshal([]byte(message.Payload), &response)
+				if err != nil {
+					panic(err)
+				}
+				receivedResponse = true
+
+				res := msg.Response{
+					ID:       request.ID,
+					Resource: "127.0.0.1:8000",
+				}
+				resBytes, _ := json.Marshal(res)
+				responseMsg := msg.Message{
+					Type:    "Response",
+					Payload: resBytes,
+				}
+				responseMsgBytes, _ := json.Marshal(responseMsg)
+				fc.lock.Lock()
+				**fc.Message = responseMsgBytes
+				fc.lock.Unlock()
+			}
+		}
+	}
+
+	select {
+	case <-connectionHandlerDone:
+		if ps.Get("127.0.0.1:8000") == nil {
+			t.Fail()
+		}
 	}
 }

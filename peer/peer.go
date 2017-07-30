@@ -163,8 +163,6 @@ func (p *Peer) Dispatch() {
 // Request sends the given request over this peer's Connection and registers the
 // given response hadnler to be called when the response arrives at the dispatcher.
 // implementations. Returns error if request could not be written.
-// Note that if we never received a response from this peer the response handler
-// will not be called.
 func (p *Peer) Request(req msg.Request, rh ResponseHandler) error {
 	responseReceived := make(chan bool)
 

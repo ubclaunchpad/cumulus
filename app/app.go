@@ -248,8 +248,7 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	validBlock := a.Pool.Update(blk, a.Chain)
 
 	if validBlock {
-		// Append to the chain before requesting
-		// the next block so that the block
+		// Append to the chain before requesting the next block so that the block
 		// numbers make sense.
 		a.Chain.AppendBlock(blk)
 		address := a.CurrentUser.Wallet.Public()

@@ -1,5 +1,5 @@
-hash: 14d7695aad2f66fada940b379240f0bd400acb153b54600074e634b009f5b271
-updated: 2017-07-23T17:39:19.702683559-07:00
+hash: b8d3d8395d2867faced0c31743cd56384beb07b6290c0e339c84d2354de4fcbc
+updated: 2017-07-29T17:35:29.15377758-07:00
 imports:
 - name: github.com/abiosoft/ishell
   version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
@@ -27,7 +27,7 @@ imports:
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/magiconair/properties
-  version: 51463bfca2576e06c62a8504b5c0f06d61312647
+  version: be5ece7dd465ab0765a9682137865547526d1dfb
 - name: github.com/mattn/go-colorable
   version: 5411d3eea5978e6cdc258b30de592b60df6aba96
   repo: https://github.com/mattn/go-colorable
@@ -36,16 +36,10 @@ imports:
   repo: https://github.com/mattn/go-isatty
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
-- name: github.com/onsi/ginkgo
-  version: 9eda700730cba42af70d53180f9dcce9266bc2bc
-  subpackages:
-  - ginkgo
-- name: github.com/onsi/gomega
-  version: c893efa28eb45626cdaa76c9f653b62488858837
 - name: github.com/pelletier/go-toml
   version: 69d355db5304c0f7f809a2edc054553e7142f016
 - name: github.com/Sirupsen/logrus
-  version: 7dd06bf38e1e13df288d471a57d5adbac106be9e
+  version: 181d419aa9e2223811b824e8f0b4af96f9ba9302
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
@@ -53,30 +47,34 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: 8c6fa02d2225de0f9bdcb7ca912556f68d172d8c
+  version: 34594c771f2c18301dc152640ad40ece28795373
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
 - name: github.com/spf13/viper
-  version: a1ecfa6a20bd4ef9e9caded262ee1b1b26847675
+  version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
 - name: github.com/stretchr/testify
   version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
+- name: golang.org/x/crypto
+  version: 558b6879de74bc843225cde5686419267ff707ca
+  subpackages:
+  - ssh/terminal
 - name: golang.org/x/sys
-  version: 4ed4d404df456f81e878683a0363ed3013a59003
+  version: 0f826bdd13b500be0f1d4004938ad978fcc6031e
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 2bf8f2a19ec09c670e931282edfe6567f6be21c9
+  version: a467ab3c3977c4a820c2a4a886d54eb7d68901f0
   subpackages:
   - transform
   - unicode/norm
 - name: gopkg.in/kyokomi/emoji.v1
   version: 7e06b236c489543f53868841f188a294e3383eab
 - name: gopkg.in/yaml.v2
-  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
+  version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9

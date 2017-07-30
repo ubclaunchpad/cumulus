@@ -84,6 +84,8 @@ func (ps *PeerStore) exchangeListenAddrs(c net.Conn, d time.Duration) (string, e
 		var addr string
 
 		for !receivedAddr || !sentAddr {
+			time.Sleep(MessageWaitTime)
+
 			message, err := msg.Read(c)
 			if err == io.EOF {
 				continue
@@ -94,7 +96,11 @@ func (ps *PeerStore) exchangeListenAddrs(c net.Conn, d time.Duration) (string, e
 			switch message.(type) {
 			case *msg.Response:
 				// We got the listen address back
-				addr = message.(*msg.Response).Resource.(string)
+				var ok bool
+				addr, ok = message.(*msg.Response).Resource.(string)
+				if !ok {
+					continue
+				}
 				if validAddress(addr) || addr != ps.ListenAddr {
 					receivedAddr = true
 				}
@@ -113,7 +119,6 @@ func (ps *PeerStore) exchangeListenAddrs(c net.Conn, d time.Duration) (string, e
 					errChan <- err
 				}
 				sentAddr = true
-			default:
 			}
 		}
 
