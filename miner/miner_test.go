@@ -13,36 +13,28 @@ import (
 
 func TestMine(t *testing.T) {
 	bc, b := blockchain.NewValidTestChainAndBlock()
-	tempMaxTarget := blockchain.MaxTarget
+	tempMaxTarget := c.MaxTarget
 
 	// Set min difficulty to be equal to the target so that the block validation
 	// passes
-	blockchain.MaxTarget = c.MaxUint256
+	c.MaxTarget = c.MaxUint256
 
 	// Set target to be as easy as possible so that we find a hash
 	// below the target straight away (2**256 - 1)
-	b.Target = blockchain.BigIntToHash(blockchain.MaxTarget)
+	b.Target = blockchain.BigIntToHash(c.MaxTarget)
 	b.Time = util.UnixNow()
 	mineResult := Mine(bc, b)
-	blockchain.MaxTarget = tempMaxTarget
+	c.MaxTarget = tempMaxTarget
 
 	assert.True(t, mineResult.Complete)
 	assert.Equal(t, mineResult.Info, MiningSuccessful)
-}
-
-func TestMineBadBlock(t *testing.T) {
-	bc, _ := blockchain.NewValidTestChainAndBlock()
-	mineResult := Mine(bc, nil)
-
-	assert.False(t, mineResult.Complete)
-	assert.Equal(t, mineResult.Info, MiningNeverStarted)
 }
 
 func TestMineHaltMiner(t *testing.T) {
 	bc, b := blockchain.NewValidTestChainAndBlock()
 
 	// Set target to be as hard as possible so that we stall.
-	b.Target = blockchain.BigIntToHash(blockchain.MinTarget)
+	b.Target = blockchain.BigIntToHash(c.MinTarget)
 	b.Time = util.UnixNow()
 
 	// Use a thread to stop the miner a few moments after starting.
@@ -75,11 +67,11 @@ func TestCloudBase(t *testing.T) {
 
 	CloudBase(b, bc, w.Public())
 
-	if valid, _ := bc.ValidBlock(b); !valid {
+	if valid, _ := consensus.VerifyBlock(bc, b); !valid {
 		t.Fail()
 	}
 
-	if b.Transactions[0].Outputs[0].Amount != consensus.BlockReward {
+	if b.Transactions[0].Outputs[0].Amount != consensus.CurrentBlockReward(bc) {
 		t.Fail()
 	}
 
