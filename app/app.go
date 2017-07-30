@@ -48,10 +48,11 @@ func Run(cfg conf.Config) {
 	config := &cfg
 
 	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
+	user := getCurrentUser()
 	a := App{
 		PeerStore:   peer.NewPeerStore(addr),
-		CurrentUser: getCurrentUser(),
-		Chain:       getLocalChain(),
+		CurrentUser: user,
+		Chain:       getLocalChain(user),
 		Pool:        getLocalPool(),
 	}
 
@@ -206,11 +207,21 @@ func (a *App) PushHandler(push *msg.Push) {
 }
 
 // getLocalChain returns an instance of the blockchain.
-func getLocalChain() *blockchain.BlockChain {
+func getLocalChain(user *User) *blockchain.BlockChain {
 	// TODO: Look for local chain on disk. If doesn't exist, go rummaging
 	// around on the internets for one.
-	bc, _ := blockchain.NewValidTestChainAndBlock()
-	return bc
+	bc := blockchain.BlockChain{
+		Blocks: make([]*blockchain.Block, 0),
+		Head:   blockchain.NilHash,
+	}
+
+	genisisBlock := blockchain.Genesis(user.HotWallet.Wallet.Public(),
+		consensus.CurrentTarget(), consensus.StartingBlockReward,
+		make([]byte, 0))
+
+	bc.Blocks = append(bc.Blocks, genisisBlock)
+	bc.Head = blockchain.HashSum(genisisBlock)
+	return &bc
 }
 
 // getLocalPool returns an instance of the pool.
@@ -264,6 +275,7 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 // SyncBlockchain updates the local copy of the blockchain by requesting missing
 // blocks from peers. Returns error if we are not connected to any peers.
 func (a *App) SyncBlockchain() error {
+	prevHead := a.Chain.Blocks[len(a.Chain.Blocks)-1]
 	newBlockChan := make(chan *blockchain.Block)
 	errChan := make(chan *msg.ProtocolError)
 
@@ -286,8 +298,10 @@ func (a *App) SyncBlockchain() error {
 	// Continually request the block after the latest block in our chain until
 	// we are totally up to date
 	for {
+		lastBlock := a.Chain.Blocks[len(a.Chain.Blocks)-1]
+
 		reqParams := map[string]interface{}{
-			"blockNumber": len(a.Chain.Blocks) - 1,
+			"lastBlockHash": blockchain.HashSum(lastBlock),
 		}
 
 		blockRequest := msg.Request{
@@ -304,24 +318,20 @@ func (a *App) SyncBlockchain() error {
 		}
 
 		// Pick a peer to send the request to (this won't always be the same one)
-		p := a.PeerStore.Get(a.PeerStore.Addrs()[0])
+		p := a.PeerStore.Get(peerAddrs[0])
 		p.Request(blockRequest, blockResponseHandler)
 
 		// Wait for response
 		select {
-		case block := <-newBlockChan:
-			if block == nil {
+		case newBlock := <-newBlockChan:
+			if newBlock == nil {
 				// We received a response with no error but an invalid resource
 				// Try again
 				continue
 			}
 
-			valid, validationCode := consensus.VerifyBlock(a.Chain, block)
+			valid, validationCode := consensus.VerifyBlock(a.Chain, newBlock)
 			if !valid {
-				if validationCode == msg.ResourceNotFound {
-					// We are up to date
-					return nil
-				}
 				// There is something wrong with this block. Try again
 				fields := log.Fields{"validationCode": validationCode}
 				log.WithFields(fields).Debug(
@@ -330,14 +340,19 @@ func (a *App) SyncBlockchain() error {
 			}
 
 			// Valid block. Append it to the chain
-			a.Chain.AppendBlock(block)
+			a.Chain.AppendBlock(newBlock)
+
+			if (&newBlock.BlockHeader).Equal(&prevHead.BlockHeader) {
+				// Our blockchain is up to date
+				return nil
+			}
 
 		case err := <-errChan:
 			if err.Code == msg.ResourceNotFound {
-				// We are up to date
-				return nil
-			} else if err.Code == msg.RequestTimeout {
-				log.Debug("SyncBlockchain timed out waiting for a response")
+				// Our chain might be out of sync, roll it back by one block
+				// and request the next block
+				prevHead = lastBlock
+				a.Chain.Blocks = a.Chain.Blocks[:len(a.Chain.Blocks)-1]
 			}
 
 			// Some other protocol error occurred. Try again

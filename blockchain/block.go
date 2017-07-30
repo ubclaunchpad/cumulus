@@ -43,6 +43,16 @@ func (bh *BlockHeader) Marshal() []byte {
 	return buf
 }
 
+// Equal returns true if all the fields (other than ExtraData) in each of
+// the BlockHeaders match, and false otherwise.
+func (bh *BlockHeader) Equal(otherHeader *BlockHeader) bool {
+	return bh.BlockNumber == otherHeader.BlockNumber &&
+		bh.LastBlock == otherHeader.LastBlock &&
+		bh.Target == otherHeader.Target &&
+		bh.Time == otherHeader.Time &&
+		bh.Nonce == otherHeader.Nonce
+}
+
 // Len returns the length in bytes of the BlockHeader.
 func (bh *BlockHeader) Len() int {
 	return len(bh.Marshal())

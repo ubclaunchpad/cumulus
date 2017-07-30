@@ -160,7 +160,7 @@ func TestGetLocalPool(t *testing.T) {
 }
 
 func TestGetLocalChain(t *testing.T) {
-	assert.NotNil(t, getLocalChain())
+	assert.NotNil(t, getLocalChain(NewUser()))
 }
 
 func TestHandleBlock(t *testing.T) {

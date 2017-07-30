@@ -38,7 +38,6 @@ const (
 )
 
 // ResponseHandler is any function that handles a response to a request.
-// NOTE: implementations of this function must handle timeouts!
 type ResponseHandler func(*msg.Response)
 
 // PushHandler is any function that handles a push message.
