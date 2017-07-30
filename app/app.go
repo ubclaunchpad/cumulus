@@ -14,6 +14,7 @@ import (
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/consensus"
 	"github.com/ubclaunchpad/cumulus/miner"
 	"github.com/ubclaunchpad/cumulus/msg"
 	"github.com/ubclaunchpad/cumulus/peer"
@@ -315,7 +316,7 @@ func (a *App) SyncBlockchain() error {
 				continue
 			}
 
-			valid, validationCode := a.Chain.ValidBlock(block)
+			valid, validationCode := consensus.VerifyBlock(a.Chain, block)
 			if !valid {
 				if validationCode == msg.ResourceNotFound {
 					// We are up to date

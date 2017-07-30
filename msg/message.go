@@ -149,21 +149,18 @@ func Read(r io.Reader) (MessagePayload, error) {
 		var req Request
 		err = json.Unmarshal([]byte(m.Payload), &req)
 		if err == nil {
-			// log.Debug("Read request ", req)
 			returnPayload = &req
 		}
 	case "Response":
 		var res Response
 		err = json.Unmarshal([]byte(m.Payload), &res)
 		if err == nil {
-			// log.Debug("Read response ", res)
 			returnPayload = &res
 		}
 	case "Push":
 		var push Push
 		err = json.Unmarshal([]byte(m.Payload), &push)
 		if err == nil {
-			// log.Debug("Read push ", push)
 			returnPayload = &push
 		}
 	default:
