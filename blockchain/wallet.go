@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	c "github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/moj"
 )
 
 const (
@@ -56,7 +57,8 @@ func (a Address) Repr() string {
 
 // Emoji returns the users address as a string of emojis (TODO).
 func (a Address) Emoji() string {
-	return a.Repr()
+	result, _ := moj.EncodeHex(a.Repr())
+	return result
 }
 
 // Marshal converts an Address to a byte slice.

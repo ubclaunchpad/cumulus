@@ -127,4 +127,5 @@ func createHotWallet(ctx *ishell.Context, app *App) {
 	emoji.Println(":credit_card: New hot wallet created!")
 	emoji.Println(":raising_hand: Name: " + wallet.Name)
 	emoji.Println(":mailbox: Address: " + wallet.Wallet.Public().Repr())
+	emoji.Println(":fist: Emoji Address: " + wallet.Wallet.Public().Emoji())
 }
