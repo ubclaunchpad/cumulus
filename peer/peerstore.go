@@ -161,10 +161,22 @@ func (ps *PeerStore) RemoveRandom() {
 }
 
 // Get synchronously retreives the peer with the given id from the peerstore
+// Returns nil if there is no peer with the given id
 func (ps *PeerStore) Get(addr string) *Peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 	return ps.peers[addr]
+}
+
+// GetRandom synchronously retreives a random peer from the peerstore
+// Returns nil if the PeerStore is empty
+func (ps *PeerStore) GetRandom() *Peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+	for _, p := range ps.peers {
+		return p
+	}
+	return nil
 }
 
 // SetDefaultRequestHandler will ensure that all new peers created who's
@@ -196,7 +208,20 @@ func (ps *PeerStore) Broadcast(push msg.Push) {
 // PeerInfoHandler will handle the response to a PeerInfo request by attempting
 // to establish connections with all new peers in the given response Resource.
 func (ps *PeerStore) PeerInfoHandler(res *msg.Response) {
-	peers := res.Resource.([]interface{})
+	if res.Resource == nil {
+		// Invalid resource, abort
+		return
+	}
+
+	peers, ok := res.Resource.([]interface{})
+	if !ok {
+		p, ok := res.Resource.(interface{})
+		if !ok {
+			// We tried :(
+			return
+		}
+		peers = append(peers, p)
+	}
 
 	log.Debugf("Found peers %s", peers)
 	for i := 0; i < len(peers) && ps.Size() < MaxPeers; i++ {

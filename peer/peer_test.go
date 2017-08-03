@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"sync"
 	"testing"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -48,69 +47,7 @@ var (
 		"19.253.228.59", "195.118.45.237", "159.78.10.205", "206.31.54.66",
 		"31.191.153.165", "130.235.208.32", "130.5.207.98", "5.226.180.24",
 	}
-
-	peerStore PeerStore
 )
-
-// fakeConn implements net.Conn
-type fakeConn struct {
-	Addr         net.Addr
-	Message      **[]byte
-	ReadOnce     bool
-	BytesWritten chan []byte
-	saveOnWrite  bool
-	lock         *sync.RWMutex
-}
-
-func newFakeConn(addr net.Addr, message **[]byte,
-	readOnce bool, saveOnWrite bool) *fakeConn {
-	return &fakeConn{
-		Addr:         addr,
-		Message:      message,
-		ReadOnce:     readOnce,
-		BytesWritten: make(chan []byte),
-		saveOnWrite:  saveOnWrite,
-		lock:         &sync.RWMutex{},
-	}
-}
-
-func (fc fakeConn) Read(b []byte) (n int, err error) {
-	fc.lock.RLock()
-	defer fc.lock.RUnlock()
-
-	message := **fc.Message
-
-	var i int
-	for i = 0; i < len(message) && i < 512; i++ {
-		b[i] = (message)[i]
-	}
-	if fc.ReadOnce {
-		**fc.Message = make([]byte, 0)
-	}
-	return i, nil
-}
-
-func (fc fakeConn) Write(b []byte) (n int, err error) {
-	if fc.saveOnWrite {
-		fc.BytesWritten <- b
-	}
-	return len(b), nil
-}
-
-func (fc fakeConn) Close() error                       { return nil }
-func (fc fakeConn) LocalAddr() net.Addr                { return fc.Addr }
-func (fc fakeConn) RemoteAddr() net.Addr               { return fc.Addr }
-func (fc fakeConn) SetDeadline(t time.Time) error      { return nil }
-func (fc fakeConn) SetReadDeadline(t time.Time) error  { return nil }
-func (fc fakeConn) SetWriteDeadline(t time.Time) error { return nil }
-
-// fakeAddr implementes net.Addr
-type fakeAddr struct {
-	Addr string
-}
-
-func (fa fakeAddr) Network() string { return fa.Addr }
-func (fa fakeAddr) String() string  { return fa.Addr }
 
 func inList(item string, list []string) bool {
 	for _, listItem := range list {
@@ -131,8 +68,8 @@ func TestMain(m *testing.M) {
 func TestSetRequestHandler(t *testing.T) {
 	var fa net.Addr
 	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc = conn.TestConn{Addr: fa}
 	ps := NewPeerStore("")
 
 	p := New(fc, ps, fa.String())
@@ -162,8 +99,8 @@ func TestSetRequestHandler(t *testing.T) {
 func TestSetPushHandler(t *testing.T) {
 	var fa net.Addr
 	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc = conn.TestConn{Addr: fa}
 	ps := NewPeerStore("")
 
 	p := New(fc, ps, fa.String())
@@ -189,8 +126,8 @@ func TestRequestTimeout(t *testing.T) {
 	message := make([]byte, 0)
 	messagePtr := &message
 
-	fa := fakeAddr{Addr: "127.0.0.1"}
-	fc := newFakeConn(fa, &messagePtr, false, false)
+	fa := conn.TestAddr{Addr: "127.0.0.1"}
+	fc := conn.NewTestConn(fa, &messagePtr, false, false)
 
 	ps := NewPeerStore("")
 	p := New(fc, ps, "")
@@ -263,8 +200,8 @@ func TestResponse(t *testing.T) {
 	var fa net.Addr
 	var fc net.Conn
 
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = newFakeConn(fa, &rbp, false, false)
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc = conn.NewTestConn(fa, &rbp, false, false)
 
 	ps := NewPeerStore("")
 	p := New(fc, ps, "")
@@ -311,8 +248,8 @@ func TestPush(t *testing.T) {
 	var fa net.Addr
 	var fc net.Conn
 
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = newFakeConn(fa, &pbp, false, false)
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc = conn.NewTestConn(fa, &pbp, false, false)
 
 	ps := NewPeerStore("")
 	p := New(fc, ps, "")
@@ -353,8 +290,8 @@ func TestRequest(t *testing.T) {
 	var fa net.Addr
 	var fc net.Conn
 
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = newFakeConn(fa, &rbp, false, false)
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc = conn.NewTestConn(fa, &rbp, false, false)
 
 	ps := NewPeerStore("")
 	p := New(fc, ps, "")

@@ -12,7 +12,7 @@ type Config struct {
 	// Whether or not to enable verbose logging.
 	Verbose bool
 	// Whether or not to participate in mining new blocks.
-	Mine bool
+	NoMiner bool
 	// Whether or not to start the Cumulus console
 	Console bool
 }

@@ -18,6 +18,7 @@ func TestRunConsoleHasCommands(t *testing.T) {
 		"create",
 		"exit",
 		"help",
+		"miner",
 		"peers",
 	}
 	c := s.Cmds()

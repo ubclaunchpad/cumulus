@@ -4,23 +4,15 @@ import "github.com/ubclaunchpad/cumulus/blockchain"
 
 // User holds basic user information.
 type User struct {
-	HotWallet
-	BlockSize uint32
-}
-
-// HotWallet is a representation of the users wallet.
-type HotWallet struct {
-	Name string
 	blockchain.Wallet
+	Name      string
+	BlockSize uint32
 }
 
 // NewUser creates a new user
 func NewUser() *User {
 	return &User{
-		HotWallet: HotWallet{
-			Wallet: blockchain.NewWallet(),
-			Name:   "default",
-		},
+		Wallet:    blockchain.NewWallet(),
 		BlockSize: blockchain.DefaultBlockSize,
 	}
 }

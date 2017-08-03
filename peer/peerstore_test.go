@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -22,8 +23,8 @@ func TestConcurrentPeerStore(t *testing.T) {
 		var fa net.Addr
 		var fc net.Conn
 		for _, addr := range addrs2 {
-			fa = fakeAddr{Addr: addr}
-			fc = fakeConn{Addr: fa}
+			fa = conn.TestAddr{Addr: addr}
+			fc = conn.TestConn{Addr: fa}
 			ps.Add(New(fc, ps, addr))
 			p := ps.Get(addr)
 			if p.ListenAddr != addr {
@@ -38,8 +39,8 @@ func TestConcurrentPeerStore(t *testing.T) {
 		var fa net.Addr
 		var fc net.Conn
 		for _, addr := range addrs1 {
-			fa = fakeAddr{Addr: addr}
-			fc = fakeConn{Addr: fa}
+			fa = conn.TestAddr{Addr: addr}
+			fc = conn.TestConn{Addr: fa}
 			ps.Add(New(fc, ps, addr))
 			ps.Remove(addr)
 		}
@@ -80,12 +81,12 @@ func TestConcurrentPeerStore(t *testing.T) {
 }
 
 func TestRemoveRandom(t *testing.T) {
-	var fa fakeAddr
-	var fc fakeConn
+	var fa conn.TestAddr
+	var fc conn.TestConn
 	ps := NewPeerStore("")
 	for _, addr := range addrs1 {
-		fa = fakeAddr{Addr: addr}
-		fc = fakeConn{Addr: fa}
+		fa = conn.TestAddr{Addr: addr}
+		fc = conn.TestConn{Addr: fa}
 		ps.Add(New(fc, ps, addr))
 	}
 
@@ -98,12 +99,12 @@ func TestRemoveRandom(t *testing.T) {
 }
 
 func TestAddrs(t *testing.T) {
-	var fa fakeAddr
-	var fc fakeConn
+	var fa conn.TestAddr
+	var fc conn.TestConn
 	ps := NewPeerStore("")
 	for _, addr := range addrs1 {
-		fa = fakeAddr{Addr: addr}
-		fc = fakeConn{Addr: fa}
+		fa = conn.TestAddr{Addr: addr}
+		fc = conn.TestConn{Addr: fa}
 		ps.Add(New(fc, ps, addr))
 	}
 
@@ -118,8 +119,8 @@ func TestAddrs(t *testing.T) {
 func TestSetDefaultRequestHandler(t *testing.T) {
 	var fa net.Addr
 	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc = conn.TestConn{Addr: fa}
 	ps := NewPeerStore("")
 
 	p := New(fc, ps, fa.String())
@@ -149,8 +150,8 @@ func TestSetDefaultRequestHandler(t *testing.T) {
 func TestSetDefaultPushHandler(t *testing.T) {
 	var fa net.Addr
 	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc = conn.TestConn{Addr: fa}
 	ps := NewPeerStore("")
 
 	p := New(fc, ps, fa.String())
@@ -187,8 +188,8 @@ func TestConnectionHandler(t *testing.T) {
 
 	var fa net.Addr
 
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc := newFakeConn(fa, &rbp, true, true)
+	fa = conn.TestAddr{Addr: "127.0.0.1"}
+	fc := conn.NewTestConn(fa, &rbp, true, true)
 
 	ps := NewPeerStore("")
 	connectionHandlerDone := make(chan bool)
@@ -217,9 +218,9 @@ func TestConnectionHandler(t *testing.T) {
 					panic(err)
 				}
 				receivedRequest = true
-				fc.lock.Lock()
+				fc.Lock.Lock()
 				**fc.Message = requestBytes
-				fc.lock.Unlock()
+				fc.Lock.Unlock()
 			case "Response":
 				err := json.Unmarshal([]byte(message.Payload), &response)
 				if err != nil {
@@ -237,9 +238,9 @@ func TestConnectionHandler(t *testing.T) {
 					Payload: resBytes,
 				}
 				responseMsgBytes, _ := json.Marshal(responseMsg)
-				fc.lock.Lock()
+				fc.Lock.Lock()
 				**fc.Message = responseMsgBytes
-				fc.lock.Unlock()
+				fc.Lock.Unlock()
 			}
 		}
 	}

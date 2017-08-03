@@ -59,3 +59,28 @@ func TestBlockHeaderLen(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestEqual(t *testing.T) {
+	block1 := NewTestBlock()
+	if !(&block1.BlockHeader).Equal(&block1.BlockHeader) {
+		t.FailNow()
+	}
+
+	equalBlockHeader := BlockHeader{
+		BlockNumber: block1.BlockNumber,
+		LastBlock:   block1.LastBlock,
+		Target:      block1.Target,
+		Time:        block1.Time,
+		Nonce:       block1.Nonce,
+		ExtraData:   []byte("OneOrTwoOrMaybeEvenThreeOrFour"),
+	}
+
+	if !(&block1.BlockHeader).Equal(&equalBlockHeader) {
+		t.FailNow()
+	}
+
+	block2 := NewTestBlock()
+	if (&block1.BlockHeader).Equal(&block2.BlockHeader) {
+		t.FailNow()
+	}
+}

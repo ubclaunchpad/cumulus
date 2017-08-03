@@ -21,7 +21,7 @@ type BlockHeader struct {
 	// Target is the current target
 	Target Hash
 	// Time is represented as the number of seconds elapsed
-	// since January 1, 1970 UTC. It increments every second when mining.
+	// since January 1, 1970 UTC.
 	Time uint32
 	// Nonce starts at 0 and increments by 1 for every hash when mining
 	Nonce uint64

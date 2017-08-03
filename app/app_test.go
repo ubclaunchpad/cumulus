@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ubclaunchpad/cumulus/miner"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
@@ -24,7 +26,7 @@ func TestPushHandlerNewBlock(t *testing.T) {
 	}
 	a.PushHandler(&push)
 	select {
-	case blk, ok := <-blockQueue:
+	case blk, ok := <-a.blockQueue:
 		assert.True(t, ok)
 		assert.Equal(t, blk, b)
 	}
@@ -40,7 +42,7 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 	}
 	a.PushHandler(&push)
 	select {
-	case tr, ok := <-transactionQueue:
+	case tr, ok := <-a.transactionQueue:
 		assert.True(t, ok)
 		assert.Equal(t, tr, txn)
 	}
@@ -167,14 +169,31 @@ func TestHandleBlock(t *testing.T) {
 	a := createNewTestApp()
 	go a.HandleWork()
 	time.Sleep(50 * time.Millisecond)
-	blockQueue <- blockchain.NewTestBlock()
-	assert.Equal(t, len(blockQueue), 0)
+	a.blockQueue <- blockchain.NewTestBlock()
+	assert.Equal(t, len(a.blockQueue), 0)
 }
 
 func TestHandleTransaction(t *testing.T) {
 	a := createNewTestApp()
 	go a.HandleWork()
 	time.Sleep(50 * time.Millisecond)
-	transactionQueue <- blockchain.NewTestTransaction()
-	assert.Equal(t, len(transactionQueue), 0)
+	a.transactionQueue <- blockchain.NewTestTransaction()
+	assert.Equal(t, len(a.transactionQueue), 0)
+}
+
+func TestMine(t *testing.T) {
+	a := createNewTestApp()
+	if miner.IsMining() {
+		t.FailNow()
+	}
+	go a.Mine()
+	time.Sleep(time.Second)
+	if !miner.IsMining() {
+		t.FailNow()
+	}
+	miner.StopMining()
+	time.Sleep(time.Second)
+	if miner.IsMining() {
+		t.FailNow()
+	}
 }
