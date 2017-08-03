@@ -7,6 +7,7 @@ import (
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/common/util"
+	"github.com/ubclaunchpad/cumulus/consensus"
 	"github.com/ubclaunchpad/cumulus/miner"
 )
 
@@ -68,10 +69,10 @@ func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
 	}
 }
 
-// Set inserts a transaction into the pool, returning
+// Push inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
 func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
-	if ok, err := bc.ValidTransaction(t); ok {
+	if ok, err := consensus.VerifyTransaction(bc, t); ok {
 		p.set(t)
 		return true
 	} else {
@@ -114,7 +115,7 @@ func (p *Pool) Delete(t *blockchain.Transaction) {
 // Block. If the Block is found invalid wrt bc, then false is returned and no
 // Transactions are removed from the Pool.
 func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
-	if ok, _ := bc.ValidBlock(b); !ok {
+	if ok, _ := consensus.VerifyBlock(bc, b); !ok {
 		return false
 	}
 	for _, t := range b.Transactions {

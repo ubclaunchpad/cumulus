@@ -4,7 +4,6 @@ import (
 	"math"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/common/util"
 	"github.com/ubclaunchpad/cumulus/consensus"
@@ -42,13 +41,6 @@ func RestartMiner(bc *blockchain.BlockChain, b *blockchain.Block) {
 // TODO: Make Mine take an interface with a callback as an arguement.
 func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
 	setStart()
-	if valid, _ := bc.ValidBlock(b); !valid {
-		log.Error("miner given invalid block")
-		return &MiningResult{
-			Complete: false,
-			Info:     MiningNeverStarted,
-		}
-	}
 
 	for !VerifyProofOfWork(b) {
 		// Check if we should keep mining.
@@ -111,7 +103,7 @@ func CloudBase(
 	// Set the transaction amount to the BlockReward
 	// TODO: Add transaction fees
 	cbReward := blockchain.TxOutput{
-		Amount:    consensus.BlockReward,
+		Amount:    consensus.CurrentBlockReward(bc),
 		Recipient: cb,
 	}
 	cbTxBody := blockchain.TxBody{
