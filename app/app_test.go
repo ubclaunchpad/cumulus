@@ -122,7 +122,7 @@ func TestHandleTransactionNotOK(t *testing.T) {
 	assert.True(t, a.Pool.Empty())
 }
 
-func TestHandleBlockOK(t *testing.T) {
+func TestHandleValidBlock(t *testing.T) {
 	a := createNewTestApp()
 	i := 0
 
@@ -142,7 +142,7 @@ func TestHandleBlockOK(t *testing.T) {
 	// TODO: Assert pool appropriately emptied.
 }
 
-func TestHandleBlockNotOK(t *testing.T) {
+func TestHandleInvalidBlock(t *testing.T) {
 	a := createNewTestApp()
 	i := 0
 

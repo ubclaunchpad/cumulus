@@ -264,19 +264,38 @@ func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 
 // HandleBlock handles new instance of BlockWork.
 func (a *App) HandleBlock(blk *blockchain.Block) {
+	log.Info("Received new block")
 	validBlock := a.Pool.Update(blk, a.Chain)
 
-	if validBlock {
-		// Append to the chain before requesting the next block so that the block
-		// numbers make sense.
-		a.Chain.AppendBlock(blk)
-		address := a.CurrentUser.Wallet.Public()
-		blk := a.Pool.NextBlock(a.Chain, address, a.CurrentUser.BlockSize)
-		if miner.IsMining() {
-			miner.RestartMiner(a.Chain, blk)
+	if !validBlock {
+		// The block was invalid wrt our chain. Maybe our chain is out of date.
+		// Update it and try again.
+		chainChanged, err := a.SyncBlockChain()
+		if chainChanged && miner.IsMining() {
+			miner.StopMining()
+			go a.Mine()
 		}
-		log.Debug("added blk number %d to chain", blk.BlockNumber)
+		if err != nil {
+			log.WithError(err).Error("Error synchronizing blockchain")
+			return
+		}
+
+		validBlock = a.Pool.Update(blk, a.Chain)
+		if !validBlock {
+			// Synchronizing our chain didn't help, the block is still invalid.
+			return
+		}
 	}
+
+	// Append to the chain before requesting the next block so that the block
+	// numbers make sense.
+	a.Chain.AppendBlock(blk)
+	if miner.IsMining() {
+		miner.StopMining()
+		go a.Mine()
+	}
+	log.Debug("Added block number %d to chain", blk.BlockNumber)
+	return
 }
 
 // Mine continuously pulls transactions form the transaction pool, uses them to
@@ -305,12 +324,15 @@ func (a *App) Mine() {
 }
 
 // SyncBlockChain updates the local copy of the blockchain by requesting missing
-// blocks from peers. Returns error if we are not connected to any peers.
-func (a *App) SyncBlockChain() error {
+// blocks from peers. Returns true if the blockchain changed as a result of
+// calling this function, false if it didn't and an error if we are not connected
+// to any peers.
+func (a *App) SyncBlockChain() (bool, error) {
 	var currentHeadHash blockchain.Hash
 	prevHead := a.Chain.LastBlock()
 	newBlockChan := make(chan *blockchain.Block)
 	errChan := make(chan *msg.ProtocolError)
+	changed := false
 
 	// Define a handler for responses to our block requests
 	blockResponseHandler := func(blockResponse *msg.Response) {
@@ -352,7 +374,8 @@ func (a *App) SyncBlockChain() error {
 		// Pick a peer to send the request to
 		p := a.PeerStore.GetRandom()
 		if p == nil {
-			return errors.New("SyncBlockchain failed: no peers to request blocks from")
+			return changed, errors.New(
+				"SyncBlockchain failed: no peers to request blocks from")
 		}
 		p.Request(blockRequest, blockResponseHandler)
 
@@ -376,10 +399,11 @@ func (a *App) SyncBlockChain() error {
 
 			// Valid block. Append it to the chain
 			a.Chain.AppendBlock(newBlock)
+			changed = true
 
 			if (&newBlock.BlockHeader).Equal(&prevHead.BlockHeader) {
 				// Our blockchain is up to date
-				return nil
+				return changed, nil
 			}
 
 		case err := <-errChan:
@@ -387,6 +411,7 @@ func (a *App) SyncBlockChain() error {
 				// Our chain might be out of sync, roll it back by one block
 				// and request the next block
 				prevHead = a.Chain.RollBack()
+				changed = true
 			}
 
 			// Some other protocol error occurred. Try again
