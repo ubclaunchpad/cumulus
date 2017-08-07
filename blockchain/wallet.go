@@ -55,7 +55,7 @@ func (a Address) Repr() string {
 	return hex.EncodeToString(hash[96/8 : 256/8])
 }
 
-// Emoji returns the users address as a string of emojis (TODO).
+// Emoji returns the users address as a string of emojis.
 func (a Address) Emoji() string {
 	result, _ := moj.EncodeHex(a.Repr())
 	return result
