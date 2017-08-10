@@ -6,7 +6,9 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
+	"math"
 	"math/big"
 
 	c "github.com/ubclaunchpad/cumulus/common/constants"
@@ -18,6 +20,8 @@ const (
 	CoordLen = 32
 	// AddrLen is the length in bytes of addresses.
 	AddrLen = 2 * CoordLen
+	// ReprLen is the length in bytes of an address checksum.
+	ReprLen = 40
 	// SigLen is the length in bytes of signatures.
 	SigLen = AddrLen
 	// AddressVersion is the version of the address shortening protocol.
@@ -93,27 +97,32 @@ func (a Address) Key() *ecdsa.PublicKey {
 	}
 }
 
-// Wallet represents a wallet that we have the ability to sign for.
-type Wallet interface {
+// Account represents a wallet that we have the ability to sign for.
+type Account interface {
 	Public() Address
 	Sign(digest Hash, random io.Reader) (Signature, error)
+	Debit(amount uint64) error
+	Credit(amount uint64) error
 }
 
-// Internal representation of a wallet.
-type wallet ecdsa.PrivateKey
+// Wallet is an account that can sign and hold a balance.
+type Wallet struct {
+	*ecdsa.PrivateKey
+	Balance uint64
+}
 
 // Key retreives the underlying private key from a wallet.
-func (w *wallet) key() *ecdsa.PrivateKey {
-	return (*ecdsa.PrivateKey)(w)
+func (w *Wallet) key() *ecdsa.PrivateKey {
+	return w.PrivateKey
 }
 
 // Public returns the public key as byte array, or address, of the wallet.
-func (w *wallet) Public() Address {
-	return Address{X: w.PublicKey.X, Y: w.PublicKey.Y}
+func (w *Wallet) Public() Address {
+	return Address{X: w.PrivateKey.PublicKey.X, Y: w.PrivateKey.PublicKey.Y}
 }
 
 // Sign returns a signature of the digest.
-func (w *wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
+func (w *Wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
 	r, s, err := ecdsa.Sign(random, w.key(), digest.Marshal())
 	return Signature{R: r, S: s}, err
 }
@@ -147,9 +156,34 @@ func (s *Signature) Marshal() []byte {
 	return buf
 }
 
-// NewWallet produces a new Wallet that can sign transactionsand has a
+// NewWallet produces a new Wallet that can sign transactions and has a
 // public Address.
-func NewWallet() Wallet {
+func NewWallet() *Wallet {
 	priv, _ := ecdsa.GenerateKey(curve, crand.Reader)
-	return (*wallet)(priv)
+	return &Wallet{
+		PrivateKey: priv,
+		Balance:    0,
+	}
+}
+
+// Debit attempts to spend some coin from the wallet.
+func (w *Wallet) Debit(amount uint64) error {
+	if amount >= w.Balance {
+		return errors.New("wallet does not have a high enough balance to satisfy the request")
+	} else if amount < 0 {
+		return errors.New("debit amounts may not be negative")
+	}
+	w.Balance -= amount
+	return nil
+}
+
+// Credit attempts to add count to the wallet.
+func (w *Wallet) Credit(amount uint64) error {
+	if amount >= math.MaxUint64 {
+		return errors.New("wallet cannot hold this amount")
+	} else if amount < 0 {
+		return errors.New("credit amounts may not be negative")
+	}
+	w.Balance += amount
+	return nil
 }

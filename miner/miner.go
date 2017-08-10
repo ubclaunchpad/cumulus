@@ -104,7 +104,7 @@ func CloudBase(
 	// TODO: Add transaction fees
 	cbReward := blockchain.TxOutput{
 		Amount:    consensus.CurrentBlockReward(bc),
-		Recipient: cb,
+		Recipient: cb.Repr(),
 	}
 	cbTxBody := blockchain.TxBody{
 		Sender:  blockchain.NilAddr,

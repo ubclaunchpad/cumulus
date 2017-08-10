@@ -26,14 +26,14 @@ func (thp TxHashPointer) Marshal() []byte {
 // TxOutput defines an output to a transaction
 type TxOutput struct {
 	Amount    uint64
-	Recipient Address
+	Recipient string
 }
 
 // Marshal converts a TxOutput to a byte slice
 func (to TxOutput) Marshal() []byte {
 	buf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buf, to.Amount)
-	buf = append(buf, to.Recipient.Marshal()...)
+	buf = append(buf, []byte(to.Recipient)...)
 	return buf
 }
 

@@ -13,7 +13,7 @@ func Genesis(miner Address, target Hash, blockReward uint64, extraData []byte) *
 
 	cbReward := TxOutput{
 		Amount:    blockReward,
-		Recipient: miner,
+		Recipient: miner.Repr(),
 	}
 
 	cbTx := &Transaction{
