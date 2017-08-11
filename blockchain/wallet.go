@@ -108,7 +108,8 @@ type Account interface {
 // Wallet is an account that can sign and hold a balance.
 type Wallet struct {
 	*ecdsa.PrivateKey
-	Balance uint64
+	PendingTxns []*Transaction
+	Balance     uint64
 }
 
 // Key retreives the underlying private key from a wallet.
@@ -168,7 +169,7 @@ func NewWallet() *Wallet {
 
 // Debit attempts to spend some coin from the wallet.
 func (w *Wallet) Debit(amount uint64) error {
-	if amount >= w.Balance {
+	if amount >= w.GetEffectiveBalance() {
 		return errors.New("wallet does not have a high enough balance to satisfy the request")
 	} else if amount < 0 {
 		return errors.New("debit amounts may not be negative")
@@ -186,4 +187,19 @@ func (w *Wallet) Credit(amount uint64) error {
 	}
 	w.Balance += amount
 	return nil
+}
+
+// SetPending appends a transaction to the pending set of transactions.
+func (w *Wallet) SetPending(t *Transaction) {
+	w.PendingTxns = append(w.PendingTxns, t)
+}
+
+// GetEffectiveBalance returns the wallet balance less the sum of the pending
+// transactions in the wallet.
+func (w *Wallet) GetEffectiveBalance() uint64 {
+	r := uint64(0)
+	for _, t := range w.PendingTxns {
+		r += t.Outputs[0].Amount
+	}
+	return r
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/msg"
 
 	crand "crypto/rand"
 )
@@ -29,14 +30,9 @@ func getCurrentUser() *User {
 
 // Pay pays an amount of coin to an address `to`.
 func (a *App) Pay(to string, amount uint64) error {
-	// Three atomic steps must occur.
-	// 1. The amount must be debited from the wallet.
-	err := a.CurrentUser.Wallet.Debit(amount)
-	if err == nil {
-		return err
-	}
+	// Two atomic steps must occur.
 
-	// 2. A legitimate transaction must be built.
+	// 1. A legitimate transaction must be built.
 	tbody := blockchain.TxBody{
 		Sender: getCurrentUser().Wallet.Public(),
 		Outputs: []blockchain.TxOutput{
@@ -47,13 +43,14 @@ func (a *App) Pay(to string, amount uint64) error {
 		},
 	}
 
-	// 3. The transaction must be signed and added to the pool.
+	// 2. The transaction must be signed and broadcasted.
 	if txn, err := tbody.Sign(*a.CurrentUser.Wallet, crand.Reader); err != nil {
-		a.HandleTransaction(txn)
+		a.PeerStore.Broadcast(msg.Push{
+			ResourceType: msg.ResourceTransaction,
+			Resource:     txn,
+		})
+		a.CurrentUser.Wallet.SetPending(txn)
 	} else {
-		// Signature failed, credit the account, return an error.
-		// Crediting cannot fail because debiting succeeded and process is single threaded.
-		a.CurrentUser.Wallet.Credit(amount)
 		return err
 	}
 
