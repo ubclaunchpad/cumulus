@@ -52,7 +52,7 @@ func (a *App) Pay(to string, amount uint64) error {
 		a.CurrentUser.Wallet.SetPending(txn)
 
 		// 3. The transaction must be added to the pool.
-		a.HandleTransaction(txn)
+		a.Pool.Push(txn, a.Chain)
 	} else {
 		return err
 	}
