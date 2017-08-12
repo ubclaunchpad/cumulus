@@ -1,6 +1,7 @@
 package msg
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,15 @@ type (
 )
 
 const (
+	// PushMessage fills the Type field in the Message struct for Push messages
+	PushMessage = "Push"
+	// RequestMessage fills the Type field in the Message struct for Request messages
+	RequestMessage = "Request"
+	// ResponseMessage fills the Type field in the Message struct for Response messages
+	ResponseMessage = "Response"
+)
+
+const (
 	// ResourcePeerInfo resources contain a list of peers.
 	ResourcePeerInfo ResourceType = iota
 	// ResourceBlock resources contain a block in the blockchain.
@@ -23,6 +33,8 @@ const (
 )
 
 const (
+	// BadRequest occurs when a malformatted request is received
+	BadRequest = 400
 	// InvalidResourceType occurs when a request is received with an unknown
 	// ResourceType value.
 	InvalidResourceType = 401
@@ -101,7 +113,7 @@ func (r *Request) Write(w io.Writer) error {
 		return err
 	}
 	msg := Message{
-		Type:    "Request",
+		Type:    RequestMessage,
 		Payload: payload,
 	}
 	return json.NewEncoder(w).Encode(msg)
@@ -113,7 +125,7 @@ func (r *Response) Write(w io.Writer) error {
 		return err
 	}
 	msg := Message{
-		Type:    "Response",
+		Type:    ResponseMessage,
 		Payload: payload,
 	}
 	return json.NewEncoder(w).Encode(msg)
@@ -125,7 +137,7 @@ func (p *Push) Write(w io.Writer) error {
 		return err
 	}
 	msg := Message{
-		Type:    "Push",
+		Type:    PushMessage,
 		Payload: payload,
 	}
 	return json.NewEncoder(w).Encode(msg)
@@ -133,7 +145,8 @@ func (p *Push) Write(w io.Writer) error {
 
 // Read decodes a message from a Reader and returns the message payload, or an
 // error if the read fails. On success, the payload returned will be either a
-// Request, Response, or Push.
+// Request, Response, or Push. Resource fields will contain the appropriate
+// type chosen by the json.Decode() function.
 func Read(r io.Reader) (MessagePayload, error) {
 	var m Message
 	err := json.NewDecoder(r).Decode(&m)
@@ -142,24 +155,26 @@ func Read(r io.Reader) (MessagePayload, error) {
 	}
 
 	var returnPayload MessagePayload
+	dec := json.NewDecoder(bytes.NewReader(m.Payload))
+	dec.UseNumber() // So big numbers aren't turned into float64
 
 	// Check the message type and use it to unmarshal the payload
 	switch m.Type {
-	case "Request":
+	case RequestMessage:
 		var req Request
-		err = json.Unmarshal([]byte(m.Payload), &req)
+		err = dec.Decode(&req)
 		if err == nil {
 			returnPayload = &req
 		}
-	case "Response":
+	case ResponseMessage:
 		var res Response
-		err = json.Unmarshal([]byte(m.Payload), &res)
+		err = dec.Decode(&res)
 		if err == nil {
 			returnPayload = &res
 		}
-	case "Push":
+	case PushMessage:
 		var push Push
-		err = json.Unmarshal([]byte(m.Payload), &push)
+		err = dec.Decode(&push)
 		if err == nil {
 			returnPayload = &push
 		}

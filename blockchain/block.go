@@ -2,9 +2,8 @@ package blockchain
 
 // BlockHeader contains metadata about a block
 import (
-	"encoding/gob"
-	"fmt"
-	"io"
+	"bytes"
+	"encoding/json"
 
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
@@ -79,19 +78,14 @@ func (b *Block) Marshal() []byte {
 	return buf
 }
 
-// Encode writes the marshalled block to the given io.Writer
-func (b *Block) Encode(w io.Writer) {
-	err := gob.NewEncoder(w).Encode(b)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-}
-
-// DecodeBlock reads the marshalled block from the given io.Reader and populates b
-func DecodeBlock(r io.Reader) *Block {
+// DecodeBlockJSON returns a block read from the given marshalled block, or an
+// error if blockBytes cannot be decoded as JSON.
+func DecodeBlockJSON(blockBytes []byte) (*Block, error) {
 	var b Block
-	gob.NewDecoder(r).Decode(&b)
-	return &b
+	dec := json.NewDecoder(bytes.NewReader(blockBytes))
+	dec.UseNumber()
+	err := dec.Decode(&b)
+	return &b, err
 }
 
 // ContainsTransaction returns true and the transaction itself if the Block

@@ -1,20 +1,19 @@
 package blockchain
 
 import (
-	"bytes"
+	"encoding/json"
 	"testing"
 
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
-func TestEncodeDecodeBlock(t *testing.T) {
+func TestEncodeDecodeBlockJSON(t *testing.T) {
 	b1 := NewTestBlock()
-
-	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
-
-	b1.Encode(buf)
-	b2 := DecodeBlock(buf)
-
+	b1Bytes, err := json.Marshal(b1)
+	b2, err := DecodeBlockJSON(b1Bytes)
+	if err != nil {
+		t.FailNow()
+	}
 	if HashSum(b1) != HashSum(b2) {
 		t.Fail()
 	}

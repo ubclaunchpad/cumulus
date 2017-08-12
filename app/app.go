@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -86,7 +87,7 @@ func Run(cfg conf.Config) {
 	// stream in. Kick off a worker to handle requests and pushes.
 	go a.HandleWork()
 
-	if !config.NoMiner {
+	if config.Mine {
 		// Start the miner
 		go a.Mine()
 	}
@@ -132,6 +133,14 @@ func Run(cfg conf.Config) {
 	if len(config.Target) > 0 {
 		// Connect to the target and discover its peers.
 		a.ConnectAndDiscover(cfg.Target)
+
+		// Download blockchain
+		log.Info("Syncronizing blockchain")
+		_, err := a.SyncBlockChain()
+		if err != nil {
+			log.WithError(err).Fatal("Failed to download blockchain")
+		}
+		log.Info("Blockchain synchronization complete")
 	}
 }
 
@@ -160,28 +169,36 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 		"Invalid resource type")
 	notFoundErr := msg.NewProtocolError(msg.ResourceNotFound,
 		"Resource not found.")
+	badRequestErr := msg.NewProtocolError(msg.BadRequest,
+		"Bad request")
 
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
 		res.Resource = a.PeerStore.Addrs()
 	case msg.ResourceBlock:
+		log.Debug("Received block request")
+
 		// Block is requested by block hash.
-		blockHash, ok := req.Params["lastBlockHash"].(blockchain.Hash)
-		if ok {
-			// If its ok, we make try to a copy of it.
-			blk, err := a.Chain.CopyBlockByLastBlockHash(blockHash)
-			if err != nil {
-				// Bad index parameter.
-				res.Error = notFoundErr
-			} else {
-				res.Resource = blk
-			}
-		} else {
-			// No blockHash parameter.
+		hashBytes, err := json.Marshal(req.Params["lastBlockHash"])
+		if err != nil {
+			res.Error = badRequestErr
+			break
+		}
+
+		var hash blockchain.Hash
+		err = json.Unmarshal(hashBytes, &hash)
+		if err != nil {
+			res.Error = badRequestErr
+			break
+		}
+
+		block, err := a.Chain.GetBlockByLastBlockHash(hash)
+		if err != nil {
 			res.Error = notFoundErr
+		} else {
+			res.Resource = block
 		}
 	default:
-		// Return err by default.
 		res.Error = typeErr
 	}
 
@@ -223,11 +240,9 @@ func getLocalChain(user *User) *blockchain.BlockChain {
 	}
 
 	genisisBlock := blockchain.Genesis(user.Wallet.Public(),
-		consensus.CurrentTarget(), consensus.StartingBlockReward,
-		make([]byte, 0))
+		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
 
-	bc.Blocks = append(bc.Blocks, genisisBlock)
-	bc.Head = blockchain.HashSum(genisisBlock)
+	bc.AppendBlock(genisisBlock)
 	return &bc
 }
 
@@ -256,9 +271,9 @@ func (a *App) HandleWork() {
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 	validTransaction := a.Pool.Push(txn, a.Chain)
 	if validTransaction {
-		log.Debug("added transaction to pool from address: " + txn.Sender.Repr())
+		log.Debug("Added transaction to pool from address: " + txn.Sender.Repr())
 	} else {
-		log.Debug("bad transaction rejected from sender: " + txn.Sender.Repr())
+		log.Debug("Bad transaction rejected from sender: " + txn.Sender.Repr())
 	}
 }
 
@@ -341,13 +356,20 @@ func (a *App) SyncBlockChain() (bool, error) {
 			return
 		}
 
-		block, ok := blockResponse.Resource.(blockchain.Block)
-		if !ok {
+		blockBytes, err := json.Marshal(blockResponse.Resource)
+		if err != nil {
 			newBlockChan <- nil
 			return
 		}
 
-		newBlockChan <- &block
+		block, err := blockchain.DecodeBlockJSON(blockBytes)
+		if err != nil {
+			log.WithError(err).Error("Error decoding block")
+			newBlockChan <- nil
+			return
+		}
+
+		newBlockChan <- block
 	}
 
 	// Continually request the block after the latest block in our chain until
@@ -385,6 +407,7 @@ func (a *App) SyncBlockChain() (bool, error) {
 			if newBlock == nil {
 				// We received a response with no error but an invalid resource
 				// Try again
+				log.Debug("Received block response with invalid resource")
 				continue
 			}
 
@@ -392,12 +415,12 @@ func (a *App) SyncBlockChain() (bool, error) {
 			if !valid {
 				// There is something wrong with this block. Try again
 				fields := log.Fields{"validationCode": validationCode}
-				log.WithFields(fields).Debug(
-					"SyncBlockchain received invalid block")
+				log.WithFields(fields).Debug("SyncBlockchain received invalid block")
 				continue
 			}
 
 			// Valid block. Append it to the chain
+			log.Debug("Adding block to blockchain")
 			a.Chain.AppendBlock(newBlock)
 			changed = true
 

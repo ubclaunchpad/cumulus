@@ -26,16 +26,11 @@ func TestEncodeDecodeBlockChain(t *testing.T) {
 	}
 }
 
-func TestCopyBlock(t *testing.T) {
+func TestGetBlock(t *testing.T) {
 	bc, _ := NewValidTestChainAndBlock()
-	b, _ := bc.CopyBlockByLastBlockHash(bc.Blocks[1].LastBlock)
+	b, _ := bc.GetBlockByLastBlockHash(bc.Blocks[1].LastBlock)
 
 	if !reflect.DeepEqual(b, bc.Blocks[1]) {
-		t.FailNow()
-	}
-
-	// Enforce copy.
-	if b == bc.Blocks[1] {
 		t.FailNow()
 	}
 }

@@ -2,7 +2,6 @@ package peer
 
 import (
 	"encoding/json"
-	"net"
 	"testing"
 
 	"github.com/google/uuid"
@@ -20,12 +19,9 @@ func TestConcurrentPeerStore(t *testing.T) {
 
 	// Asynchronously add and find peers
 	go func() {
-		var fa net.Addr
-		var fc net.Conn
 		for _, addr := range addrs2 {
-			fa = conn.TestAddr{Addr: addr}
-			fc = conn.TestConn{Addr: fa}
-			ps.Add(New(fc, ps, addr))
+			bc := conn.NewBufConn(false, false)
+			ps.Add(New(bc, ps, addr))
 			p := ps.Get(addr)
 			if p.ListenAddr != addr {
 				resChan1 <- false
@@ -36,12 +32,9 @@ func TestConcurrentPeerStore(t *testing.T) {
 
 	// Asynchronously add and remove peers
 	go func() {
-		var fa net.Addr
-		var fc net.Conn
 		for _, addr := range addrs1 {
-			fa = conn.TestAddr{Addr: addr}
-			fc = conn.TestConn{Addr: fa}
-			ps.Add(New(fc, ps, addr))
+			bc := conn.NewBufConn(false, false)
+			ps.Add(New(bc, ps, addr))
 			ps.Remove(addr)
 		}
 		resChan2 <- true
@@ -81,13 +74,10 @@ func TestConcurrentPeerStore(t *testing.T) {
 }
 
 func TestRemoveRandom(t *testing.T) {
-	var fa conn.TestAddr
-	var fc conn.TestConn
 	ps := NewPeerStore("")
 	for _, addr := range addrs1 {
-		fa = conn.TestAddr{Addr: addr}
-		fc = conn.TestConn{Addr: fa}
-		ps.Add(New(fc, ps, addr))
+		bc := conn.NewBufConn(false, false)
+		ps.Add(New(bc, ps, addr))
 	}
 
 	for i := ps.Size(); i > 0; i-- {
@@ -99,13 +89,10 @@ func TestRemoveRandom(t *testing.T) {
 }
 
 func TestAddrs(t *testing.T) {
-	var fa conn.TestAddr
-	var fc conn.TestConn
 	ps := NewPeerStore("")
 	for _, addr := range addrs1 {
-		fa = conn.TestAddr{Addr: addr}
-		fc = conn.TestConn{Addr: fa}
-		ps.Add(New(fc, ps, addr))
+		bc := conn.NewBufConn(false, false)
+		ps.Add(New(bc, ps, addr))
 	}
 
 	addrs := ps.Addrs()
@@ -117,13 +104,10 @@ func TestAddrs(t *testing.T) {
 }
 
 func TestSetDefaultRequestHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc = conn.TestConn{Addr: fa}
+	bc := conn.NewBufConn(false, false)
 	ps := NewPeerStore("")
 
-	p := New(fc, ps, fa.String())
+	p := New(bc, ps, "127.0.0.1:8000")
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
@@ -141,20 +125,17 @@ func TestSetDefaultRequestHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, ps, fa.String())
+	p2 := New(bc, ps, "127.0.0.1:8000")
 	if p2.requestHandler == nil {
 		t.FailNow()
 	}
 }
 
 func TestSetDefaultPushHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc = conn.TestConn{Addr: fa}
+	bc := conn.NewBufConn(false, false)
 	ps := NewPeerStore("")
 
-	p := New(fc, ps, fa.String())
+	p := New(bc, ps, "127.0.0.1:8000")
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
@@ -167,7 +148,7 @@ func TestSetDefaultPushHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, ps, fa.String())
+	p2 := New(bc, ps, "127.0.0.1:8000")
 	if p2.pushHandler == nil {
 		t.FailNow()
 	}
@@ -180,22 +161,26 @@ func TestConnectionHandler(t *testing.T) {
 	}
 	requestPayloadBytes, _ := json.Marshal(req)
 	requestMsg := msg.Message{
-		Type:    "Request",
+		Type:    msg.RequestMessage,
 		Payload: requestPayloadBytes,
 	}
 	requestBytes, _ := json.Marshal(requestMsg)
-	rbp := &requestBytes
+	readChan := make(chan []byte)
+	writeChan := make(chan []byte)
 
-	var fa net.Addr
-
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc := conn.NewTestConn(fa, &rbp, true, true)
+	bc := conn.NewBufConn(false, false)
+	bc.OnRead = func() []byte {
+		return <-readChan
+	}
+	bc.OnWrite = func(writeBytes []byte) {
+		writeChan <- writeBytes
+	}
 
 	ps := NewPeerStore("")
 	connectionHandlerDone := make(chan bool)
 
 	go func() {
-		ps.ConnectionHandler(fc)
+		ps.ConnectionHandler(bc)
 		connectionHandlerDone <- true
 	}()
 
@@ -204,7 +189,7 @@ func TestConnectionHandler(t *testing.T) {
 
 	for !receivedRequest || !receivedResponse {
 		select {
-		case receivedMsg := <-fc.BytesWritten:
+		case receivedMsg := <-writeChan:
 			var message msg.Message
 			var request msg.Request
 			var response msg.Response
@@ -212,16 +197,14 @@ func TestConnectionHandler(t *testing.T) {
 			json.Unmarshal(receivedMsg, &message)
 
 			switch message.Type {
-			case "Request":
+			case msg.RequestMessage:
 				err := json.Unmarshal([]byte(message.Payload), &request)
 				if err != nil {
 					panic(err)
 				}
 				receivedRequest = true
-				fc.Lock.Lock()
-				**fc.Message = requestBytes
-				fc.Lock.Unlock()
-			case "Response":
+				readChan <- requestBytes
+			case msg.ResponseMessage:
 				err := json.Unmarshal([]byte(message.Payload), &response)
 				if err != nil {
 					panic(err)
@@ -234,13 +217,11 @@ func TestConnectionHandler(t *testing.T) {
 				}
 				resBytes, _ := json.Marshal(res)
 				responseMsg := msg.Message{
-					Type:    "Response",
+					Type:    msg.ResponseMessage,
 					Payload: resBytes,
 				}
-				responseMsgBytes, _ := json.Marshal(responseMsg)
-				fc.Lock.Lock()
-				**fc.Message = responseMsgBytes
-				fc.Lock.Unlock()
+				responseBytes, _ := json.Marshal(responseMsg)
+				readChan <- responseBytes
 			}
 		}
 	}

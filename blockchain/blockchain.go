@@ -40,8 +40,6 @@ func DecodeBlockChain(r io.Reader) *BlockChain {
 
 // AppendBlock adds a block to the end of the block chain.
 func (bc *BlockChain) AppendBlock(b *Block) {
-	b.BlockNumber = uint32(len(bc.Blocks))
-	b.LastBlock = HashSum(bc.Blocks[b.BlockNumber-1])
 	bc.Blocks = append(bc.Blocks, b)
 	bc.Head = HashSum(b)
 }
@@ -79,17 +77,14 @@ func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (b
 	return false, 0, 0
 }
 
-// CopyBlockByLastBlockHash returns a copy of the block in the local chain that
+// GetBlockByLastBlockHash returns a copy of the block in the local chain that
 // comes directly after the block with the given hash. Returns error if no such
 // block is found.
-func (bc *BlockChain) CopyBlockByLastBlockHash(hash Hash) (*Block, error) {
+func (bc *BlockChain) GetBlockByLastBlockHash(hash Hash) (*Block, error) {
 	// Find the block with the given hash
 	for _, block := range bc.Blocks {
 		if block.LastBlock == hash {
-			newBlock := *block
-			newBlock.Transactions = make([]*Transaction, len(block.Transactions))
-			copy(newBlock.Transactions, block.Transactions)
-			return &newBlock, nil
+			return block, nil
 		}
 	}
 	return nil, errors.New("No such block")

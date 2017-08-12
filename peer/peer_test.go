@@ -1,6 +1,7 @@
 package peer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -9,6 +10,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
+	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
@@ -66,13 +68,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestSetRequestHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc = conn.TestConn{Addr: fa}
+	fa := conn.TestAddr{Addr: "127.0.0.1"}
+	bc := conn.NewBufConn(false, false)
 	ps := NewPeerStore("")
 
-	p := New(fc, ps, fa.String())
+	p := New(bc, ps, fa.String())
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
@@ -90,20 +90,18 @@ func TestSetRequestHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, ps, fa.String())
+	p2 := New(bc, ps, fa.String())
 	if p2.requestHandler != nil {
 		t.FailNow()
 	}
 }
 
 func TestSetPushHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc = conn.TestConn{Addr: fa}
+	fa := conn.TestAddr{Addr: "127.0.0.1"}
+	bc := conn.NewBufConn(false, false)
 	ps := NewPeerStore("")
 
-	p := New(fc, ps, fa.String())
+	p := New(bc, ps, fa.String())
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
@@ -116,21 +114,17 @@ func TestSetPushHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, ps, fa.String())
+	p2 := New(bc, ps, fa.String())
 	if p2.pushHandler != nil {
 		t.FailNow()
 	}
 }
 
 func TestRequestTimeout(t *testing.T) {
-	message := make([]byte, 0)
-	messagePtr := &message
-
-	fa := conn.TestAddr{Addr: "127.0.0.1"}
-	fc := conn.NewTestConn(fa, &messagePtr, false, false)
+	bc := conn.NewBufConn(false, false)
 
 	ps := NewPeerStore("")
-	p := New(fc, ps, "")
+	p := New(bc, ps, "")
 	responseChan := make(chan *msg.Response)
 
 	responseHandler := func(res *msg.Response) {
@@ -175,6 +169,7 @@ func TestValidAddress(t *testing.T) {
 
 func TestResponse(t *testing.T) {
 	responseChan := make(chan *msg.Response)
+	bc := conn.NewBufConn(true, false)
 
 	req := msg.Request{
 		ID:           uuid.New().String(),
@@ -188,23 +183,17 @@ func TestResponse(t *testing.T) {
 
 	responsePayloadBytes, _ := json.Marshal(response)
 	responseMsg := msg.Message{
-		Type:    "Response",
+		Type:    msg.ResponseMessage,
 		Payload: responsePayloadBytes,
 	}
 	responseBytes, err := json.Marshal(responseMsg)
 	if err != nil {
-		panic(err)
+		t.FailNow()
 	}
-	rbp := &responseBytes
-
-	var fa net.Addr
-	var fc net.Conn
-
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc = conn.NewTestConn(fa, &rbp, false, false)
+	bc.Buf = bytes.NewBuffer(responseBytes)
 
 	ps := NewPeerStore("")
-	p := New(fc, ps, "")
+	p := New(bc, ps, "")
 
 	responseHandler := func(res *msg.Response) {
 		responseChan <- res
@@ -214,7 +203,7 @@ func TestResponse(t *testing.T) {
 
 	err = p.Request(req, responseHandler)
 	if err != nil {
-		panic(err)
+		t.FailNow()
 	}
 
 	select {
@@ -229,6 +218,7 @@ func TestResponse(t *testing.T) {
 
 func TestPush(t *testing.T) {
 	pushChan := make(chan *msg.Push)
+	bc := conn.NewBufConn(false, false)
 
 	push := msg.Push{
 		ResourceType: msg.ResourceTransaction,
@@ -238,21 +228,15 @@ func TestPush(t *testing.T) {
 	pushPayloadBytes, _ := json.Marshal(push)
 
 	pushMsg := msg.Message{
-		Type:    "Push",
+		Type:    msg.PushMessage,
 		Payload: pushPayloadBytes,
 	}
 
 	pushBytes, _ := json.Marshal(pushMsg)
-	pbp := &pushBytes
-
-	var fa net.Addr
-	var fc net.Conn
-
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc = conn.NewTestConn(fa, &pbp, false, false)
+	bc.Buf = bytes.NewBuffer(pushBytes)
 
 	ps := NewPeerStore("")
-	p := New(fc, ps, "")
+	p := New(bc, ps, "")
 
 	p.SetPushHandler(func(push *msg.Push) {
 		pushChan <- push
@@ -271,6 +255,7 @@ func TestPush(t *testing.T) {
 
 func TestRequest(t *testing.T) {
 	requestChan := make(chan *msg.Request)
+	bc := conn.NewBufConn(false, false)
 
 	req := msg.Request{
 		ID:           uuid.New().String(),
@@ -280,21 +265,15 @@ func TestRequest(t *testing.T) {
 	requestPayloadBytes, _ := json.Marshal(req)
 
 	requestMsg := msg.Message{
-		Type:    "Request",
+		Type:    msg.RequestMessage,
 		Payload: requestPayloadBytes,
 	}
 
 	requestBytes, _ := json.Marshal(requestMsg)
-	rbp := &requestBytes
-
-	var fa net.Addr
-	var fc net.Conn
-
-	fa = conn.TestAddr{Addr: "127.0.0.1"}
-	fc = conn.NewTestConn(fa, &rbp, false, false)
+	bc.Buf = bytes.NewBuffer(requestBytes)
 
 	ps := NewPeerStore("")
-	p := New(fc, ps, "")
+	p := New(bc, ps, "")
 
 	p.SetRequestHandler(func(req *msg.Request) msg.Response {
 		requestChan <- req
@@ -309,5 +288,52 @@ func TestRequest(t *testing.T) {
 			request.ID != req.ID {
 			t.FailNow()
 		}
+	}
+}
+
+func TestSendBlock(t *testing.T) {
+	fa := conn.TestAddr{Addr: "127.0.0.1"}
+
+	var fc net.Conn
+	fc = conn.NewBufConn(false, false)
+	ps := NewPeerStore("")
+	p := New(fc, ps, fa.String())
+
+	block := blockchain.NewTestBlock()
+
+	push := msg.Push{
+		ResourceType: msg.ResourceBlock,
+		Resource:     block,
+	}
+
+	err := p.Push(push)
+	if err != nil {
+		t.FailNow()
+	}
+	payload, err := msg.Read(p.Connection)
+	if err != nil {
+		t.FailNow()
+	}
+
+	switch payload.(type) {
+	case *msg.Push:
+		receivedPush := payload.(*msg.Push)
+		if receivedPush.ResourceType != msg.ResourceBlock {
+			t.FailNow()
+		}
+		fmt.Println(receivedPush.Resource)
+		blockBytes, err := json.Marshal(receivedPush.Resource)
+		if err != nil {
+			t.FailNow()
+		}
+		receivedBlock, err := blockchain.DecodeBlockJSON(blockBytes)
+		if err != nil {
+			t.FailNow()
+		}
+		if blockchain.HashSum(receivedBlock) != blockchain.HashSum(block) {
+			t.FailNow()
+		}
+	default:
+		t.FailNow()
 	}
 }
