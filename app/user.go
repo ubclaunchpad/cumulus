@@ -1,6 +1,8 @@
 package app
 
 import (
+	"errors"
+
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/msg"
 
@@ -30,11 +32,15 @@ func getCurrentUser() *User {
 
 // Pay pays an amount of coin to an address `to`.
 func (a *App) Pay(to string, amount uint64) error {
-	// Three atomic steps must occur.
+	// Four atomic steps must occur.
+	wallet := a.CurrentUser.Wallet
+	pool := a.Pool
 
 	// 1. A legitimate transaction must be built.
 	tbody := blockchain.TxBody{
-		Sender: getCurrentUser().Wallet.Public(),
+		Sender: wallet.Public(),
+		// TODO: Collect inputs.
+		Input: blockchain.TxHashPointer{},
 		Outputs: []blockchain.TxOutput{
 			blockchain.TxOutput{
 				Recipient: to,
@@ -43,16 +49,23 @@ func (a *App) Pay(to string, amount uint64) error {
 		},
 	}
 
-	// 2. The transaction must be signed and broadcasted.
-	if txn, err := tbody.Sign(*a.CurrentUser.Wallet, crand.Reader); err != nil {
+	if txn, err := tbody.Sign(*a.CurrentUser.Wallet, crand.Reader); err == nil {
+		// 2. The transaction must be signed.
 		a.PeerStore.Broadcast(msg.Push{
 			ResourceType: msg.ResourceTransaction,
 			Resource:     txn,
 		})
-		a.CurrentUser.Wallet.SetPending(txn)
+
+		// 4. The transaction must be broadcasted to the peers.
+		if err := wallet.SetPending(txn); err != nil {
+			return err
+		}
 
 		// 3. The transaction must be added to the pool.
-		a.Pool.Push(txn, a.Chain)
+		if !pool.Push(txn, a.Chain) {
+			return errors.New("transaction broadcasted, but could not be added to the pool")
+		}
+
 	} else {
 		return err
 	}

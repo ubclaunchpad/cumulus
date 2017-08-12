@@ -107,9 +107,12 @@ func connect(ctx *ishell.Context, a *App) {
 }
 
 func createWallet(ctx *ishell.Context, app *App) {
+	// Create a new wallet and set as CurrentUser's wallet.
 	wallet := blockchain.NewWallet()
 	app.CurrentUser.Wallet = wallet
 	emoji.Println(":credit_card: New wallet created!")
+
+	// Give a printout of the address(es).
 	emoji.Print(":mailbox:")
 	ctx.Println(" Address: " + wallet.Public().Repr())
 	emoji.Println(":fist: Emoji Address: " + wallet.Public().Emoji())
@@ -117,6 +120,7 @@ func createWallet(ctx *ishell.Context, app *App) {
 }
 
 func createTransaction(ctx *ishell.Context, app *App) {
+	// Read in the recipient address.
 	emoji.Print(":credit_card:")
 	ctx.Println(" Enter recipient wallet address")
 	toAddress := shell.ReadLine()
@@ -130,7 +134,7 @@ func createTransaction(ctx *ishell.Context, app *App) {
 		return
 	}
 
-	// Make payment.
+	// Try to make a payment.
 	err = app.Pay(toAddress, amount)
 	if err != nil {
 		emoji.Println(":disappointed: Transaction failed!")

@@ -6,6 +6,8 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"io"
 	"math/big"
 
@@ -173,14 +175,16 @@ func (w *Wallet) SetAllPending(txns []*Transaction) {
 
 // SetPending appends one transaction to the pending set of transaction
 // if the wallet effective balance is high enough to accomodate.
-func (w *Wallet) SetPending(txn *Transaction) {
+func (w *Wallet) SetPending(txn *Transaction) error {
 	bal := w.GetEffectiveBalance()
 	spend := txn.GetTotalOutput()
 	if bal >= spend {
 		w.PendingTxns = append(w.PendingTxns, txn)
 	} else {
-		log.Printf("wallet balance is too low %v < %v", bal, spend)
+		msg := fmt.Sprintf("wallet balance is too low %v < %v", bal, spend)
+		return errors.New(msg)
 	}
+	return nil
 }
 
 // DropAllPending drops pending transactions if they apper in txns.
