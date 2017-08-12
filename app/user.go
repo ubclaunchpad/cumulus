@@ -36,7 +36,7 @@ func (a *App) Pay(to string, amount uint64) error {
 	wallet := a.CurrentUser.Wallet
 	pool := a.Pool
 
-	// 1. A legitimate transaction must be built.
+	// A legitimate transaction must be built.
 	tbody := blockchain.TxBody{
 		Sender: wallet.Public(),
 		// TODO: Collect inputs.
@@ -49,22 +49,24 @@ func (a *App) Pay(to string, amount uint64) error {
 		},
 	}
 
+	// The transaction must be signed.
 	if txn, err := tbody.Sign(*a.CurrentUser.Wallet, crand.Reader); err == nil {
-		// 2. The transaction must be signed.
-		a.PeerStore.Broadcast(msg.Push{
-			ResourceType: msg.ResourceTransaction,
-			Resource:     txn,
-		})
 
-		// 4. The transaction must be broadcasted to the peers.
+		// The transaction must be broadcasted to the peers.
 		if err := wallet.SetPending(txn); err != nil {
 			return err
 		}
 
-		// 3. The transaction must be added to the pool.
+		// The transaction must be added to the pool.
 		if !pool.Push(txn, a.Chain) {
 			return errors.New("transaction broadcasted, but could not be added to the pool")
 		}
+
+		// The transaction must be broadcasted to the network.
+		a.PeerStore.Broadcast(msg.Push{
+			ResourceType: msg.ResourceTransaction,
+			Resource:     txn,
+		})
 
 	} else {
 		return err
