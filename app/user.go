@@ -59,7 +59,7 @@ func (a *App) Pay(to string, amount uint64) error {
 
 		// The transaction must be added to the pool.
 		if !pool.Push(txn, a.Chain) {
-			return errors.New("transaction broadcasted, but could not be added to the pool")
+			return errors.New("transaction validation failed")
 		}
 
 		// The transaction must be broadcasted to the network.
