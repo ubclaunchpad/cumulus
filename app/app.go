@@ -251,11 +251,17 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 		// the next block so that the block
 		// numbers make sense.
 		a.Chain.AppendBlock(blk)
-		address := a.CurrentUser.Wallet.Public()
-		blk := a.Pool.NextBlock(a.Chain, address, a.CurrentUser.BlockSize)
+
+		// Drop pending transactions (if they occur in this block).
+		a.CurrentUser.Wallet.DropAllPending(blk.Transactions)
+
+		// Handle miner behaviour (set up a new block).
 		if miner.IsMining() {
+			address := a.CurrentUser.Wallet.Public()
+			blk := a.Pool.NextBlock(a.Chain, address, a.CurrentUser.BlockSize)
 			miner.RestartMiner(a.Chain, blk)
 		}
+
 		log.Debug("added blk number %d to chain", blk.BlockNumber)
 	}
 }

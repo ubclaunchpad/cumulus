@@ -103,3 +103,12 @@ func (t *Transaction) InputsEqualOutputs(other ...*Transaction) bool {
 
 	return (int(outAmount) - int(inAmount)) == 0
 }
+
+// GetTotalOutput sums the output amounts from the transaction.
+func (t *Transaction) GetTotalOutput() uint64 {
+	result := uint64(0)
+	for _, out := range t.Outputs {
+		result += out.Amount
+	}
+	return result
+}

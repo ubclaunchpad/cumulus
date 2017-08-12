@@ -6,11 +6,10 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"io"
-	"math"
 	"math/big"
 
+	log "github.com/Sirupsen/logrus"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/moj"
 )
@@ -167,39 +166,70 @@ func NewWallet() *Wallet {
 	}
 }
 
-// Debit attempts to spend some coin from the wallet.
-func (w *Wallet) Debit(amount uint64) error {
-	if amount >= w.GetEffectiveBalance() {
-		return errors.New("wallet does not have a high enough balance to satisfy the request")
-	} else if amount < 0 {
-		return errors.New("debit amounts may not be negative")
+// SetAllPending appends transactions to the pending set of transactions.
+func (w *Wallet) SetAllPending(txns []*Transaction) {
+	for _, t := range txns {
+		w.SetPending(t)
 	}
-	w.Balance -= amount
-	return nil
 }
 
-// Credit attempts to add count to the wallet.
-func (w *Wallet) Credit(amount uint64) error {
-	if amount >= math.MaxUint64 {
-		return errors.New("wallet cannot hold this amount")
-	} else if amount < 0 {
-		return errors.New("credit amounts may not be negative")
+// SetPending appends one transaction to the pending set of transaction
+// if the wallet effective balance is high enough to accomodate.
+func (w *Wallet) SetPending(txn *Transaction) {
+	bal := w.GetEffectiveBalance()
+	spend := txn.GetTotalOutput()
+	if bal >= spend {
+		w.PendingTxns = append(w.PendingTxns, txn)
+	} else {
+		log.Printf("wallet balance is too low %v < %v", bal, spend)
 	}
-	w.Balance += amount
-	return nil
 }
 
-// SetPending appends a transaction to the pending set of transactions.
-func (w *Wallet) SetPending(t *Transaction) {
-	w.PendingTxns = append(w.PendingTxns, t)
+// DropAllPending drops pending transactions if they apper in txns.
+func (w *Wallet) DropAllPending(txns []*Transaction) {
+	for _, t := range txns {
+		if p, i := w.IsPending(t); p {
+			w.DropPending(i)
+		}
+	}
+}
+
+// DropPending a single pending transaction by index in the pending list.
+func (w *Wallet) DropPending(i int) {
+	if i < len(w.PendingTxns) && i >= 0 {
+		log.Info("dropping transaction with hash %s", w.PendingTxns[i].Input.Hash)
+		w.PendingTxns = append(w.PendingTxns[:i], w.PendingTxns[i+1:]...)
+	}
+}
+
+// IsPending returns true if the transaction exists in the pending list.
+// If true, it also returns the integer index of the transaction.
+func (w *Wallet) IsPending(txn *Transaction) (bool, int) {
+	for i, t := range w.PendingTxns {
+		if t.Input.Hash == txn.Input.Hash {
+			return true, i
+		}
+	}
+	return false, -1
 }
 
 // GetEffectiveBalance returns the wallet balance less the sum of the pending
 // transactions in the wallet.
 func (w *Wallet) GetEffectiveBalance() uint64 {
-	r := uint64(0)
+	r := w.Balance
 	for _, t := range w.PendingTxns {
-		r += t.Outputs[0].Amount
+		r -= t.Outputs[0].Amount
 	}
 	return r
+}
+
+// GetBalance returns the raw balance without calculating pending transactions.
+func (w *Wallet) GetBalance() uint64 {
+	// TODO: Get historical wallet activity, cache and update block by block.
+	return w.Balance
+}
+
+// SetBalance idempotently sets the account balance.
+func (w *Wallet) SetBalance(b uint64) {
+	w.Balance = b
 }

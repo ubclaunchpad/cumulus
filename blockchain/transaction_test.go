@@ -26,3 +26,14 @@ func TestTransactionLen(t *testing.T) {
 
 	assert.Equal(t, tx.Len(), txLen)
 }
+
+func TestTransactionGetTotalOutput(t *testing.T) {
+	tx := NewTestTransaction()
+	tx.Outputs = []TxOutput{
+		TxOutput{
+			Recipient: tx.Outputs[0].Recipient,
+			Amount:    5,
+		},
+	}
+	assert.Equal(t, tx.GetTotalOutput(), uint64(5))
+}
