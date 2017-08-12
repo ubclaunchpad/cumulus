@@ -220,7 +220,7 @@ func (w *Wallet) IsPending(txn *Transaction) (bool, int) {
 func (w *Wallet) GetEffectiveBalance() uint64 {
 	r := w.Balance
 	for _, t := range w.PendingTxns {
-		r -= t.Outputs[0].Amount
+		r -= t.GetTotalOutput()
 	}
 	return r
 }

@@ -41,3 +41,13 @@ func TestDropAllPending(t *testing.T) {
 	result, _ = w.IsPending(txn)
 	assert.False(t, result)
 }
+
+func TestGetWalletBalances(t *testing.T) {
+	w := NewWallet()
+	txn := NewTestTransaction()
+	w.SetBalance(txn.GetTotalOutput())
+	w.SetAllPending([]*Transaction{txn})
+
+	assert.Equal(t, w.GetBalance(), txn.GetTotalOutput())
+	assert.Equal(t, w.GetEffectiveBalance(), uint64(0))
+}
