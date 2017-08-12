@@ -100,8 +100,6 @@ func (a Address) Key() *ecdsa.PublicKey {
 type Account interface {
 	Public() Address
 	Sign(digest Hash, random io.Reader) (Signature, error)
-	Debit(amount uint64) error
-	Credit(amount uint64) error
 }
 
 // Wallet is an account that can sign and hold a balance.

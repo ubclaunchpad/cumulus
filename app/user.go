@@ -30,7 +30,7 @@ func getCurrentUser() *User {
 
 // Pay pays an amount of coin to an address `to`.
 func (a *App) Pay(to string, amount uint64) error {
-	// Two atomic steps must occur.
+	// Three atomic steps must occur.
 
 	// 1. A legitimate transaction must be built.
 	tbody := blockchain.TxBody{
@@ -50,6 +50,9 @@ func (a *App) Pay(to string, amount uint64) error {
 			Resource:     txn,
 		})
 		a.CurrentUser.Wallet.SetPending(txn)
+
+		// 3. The transaction must be added to the pool.
+		a.HandleTransaction(txn)
 	} else {
 		return err
 	}

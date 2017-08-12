@@ -120,8 +120,8 @@ func createTransaction(ctx *ishell.Context, app *App) {
 	emoji.Print(":credit_card:")
 	ctx.Println(" Enter recipient wallet address")
 	toAddress := shell.ReadLine()
-	// TODO: Error handling address input.
 
+	// Get amount from user.
 	emoji.Print(":dollar:")
 	ctx.Println(" Enter amount to send: ")
 	amount, err := strconv.ParseUint(shell.ReadLine(), 10, 64)
@@ -130,7 +130,7 @@ func createTransaction(ctx *ishell.Context, app *App) {
 		return
 	}
 
-	// TODO: Check if we have enough coins to make the purchase.
+	// Make payment.
 	err = app.Pay(toAddress, amount)
 	if err != nil {
 		emoji.Println(":disappointed: Transaction failed!")
