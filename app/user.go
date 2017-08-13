@@ -32,7 +32,7 @@ func getCurrentUser() *User {
 
 // Pay pays an amount of coin to an address `to`.
 func (a *App) Pay(to string, amount uint64) error {
-	// Four atomic steps must occur.
+	// Four steps must occur.
 	wallet := a.CurrentUser.Wallet
 	pool := a.Pool
 
