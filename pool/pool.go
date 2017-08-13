@@ -11,7 +11,7 @@ import (
 	"github.com/ubclaunchpad/cumulus/miner"
 )
 
-// PooledTransaction is a Transaction with a timetamp.
+// PooledTransaction is a Transaction with a timestamp.
 type PooledTransaction struct {
 	Transaction *blockchain.Transaction
 	Time        time.Time
@@ -53,7 +53,8 @@ func (p *Pool) GetN(N int) *blockchain.Transaction {
 
 // GetIndex returns the index of the transaction in the ordering.
 func (p *Pool) GetIndex(t *blockchain.Transaction) int {
-	target := p.ValidTransactions[t.Input.Hash].Time
+	hash := blockchain.HashSum(t)
+	target := p.ValidTransactions[hash].Time
 	return getIndex(p.Order, target, 0, p.Len()-1)
 }
 
@@ -88,10 +89,10 @@ func (p *Pool) PushUnsafe(t *blockchain.Transaction) {
 }
 
 // Silently adds a transaction to the pool.
-// Deletes a transaction if it exists from the same
-// input hash.
+// Deletes a transaction if it exists from the input hash.
 func (p *Pool) set(t *blockchain.Transaction) {
-	if txn, ok := p.ValidTransactions[t.Input.Hash]; ok {
+	hash := blockchain.HashSum(t)
+	if txn, ok := p.ValidTransactions[hash]; ok {
 		p.Delete(txn.Transaction)
 	}
 	vt := &PooledTransaction{
@@ -99,16 +100,17 @@ func (p *Pool) set(t *blockchain.Transaction) {
 		Time:        time.Now(),
 	}
 	p.Order = append(p.Order, vt)
-	p.ValidTransactions[t.Input.Hash] = vt
+	p.ValidTransactions[hash] = vt
 }
 
 // Delete removes a transaction from the Pool.
 func (p *Pool) Delete(t *blockchain.Transaction) {
-	vt, ok := p.ValidTransactions[t.Input.Hash]
+	hash := blockchain.HashSum(t)
+	vt, ok := p.ValidTransactions[hash]
 	if ok {
 		i := p.GetIndex(vt.Transaction)
 		p.Order = append(p.Order[0:i], p.Order[i+1:]...)
-		delete(p.ValidTransactions, t.Input.Hash)
+		delete(p.ValidTransactions, hash)
 	}
 }
 

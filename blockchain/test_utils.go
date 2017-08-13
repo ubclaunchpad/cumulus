@@ -38,13 +38,17 @@ func NewTestTxOutput() TxOutput {
 func NewTestTxBody() TxBody {
 	// Uniform distribution on [1, 4]
 	nOutputs := mrand.Intn(4) + 1
+	nInputs := mrand.Intn(4) + 1
 	body := TxBody{
 		Sender:  NewWallet().Public(),
-		Input:   NewTestTxHashPointer(),
+		Inputs:  make([]TxHashPointer, nInputs),
 		Outputs: make([]TxOutput, nOutputs),
 	}
 	for i := 0; i < nOutputs; i++ {
 		body.Outputs[i] = NewTestTxOutput()
+	}
+	for i := 0; i < nInputs; i++ {
+		body.Inputs[i] = NewTestTxHashPointer()
 	}
 	return body
 }
@@ -123,46 +127,53 @@ func NewTestOutputBlock(t []*Transaction, input *Block) *Block {
 	}
 }
 
-// NewTestTransactionValue creates a new transaction with specific value a.
-func NewTestTransactionValue(s, r *Wallet, a uint64, i uint32) (*Transaction, error) {
+// NewTestTransactionValue creates a new transaction with specific value a at
+// index i in block number b.
+func NewTestTransactionValue(s, r *Wallet, a uint64, i uint32, b uint32) (*Transaction, error) {
 	tbody := TxBody{
-		Sender: s.Public(),
-		Input: TxHashPointer{
-			BlockNumber: 0,
-			Hash:        NewTestHash(),
-			Index:       i,
-		},
+		Sender:  s.Public(),
+		Inputs:  make([]TxHashPointer, 1),
 		Outputs: make([]TxOutput, 1),
 	}
 	tbody.Outputs[0] = TxOutput{
 		Amount:    a,
 		Recipient: r.Public().Repr(),
 	}
+	tbody.Inputs[0] = TxHashPointer{
+		BlockNumber: b,
+		Hash:        NewTestHash(),
+		Index:       i,
+	}
 	return tbody.Sign(*s, crand.Reader)
 }
 
-// NewValidBlockChainFixture creates a valid blockchain of two blocks.
+// NewValidBlockChainFixture creates a valid blockchain of two blocks
+// and returns the recipient of the only transaction in block 1.
 func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	original := NewWallet()
 	sender := NewWallet()
 	recipient := NewWallet()
 
-	trA, _ := NewTestTransactionValue(original, sender, 2, 1)
+	// Transaction A is in block 0 at index 0 (sender awarded 2 coins).
+	trA, _ := NewTestTransactionValue(original, sender, 2, 1, 0)
 	trA.Outputs = append(trA.Outputs, TxOutput{
 		Amount:    2,
 		Recipient: sender.Public().Repr(),
 	})
 
-	trB, _ := NewTestTransactionValue(sender, recipient, 4, 1)
-	trB.Input.Hash = HashSum(trA)
+	// Transaction B is in block 1 at index 0 (sender sends 2 coins to recipient).
+	trB, _ := NewTestTransactionValue(sender, recipient, 2, 1, 1)
+	trB.Inputs[1].Hash = HashSum(trA)
 
 	trB, _ = trB.TxBody.Sign(*sender, crand.Reader)
 
+	// CloudBase will bump our transactions forward.
 	cbA, _ := NewValidCloudBaseTestTransaction()
 	cbB, _ := NewValidCloudBaseTestTransaction()
 	inputTransactions := []*Transaction{cbA, trA}
 	outputTransactions := []*Transaction{cbB, trB}
 
+	// Create the blocks in the blockchain.
 	inputBlock := NewTestInputBlock(inputTransactions)
 	outputBlock := NewTestOutputBlock(outputTransactions, inputBlock)
 
@@ -172,23 +183,27 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	}, *recipient
 }
 
-// NewValidTestChainAndBlock creates a valid BlockChain and a Block that is valid
-// with respect to the BlockChain.
+// NewValidTestChainAndBlock creates a valid BlockChain of 2 blocks,
+// and a Block that is valid with respect to the BlockChain.
+//	 [ 2in | 2out ]   ->>   [ 2in | 2out ]	 ,	[ 2in | 2out ]
 func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 	bc, s := NewValidBlockChainFixture()
 	inputBlock := bc.Blocks[1]
-	inputTransaction := inputBlock.Transactions[0]
-	a := inputTransaction.Outputs[0].Amount
+
+	// Collect the transaction following the CloudBase.
+	inputTransaction := inputBlock.Transactions[1]
+	a := inputTransaction.Outputs[1].Amount
 
 	// Create a legit block that does *not* appear in bc.
 	tbody := TxBody{
-		Sender: s.Public(),
-		Input: TxHashPointer{
-			BlockNumber: 1,
-			Hash:        HashSum(inputTransaction),
-			Index:       0,
-		},
+		Sender:  s.Public(),
+		Inputs:  make([]TxHashPointer, 1),
 		Outputs: make([]TxOutput, 1),
+	}
+	tbody.Inputs[0] = TxHashPointer{
+		BlockNumber: 1,
+		Hash:        HashSum(inputTransaction),
+		Index:       1,
 	}
 	tbody.Outputs[0] = TxOutput{
 		Amount:    a,
@@ -227,7 +242,7 @@ func NewValidCloudBaseTestTransaction() (*Transaction, Address) {
 	}
 	cbTxBody := TxBody{
 		Sender:  NilAddr,
-		Input:   cbInput,
+		Inputs:  []TxHashPointer{cbInput},
 		Outputs: []TxOutput{cbReward},
 	}
 	cbTx := &Transaction{

@@ -1,5 +1,5 @@
-hash: 14d7695aad2f66fada940b379240f0bd400acb153b54600074e634b009f5b271
-updated: 2017-07-23T17:39:19.702683559-07:00
+hash: 1954740399ad628bee9d88f3092c1c51283b8aa55e281f413d031f03fb734703
+updated: 2017-08-12T21:45:36.257782645-07:00
 imports:
 - name: github.com/abiosoft/ishell
   version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
@@ -26,6 +26,8 @@ imports:
   - json/token
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+- name: github.com/juliangruber/go-intersect
+  version: b60b3a5b35ade098834e63cf9e094108650641a2
 - name: github.com/magiconair/properties
   version: 51463bfca2576e06c62a8504b5c0f06d61312647
 - name: github.com/mattn/go-colorable

@@ -19,26 +19,25 @@ func VerifyTransaction(bc *blockchain.BlockChain,
 	}
 
 	// Find the transaction input in the chain (by hash)
-	input := bc.GetInputTransaction(t)
-	if input == nil || blockchain.HashSum(input) != t.Input.Hash {
-		return false, NoInputTransaction
+	inputs := bc.GetAllInputs(t)
+	if len(inputs) == 0 {
+		return false, NoInputTransactions
 	}
 
 	// Check that output to sender in input is equal to outputs in t
-	if !input.InputsEqualOutputs(t) {
+	if !(t.GetTotalOutput() == t.GetTotalInput(bc)) {
 		return false, Overspend
 	}
 
-	// Verify signature of t
+	// Verify signature of t.
 	hash := blockchain.HashSum(t.TxBody)
 	if !ecdsa.Verify(t.Sender.Key(), hash.Marshal(), t.Sig.R, t.Sig.S) {
 		return false, BadSig
 	}
 
-	// Test if identical transaction already exists in chain.
-	end := uint32(len(bc.Blocks))
-	start := t.Input.BlockNumber
-	if exists, _, _ := bc.ContainsTransaction(t, start, end); exists {
+	// Test if inputs already spent elsewhere.
+	start, _ := bc.GetBlockRange(t)
+	if bc.InputsSpentElsewhere(t, start) {
 		return false, Respend
 	}
 
@@ -60,10 +59,10 @@ func VerifyCloudBase(bc *blockchain.BlockChain,
 		return false, BadCloudBaseSender
 	}
 
-	// Check that the input is 0.
-	if t.TxBody.Input.BlockNumber != 0 ||
-		t.TxBody.Input.Hash != blockchain.NilHash ||
-		t.Input.Index != 0 {
+	// Check that the input is 0 (only one input to CB).
+	input := t.TxBody.Inputs[0]
+	if input.BlockNumber != 0 || input.Hash != blockchain.NilHash ||
+		input.Index != 0 {
 		return false, BadCloudBaseInput
 	}
 
@@ -223,9 +222,8 @@ func VerifyBlock(bc *blockchain.BlockChain,
 	// Check for multiple transactions referencing same input transaction.
 	for i, trA := range b.Transactions {
 		for j, trB := range b.Transactions {
-			if (i != j) && (trA.Input.Hash == trB.Input.Hash) {
-				inputTr := bc.GetInputTransaction(trA)
-				if !inputTr.InputsEqualOutputs(trA, trB) {
+			if i != j {
+				if trA.InputsIntersect(trB) {
 					return false, DoubleSpend
 				}
 			}

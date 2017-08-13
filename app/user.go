@@ -40,7 +40,7 @@ func (a *App) Pay(to string, amount uint64) error {
 	tbody := blockchain.TxBody{
 		Sender: wallet.Public(),
 		// TODO: Collect inputs.
-		Input: blockchain.TxHashPointer{},
+		Inputs: []blockchain.TxHashPointer{},
 		Outputs: []blockchain.TxOutput{
 			blockchain.TxOutput{
 				Recipient: to,

@@ -28,12 +28,9 @@ func TestVerifyTransactionNilTransaction(t *testing.T) {
 }
 
 func TestVerifyTransactionNoInputTransaction(t *testing.T) {
-	tr, _ := blockchain.NewTestTransactionValue(
-		blockchain.NewWallet(),
-		blockchain.NewWallet(),
-		1,
-		0,
-	)
+	s := blockchain.NewWallet()
+	r := blockchain.NewWallet()
+	tr, _ := blockchain.NewTestTransactionValue(s, r, 1, 0, 0)
 	bc, _ := blockchain.NewValidBlockChainFixture()
 
 	valid, code := VerifyTransaction(bc, tr)
@@ -41,7 +38,7 @@ func TestVerifyTransactionNoInputTransaction(t *testing.T) {
 	if valid {
 		t.Fail()
 	}
-	if code != NoInputTransaction {
+	if code != NoInputTransactions {
 		t.Fail()
 	}
 }
@@ -361,7 +358,7 @@ func TestVerifyCloudBaseBadSender(t *testing.T) {
 func TestVerifyCloudBaseBadBadInput(t *testing.T) {
 	bc, _ := blockchain.NewValidBlockChainFixture()
 	b := bc.Blocks[0]
-	b.GetCloudBaseTransaction().TxBody.Input.BlockNumber = 1
+	b.GetCloudBaseTransaction().TxBody.Inputs[0].BlockNumber = 1
 	valid, code := VerifyCloudBase(bc, b.GetCloudBaseTransaction())
 
 	if valid {
@@ -373,7 +370,7 @@ func TestVerifyCloudBaseBadBadInput(t *testing.T) {
 
 	bc, _ = blockchain.NewValidBlockChainFixture()
 	b = bc.Blocks[0]
-	b.GetCloudBaseTransaction().TxBody.Input.Hash = blockchain.NewTestHash()
+	b.GetCloudBaseTransaction().TxBody.Inputs[0].Hash = blockchain.NewTestHash()
 	valid, code = VerifyCloudBase(bc, b.GetCloudBaseTransaction())
 
 	if valid {
@@ -385,7 +382,7 @@ func TestVerifyCloudBaseBadBadInput(t *testing.T) {
 
 	bc, _ = blockchain.NewValidBlockChainFixture()
 	b = bc.Blocks[0]
-	b.GetCloudBaseTransaction().TxBody.Input.Index = 1
+	b.GetCloudBaseTransaction().TxBody.Inputs[0].Index = 1
 	valid, code = VerifyCloudBase(bc, b.GetCloudBaseTransaction())
 
 	if valid {

@@ -4,6 +4,8 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
+
+	intersect "github.com/juliangruber/go-intersect"
 )
 
 // BlockChain represents a linked list of blocks
@@ -45,17 +47,27 @@ func (bc *BlockChain) AppendBlock(b *Block) {
 	bc.Blocks = append(bc.Blocks, b)
 }
 
-// GetInputTransaction returns the input Transaction to t. If the input does
-// not exist, then GetInputTransaction returns nil.
-func (bc *BlockChain) GetInputTransaction(t *Transaction) *Transaction {
-	if t.Input.BlockNumber > uint32(len(bc.Blocks)) {
+// GetInputTransaction returns the input Transaction referenced by TxHashPointer.
+// If the Transaction does not exist, then GetInputTransaction returns nil.
+func (bc *BlockChain) GetInputTransaction(t *TxHashPointer) *Transaction {
+	if t.BlockNumber > uint32(len(bc.Blocks)) {
 		return nil
 	}
-	b := bc.Blocks[t.Input.BlockNumber]
-	if t.Input.Index > uint32(len(b.Transactions)) {
+	b := bc.Blocks[t.BlockNumber]
+	if t.Index > uint32(len(b.Transactions)) {
 		return nil
 	}
-	return b.Transactions[t.Input.Index]
+	return b.Transactions[t.Index]
+}
+
+// GetAllInputs returns all the transactions referenced by a transaction
+// as inputs.
+func (bc *BlockChain) GetAllInputs(t *Transaction) []*Transaction {
+	txns := make([]*Transaction, len(t.Inputs))
+	for _, tx := range t.Inputs {
+		txns = append(txns, bc.GetInputTransaction(&tx))
+	}
+	return txns
 }
 
 // ContainsTransaction returns true if the BlockChain contains the transaction
@@ -69,7 +81,7 @@ func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (b
 	return false, 0, 0
 }
 
-// CopyLocalBlockByIndex returns a copy of a block in the local chain by index.
+// CopyBlockByIndex returns a copy of a block in the local chain by index.
 func (bc *BlockChain) CopyBlockByIndex(i uint32) (*Block, error) {
 	if i >= 0 && i < uint32(len(bc.Blocks)) {
 		blk := bc.Blocks[i]
@@ -79,4 +91,36 @@ func (bc *BlockChain) CopyBlockByIndex(i uint32) (*Block, error) {
 		return &b, nil
 	}
 	return nil, errors.New("block request out of bounds")
+}
+
+// InputsSpentElsewhere returns true if inputs perported to be only spent
+// on transaction t have been spent elsewhere after block index `start`.
+func (bc *BlockChain) InputsSpentElsewhere(t *Transaction, start uint32) bool {
+	// This implementation runs in O(n * m * l * x)
+	// where n = number of blocks in range.
+	// 		 m = number of transactions per block.
+	// 		 l = number of inputs in a transaction.
+	// 		 x = a factor of the hash efficiency function on (1, 2).
+	for _, b := range bc.Blocks[start:] {
+		for _, txn := range b.Transactions {
+			if HashSum(txn) == HashSum(t) {
+				continue
+			} else {
+				if t.InputsIntersect(txn) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// InputsIntersect returns true if the inputs of t intersect with those of
+// other.
+func (t *Transaction) InputsIntersect(other *Transaction) bool {
+	intersection := intersect.Hash(t.Inputs, other.Inputs)
+	if len(intersection.([]TxHashPointer)) > 0 {
+		return true
+	}
+	return false
 }
