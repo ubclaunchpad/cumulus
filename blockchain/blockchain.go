@@ -4,8 +4,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
-
-	intersect "github.com/juliangruber/go-intersect"
 )
 
 // BlockChain represents a linked list of blocks
@@ -111,16 +109,6 @@ func (bc *BlockChain) InputsSpentElsewhere(t *Transaction, start uint32) bool {
 				}
 			}
 		}
-	}
-	return false
-}
-
-// InputsIntersect returns true if the inputs of t intersect with those of
-// other.
-func (t *Transaction) InputsIntersect(other *Transaction) bool {
-	intersection := intersect.Hash(t.Inputs, other.Inputs)
-	if len(intersection.([]TxHashPointer)) > 0 {
-		return true
 	}
 	return false
 }

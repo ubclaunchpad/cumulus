@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 
+	intersect "github.com/juliangruber/go-intersect"
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
@@ -154,4 +155,14 @@ func (bc *BlockChain) GetBlockRange(t *Transaction) (uint32, uint32) {
 		}
 	}
 	return min, max
+}
+
+// InputsIntersect returns true if the inputs of t intersect with those of
+// other.
+func (t *Transaction) InputsIntersect(other *Transaction) bool {
+	intersection := intersect.Hash(t.Inputs, other.Inputs)
+	if len(intersection.([]TxHashPointer)) > 0 {
+		return true
+	}
+	return false
 }
