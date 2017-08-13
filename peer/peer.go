@@ -142,7 +142,7 @@ func (p *Peer) Dispatch() {
 			res := message.(*msg.Response)
 			rh := p.getResponseHandler(res.ID)
 			if rh == nil {
-				log.Error("Dispatcher could not find response handler for response on peer",
+				log.Errorf("Dispatcher could not find response handler for response on peer %s",
 					p.ListenAddr)
 			} else {
 				rh(res)

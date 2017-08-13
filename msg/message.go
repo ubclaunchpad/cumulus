@@ -33,16 +33,20 @@ const (
 )
 
 const (
-	// BadRequest occurs when a malformatted request is received
+	// BadRequest occurs when a malformatted request is received.
 	BadRequest = 400
 	// InvalidResourceType occurs when a request is received with an unknown
 	// ResourceType value.
 	InvalidResourceType = 401
+	// ResourceNotFound occurs when a node reports the requested resource missing.
+	ResourceNotFound = 404
 	// RequestTimeout occurs when a peer does not respond to a request within
 	// some predefined period of time (see peer.DefaultRequestTimeout)
 	RequestTimeout = 408
-	// ResourceNotFound occurs when a node reports the requested resource missing.
-	ResourceNotFound = 404
+	// UpToDate occurs when a block request is received for a block that has
+	// not yet been mined (i.e. the lastBlockHash param in the request is the
+	// hash of the latest block in the blockchain).
+	UpToDate = 416
 	// NotImplemented occurs when a message or request is received whos response
 	// requires functionality that does not yet exist.
 	NotImplemented = 501

@@ -53,7 +53,7 @@ func Run(cfg conf.Config) {
 	a := App{
 		PeerStore:        peer.NewPeerStore(addr),
 		CurrentUser:      user,
-		Chain:            getLocalChain(user),
+		Chain:            createBlockchain(user),
 		Pool:             getLocalPool(),
 		blockQueue:       make(chan *blockchain.Block, blockQueueSize),
 		transactionQueue: make(chan *blockchain.Transaction, transactionQueueSize),
@@ -171,6 +171,8 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 		"Resource not found.")
 	badRequestErr := msg.NewProtocolError(msg.BadRequest,
 		"Bad request")
+	upToDateErr := msg.NewProtocolError(msg.UpToDate,
+		"The requested block has not yet been mined")
 
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
@@ -189,6 +191,9 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 		err = json.Unmarshal(hashBytes, &hash)
 		if err != nil {
 			res.Error = badRequestErr
+			break
+		} else if len(a.Chain.Blocks) > 0 && hash == blockchain.HashSum(a.Chain.LastBlock()) {
+			res.Error = upToDateErr
 			break
 		}
 
@@ -230,19 +235,19 @@ func (a *App) PushHandler(push *msg.Push) {
 	}
 }
 
-// getLocalChain returns an instance of the blockchain.
-func getLocalChain(user *User) *blockchain.BlockChain {
-	// TODO: Look for local chain on disk. If doesn't exist, go rummaging
+// createBlockchain returns a new instance of a blockchain with only a genesis
+// block.
+func createBlockchain(user *User) *blockchain.BlockChain {
 	// around on the internets for one.
 	bc := blockchain.BlockChain{
 		Blocks: make([]*blockchain.Block, 0),
 		Head:   blockchain.NilHash,
 	}
 
-	genisisBlock := blockchain.Genesis(user.Wallet.Public(),
+	genesisBlock := blockchain.Genesis(user.Wallet.Public(),
 		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
 
-	bc.AppendBlock(genisisBlock)
+	bc.AppendBlock(genesisBlock)
 	return &bc
 }
 
@@ -344,7 +349,6 @@ func (a *App) Mine() {
 // to any peers.
 func (a *App) SyncBlockChain() (bool, error) {
 	var currentHeadHash blockchain.Hash
-	prevHead := a.Chain.LastBlock()
 	newBlockChan := make(chan *blockchain.Block)
 	errChan := make(chan *msg.ProtocolError)
 	changed := false
@@ -364,7 +368,6 @@ func (a *App) SyncBlockChain() (bool, error) {
 
 		block, err := blockchain.DecodeBlockJSON(blockBytes)
 		if err != nil {
-			log.WithError(err).Error("Error decoding block")
 			newBlockChan <- nil
 			return
 		}
@@ -424,17 +427,14 @@ func (a *App) SyncBlockChain() (bool, error) {
 			a.Chain.AppendBlock(newBlock)
 			changed = true
 
-			if (&newBlock.BlockHeader).Equal(&prevHead.BlockHeader) {
-				// Our blockchain is up to date
-				return changed, nil
-			}
-
 		case err := <-errChan:
 			if err.Code == msg.ResourceNotFound {
 				// Our chain might be out of sync, roll it back by one block
 				// and request the next block
-				prevHead = a.Chain.RollBack()
+				a.Chain.RollBack()
 				changed = true
+			} else if err.Code == msg.UpToDate {
+				return changed, nil
 			}
 
 			// Some other protocol error occurred. Try again

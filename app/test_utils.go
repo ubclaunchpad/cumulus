@@ -7,9 +7,9 @@ import (
 	"github.com/ubclaunchpad/cumulus/pool"
 )
 
-func createNewTestBlockRequest(lastBlock interface{}) *msg.Request {
+func createNewTestBlockRequest(lastBlockHash interface{}) *msg.Request {
 	params := make(map[string]interface{}, 1)
-	params["lastBlock"] = lastBlock
+	params["lastBlockHash"] = lastBlockHash
 	return &msg.Request{
 		ResourceType: msg.ResourceBlock,
 		Params:       params,

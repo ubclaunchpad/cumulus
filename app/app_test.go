@@ -48,18 +48,17 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 	}
 }
 
-// TODO: Enable once block request by hash implemented.
-// func TestRequestHandlerNewBlockOK(t *testing.T) {
-// 	// Request a new block by hash and verify we get the right one.
-// 	a := createNewTestApp()
+func TestRequestHandlerNewBlockOK(t *testing.T) {
+	// Request a new block by hash and verify we get the right one.
+	a := createNewTestApp()
 
-// 	req := createNewTestBlockRequest(a.Chain.Blocks[1].LastBlock)
-// 	resp := a.RequestHandler(req)
-// 	block, ok := resp.Resource.(*blockchain.Block)
+	req := createNewTestBlockRequest(a.Chain.Blocks[1].LastBlock)
+	resp := a.RequestHandler(req)
+	block, ok := resp.Resource.(*blockchain.Block)
 
-// 	assert.True(t, ok, "resource should contain block")
-// 	assert.Equal(t, block, a.Chain.Blocks[1])
-// }
+	assert.True(t, ok, "resource should contain block")
+	assert.Equal(t, block, a.Chain.Blocks[1])
+}
 
 func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 	a := createNewTestApp()
@@ -73,7 +72,7 @@ func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 
 	// Make sure request failed.
 	assert.False(t, ok, "resource should not contain block")
-	assert.Equal(t, msg.ResourceNotFound, int(resp.Error.Code), resp.Error.Message)
+	assert.Equal(t, msg.BadRequest, int(resp.Error.Code), resp.Error.Message)
 }
 
 func TestRequestHandlerNewBlockBadType(t *testing.T) {
@@ -161,8 +160,8 @@ func TestGetLocalPool(t *testing.T) {
 	assert.NotNil(t, getLocalPool())
 }
 
-func TestGetLocalChain(t *testing.T) {
-	assert.NotNil(t, getLocalChain(NewUser()))
+func TestCreateBlockchain(t *testing.T) {
+	assert.NotNil(t, createBlockchain(NewUser()))
 }
 
 func TestHandleBlock(t *testing.T) {
