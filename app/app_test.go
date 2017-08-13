@@ -178,3 +178,18 @@ func TestHandleTransaction(t *testing.T) {
 	transactionQueue <- blockchain.NewTestTransaction()
 	assert.Equal(t, len(transactionQueue), 0)
 }
+
+func TestPay(t *testing.T) {
+	amt := uint64(5)
+	a := createNewTestApp()
+	err := a.Pay("badf00d", amt)
+
+	// Fail with low balance.
+	assert.NotNil(t, err)
+
+	a.CurrentUser.Wallet.SetBalance(amt)
+	err = a.Pay("badf00d", amt)
+
+	// Fail with bad inputs.
+	assert.NotNil(t, err)
+}

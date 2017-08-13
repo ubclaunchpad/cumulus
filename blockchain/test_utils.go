@@ -30,7 +30,7 @@ func NewTestTxHashPointer() TxHashPointer {
 func NewTestTxOutput() TxOutput {
 	return TxOutput{
 		Amount:    uint64(mrand.Int63()),
-		Recipient: NewWallet().Public(),
+		Recipient: NewWallet().Public().Repr(),
 	}
 }
 
@@ -53,7 +53,7 @@ func NewTestTxBody() TxBody {
 func NewTestTransaction() *Transaction {
 	sender := NewWallet()
 	tbody := NewTestTxBody()
-	t, _ := tbody.Sign(sender, crand.Reader)
+	t, _ := tbody.Sign(*sender, crand.Reader)
 	return t
 }
 
@@ -124,7 +124,7 @@ func NewTestOutputBlock(t []*Transaction, input *Block) *Block {
 }
 
 // NewTestTransactionValue creates a new transaction with specific value a.
-func NewTestTransactionValue(s, r Wallet, a uint64, i uint32) (*Transaction, error) {
+func NewTestTransactionValue(s, r *Wallet, a uint64, i uint32) (*Transaction, error) {
 	tbody := TxBody{
 		Sender: s.Public(),
 		Input: TxHashPointer{
@@ -136,9 +136,9 @@ func NewTestTransactionValue(s, r Wallet, a uint64, i uint32) (*Transaction, err
 	}
 	tbody.Outputs[0] = TxOutput{
 		Amount:    a,
-		Recipient: r.Public(),
+		Recipient: r.Public().Repr(),
 	}
-	return tbody.Sign(s, crand.Reader)
+	return tbody.Sign(*s, crand.Reader)
 }
 
 // NewValidBlockChainFixture creates a valid blockchain of two blocks.
@@ -150,13 +150,13 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	trA, _ := NewTestTransactionValue(original, sender, 2, 1)
 	trA.Outputs = append(trA.Outputs, TxOutput{
 		Amount:    2,
-		Recipient: sender.Public(),
+		Recipient: sender.Public().Repr(),
 	})
 
 	trB, _ := NewTestTransactionValue(sender, recipient, 4, 1)
 	trB.Input.Hash = HashSum(trA)
 
-	trB, _ = trB.TxBody.Sign(sender, crand.Reader)
+	trB, _ = trB.TxBody.Sign(*sender, crand.Reader)
 
 	cbA, _ := NewValidCloudBaseTestTransaction()
 	cbB, _ := NewValidCloudBaseTestTransaction()
@@ -169,7 +169,7 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	return &BlockChain{
 		Blocks: []*Block{inputBlock, outputBlock},
 		Head:   NewTestHash(),
-	}, recipient
+	}, *recipient
 }
 
 // NewValidTestChainAndBlock creates a valid BlockChain and a Block that is valid
@@ -192,7 +192,7 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 	}
 	tbody.Outputs[0] = TxOutput{
 		Amount:    a,
-		Recipient: NewWallet().Public(),
+		Recipient: NewWallet().Public().Repr(),
 	}
 
 	tr, _ := tbody.Sign(s, crand.Reader)
@@ -223,7 +223,7 @@ func NewValidCloudBaseTestTransaction() (*Transaction, Address) {
 	}
 	cbReward := TxOutput{
 		Amount:    25,
-		Recipient: w.Public(),
+		Recipient: w.Public().Repr(),
 	}
 	cbTxBody := TxBody{
 		Sender:  NilAddr,

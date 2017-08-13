@@ -82,7 +82,7 @@ func VerifyCloudBase(bc *blockchain.BlockChain,
 	reward := StartingBlockReward / uint64(math.Pow(float64(2), timesHalved))
 
 	// Check that the output is properly set.
-	if len(t.Outputs) != 1 || t.Outputs[0].Recipient == blockchain.NilAddr {
+	if len(t.Outputs) != 1 || t.Outputs[0].Recipient == blockchain.NilAddr.Repr() {
 		return false, BadCloudBaseOutput
 	}
 

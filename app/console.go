@@ -65,22 +65,9 @@ func create(ctx *ishell.Context, app *App) {
 		"Transaction",
 	}, "What would you like to create?")
 	if choice == 0 {
-		createHotWallet(ctx, app)
+		createWallet(ctx, app)
 	} else {
-		shell.Print("Sender wallet ID: ")
-		senderID := shell.ReadLine()
-		shell.Print("Recipient wallet ID: ")
-		recipientID := shell.ReadLine()
-		shell.Print("Amount to send: ")
-		amount, err := strconv.ParseFloat(shell.ReadLine(), 64)
-		if err != nil {
-			shell.Println("Invalid number format. Please enter an amount in decimal format.")
-			return
-		}
-
-		// TODO: make transaction, add it to the pool, broadcast it
-		ctx.Printf(`\nNew Transaction: \nSenderID: %s \nRecipiendID: %s\nAmount: %f"`,
-			senderID, recipientID, amount)
+		createTransaction(ctx, app)
 	}
 }
 
@@ -119,13 +106,40 @@ func connect(ctx *ishell.Context, a *App) {
 	}
 }
 
-func createHotWallet(ctx *ishell.Context, app *App) {
-	shell.Print("Enter wallet name: ")
-	walletName := shell.ReadLine()
-	wallet := HotWallet{walletName, blockchain.NewWallet()}
-	app.CurrentUser.HotWallet = wallet
-	emoji.Println(":credit_card: New hot wallet created!")
-	emoji.Println(":raising_hand: Name: " + wallet.Name)
-	emoji.Println(":mailbox: Address: " + wallet.Wallet.Public().Repr())
-	emoji.Println(":fist: Emoji Address: " + wallet.Wallet.Public().Emoji())
+func createWallet(ctx *ishell.Context, app *App) {
+	// Create a new wallet and set as CurrentUser's wallet.
+	wallet := blockchain.NewWallet()
+	app.CurrentUser.Wallet = wallet
+	emoji.Println(":credit_card: New wallet created!")
+
+	// Give a printout of the address(es).
+	emoji.Print(":mailbox:")
+	ctx.Println(" Address: " + wallet.Public().Repr())
+	emoji.Println(":fist: Emoji Address: " + wallet.Public().Emoji())
+	ctx.Println("")
+}
+
+func createTransaction(ctx *ishell.Context, app *App) {
+	// Read in the recipient address.
+	emoji.Print(":credit_card:")
+	ctx.Println(" Enter recipient wallet address")
+	toAddress := shell.ReadLine()
+
+	// Get amount from user.
+	emoji.Print(":dollar:")
+	ctx.Println(" Enter amount to send: ")
+	amount, err := strconv.ParseUint(shell.ReadLine(), 10, 64)
+	if err != nil {
+		emoji.Println(":disappointed: Invalid number format. Please enter an amount in decimal format.")
+		return
+	}
+
+	// Try to make a payment.
+	err = app.Pay(toAddress, amount)
+	if err != nil {
+		emoji.Println(":disappointed: Transaction failed!")
+		ctx.Println(err.Error)
+	} else {
+		emoji.Println(":mailbox_with_mail: Its in the mail!")
+	}
 }

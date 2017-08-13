@@ -6,9 +6,12 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"io"
 	"math/big"
 
+	log "github.com/Sirupsen/logrus"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/moj"
 )
@@ -18,6 +21,8 @@ const (
 	CoordLen = 32
 	// AddrLen is the length in bytes of addresses.
 	AddrLen = 2 * CoordLen
+	// ReprLen is the length in bytes of an address checksum.
+	ReprLen = 40
 	// SigLen is the length in bytes of signatures.
 	SigLen = AddrLen
 	// AddressVersion is the version of the address shortening protocol.
@@ -93,27 +98,31 @@ func (a Address) Key() *ecdsa.PublicKey {
 	}
 }
 
-// Wallet represents a wallet that we have the ability to sign for.
-type Wallet interface {
+// Account represents a wallet that we have the ability to sign for.
+type Account interface {
 	Public() Address
 	Sign(digest Hash, random io.Reader) (Signature, error)
 }
 
-// Internal representation of a wallet.
-type wallet ecdsa.PrivateKey
+// Wallet is an account that can sign and hold a balance.
+type Wallet struct {
+	*ecdsa.PrivateKey
+	PendingTxns []*Transaction
+	Balance     uint64
+}
 
 // Key retreives the underlying private key from a wallet.
-func (w *wallet) key() *ecdsa.PrivateKey {
-	return (*ecdsa.PrivateKey)(w)
+func (w *Wallet) key() *ecdsa.PrivateKey {
+	return w.PrivateKey
 }
 
 // Public returns the public key as byte array, or address, of the wallet.
-func (w *wallet) Public() Address {
-	return Address{X: w.PublicKey.X, Y: w.PublicKey.Y}
+func (w *Wallet) Public() Address {
+	return Address{X: w.PrivateKey.PublicKey.X, Y: w.PrivateKey.PublicKey.Y}
 }
 
 // Sign returns a signature of the digest.
-func (w *wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
+func (w *Wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
 	r, s, err := ecdsa.Sign(random, w.key(), digest.Marshal())
 	return Signature{R: r, S: s}, err
 }
@@ -147,9 +156,82 @@ func (s *Signature) Marshal() []byte {
 	return buf
 }
 
-// NewWallet produces a new Wallet that can sign transactionsand has a
+// NewWallet produces a new Wallet that can sign transactions and has a
 // public Address.
-func NewWallet() Wallet {
+func NewWallet() *Wallet {
 	priv, _ := ecdsa.GenerateKey(curve, crand.Reader)
-	return (*wallet)(priv)
+	return &Wallet{
+		PrivateKey: priv,
+		Balance:    0,
+	}
+}
+
+// SetAllPending appends transactions to the pending set of transactions.
+func (w *Wallet) SetAllPending(txns []*Transaction) {
+	for _, t := range txns {
+		w.SetPending(t)
+	}
+}
+
+// SetPending appends one transaction to the pending set of transaction
+// if the wallet effective balance is high enough to accomodate.
+func (w *Wallet) SetPending(txn *Transaction) error {
+	bal := w.GetEffectiveBalance()
+	spend := txn.GetTotalOutput()
+	if bal >= spend {
+		w.PendingTxns = append(w.PendingTxns, txn)
+	} else {
+		msg := fmt.Sprintf("wallet balance is too low %v < %v", bal, spend)
+		return errors.New(msg)
+	}
+	return nil
+}
+
+// DropAllPending drops pending transactions if they apper in txns.
+func (w *Wallet) DropAllPending(txns []*Transaction) {
+	for _, t := range txns {
+		if p, i := w.IsPending(t); p {
+			w.DropPending(i)
+		}
+	}
+}
+
+// DropPending a single pending transaction by index in the pending list.
+func (w *Wallet) DropPending(i int) {
+	if i < len(w.PendingTxns) && i >= 0 {
+		log.Info("dropping transaction with hash %s", w.PendingTxns[i].Input.Hash)
+		w.PendingTxns = append(w.PendingTxns[:i], w.PendingTxns[i+1:]...)
+	}
+}
+
+// IsPending returns true if the transaction exists in the pending list.
+// If true, it also returns the integer index of the transaction.
+func (w *Wallet) IsPending(txn *Transaction) (bool, int) {
+	for i, t := range w.PendingTxns {
+		if t.Input.Hash == txn.Input.Hash {
+			return true, i
+		}
+	}
+	return false, -1
+}
+
+// GetEffectiveBalance returns the wallet balance less the sum of the pending
+// transactions in the wallet.
+func (w *Wallet) GetEffectiveBalance() uint64 {
+	r := w.Balance
+	for _, t := range w.PendingTxns {
+		r -= t.GetTotalOutput()
+	}
+	return r
+}
+
+// GetBalance returns the raw balance without calculating pending transactions.
+func (w *Wallet) GetBalance() uint64 {
+	// TODO: Get historical wallet activity, cache and update block by block.
+	return w.Balance
+}
+
+// SetBalance idempotently sets the account balance.
+func (w *Wallet) SetBalance(b uint64) {
+	w.Balance = b
 }

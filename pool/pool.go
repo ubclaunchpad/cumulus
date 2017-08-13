@@ -71,6 +71,7 @@ func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
 
 // Push inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
+// TODO: This should return an error if could not add.
 func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
 	if ok, err := consensus.VerifyTransaction(bc, t); ok {
 		p.set(t)
