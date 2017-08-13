@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"os/signal"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/consensus"
@@ -243,8 +245,12 @@ func createBlockchain(user *User) *blockchain.BlockChain {
 		Head:   blockchain.NilHash,
 	}
 
+	// TODO: update when we have adjustable difficulty
+	target := new(big.Int).Div(constants.MaxTarget, big.NewInt(2<<24))
+	targetHash := blockchain.BigIntToHash(target)
+
 	genesisBlock := blockchain.Genesis(user.Wallet.Public(),
-		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
+		targetHash, consensus.StartingBlockReward, []byte{})
 
 	bc.AppendBlock(genesisBlock)
 	return &bc
@@ -323,7 +329,11 @@ func (a *App) RunMiner() {
 		// Make a new block form the transactions in the transaction pool
 		blockToMine := a.Pool.NextBlock(a.Chain, a.CurrentUser.Wallet.Public(),
 			a.CurrentUser.BlockSize)
+		blockToMine.Target = a.Chain.Blocks[0].Target
+
+		// TODO: update this when we have adjustable difficulty
 		miningResult := miner.Mine(a.Chain, blockToMine)
+
 		if miningResult.Complete {
 			log.Info("Sucessfully mined a block!")
 			push := msg.Push{

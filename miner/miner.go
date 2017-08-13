@@ -37,8 +37,7 @@ func RestartMiner(bc *blockchain.BlockChain, b *blockchain.Block) {
 }
 
 // Mine continuously increases the nonce and tries to verify the proof of work
-// until the puzzle is solved
-// TODO: Make Mine take an interface with a callback as an arguement.
+// until the puzzle is solved.
 func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
 	setStart()
 
