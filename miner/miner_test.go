@@ -75,7 +75,7 @@ func TestCloudBase(t *testing.T) {
 		t.Fail()
 	}
 
-	if b.Transactions[0].Outputs[0].Recipient != w.Public() {
+	if b.Transactions[0].Outputs[0].Recipient != w.Public().Repr() {
 		t.Fail()
 	}
 }

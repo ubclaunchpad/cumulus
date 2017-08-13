@@ -16,7 +16,7 @@ run-console: cumulus
 deps:
 	glide install
 
-clean:
+clean: cumulus
 	rm cumulus
 
 install-glide:

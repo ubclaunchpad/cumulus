@@ -256,3 +256,18 @@ func TestHandleWork(t *testing.T) {
 	time.Sleep(time.Second)
 	assert.Equal(t, len(a.Chain.Blocks), 1)
 }
+
+func TestPay(t *testing.T) {
+	amt := uint64(5)
+	a := createNewTestApp()
+	err := a.Pay("badf00d", amt)
+
+	// Fail with low balance.
+	assert.NotNil(t, err)
+
+	a.CurrentUser.Wallet.SetBalance(amt)
+	err = a.Pay("badf00d", amt)
+
+	// Fail with bad inputs.
+	assert.NotNil(t, err)
+}

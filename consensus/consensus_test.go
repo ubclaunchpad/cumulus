@@ -68,7 +68,7 @@ func TestVerifyTransactionSignatureFail(t *testing.T) {
 	tr := bc.Blocks[1].Transactions[1]
 
 	fakeSender := blockchain.NewWallet()
-	tr, _ = tr.TxBody.Sign(fakeSender, crand.Reader)
+	tr, _ = tr.TxBody.Sign(*fakeSender, crand.Reader)
 	bc.Blocks[1].Transactions[1] = tr
 
 	valid, code := VerifyTransaction(bc, tr)
@@ -404,7 +404,7 @@ func TestVerifyCloudBaseBadOutput(t *testing.T) {
 			b.GetCloudBaseTransaction().Outputs,
 			blockchain.TxOutput{
 				Amount:    25,
-				Recipient: w.Public(),
+				Recipient: w.Public().Repr(),
 			},
 		)
 	valid, code := VerifyCloudBase(bc, b.GetCloudBaseTransaction())
@@ -431,7 +431,7 @@ func TestVerifyCloudBaseBadOutput(t *testing.T) {
 
 	bc, _ = blockchain.NewValidBlockChainFixture()
 	b = bc.Blocks[0]
-	b.GetCloudBaseTransaction().Outputs[0].Recipient = blockchain.NilAddr
+	b.GetCloudBaseTransaction().Outputs[0].Recipient = blockchain.NilAddr.Repr()
 	valid, code = VerifyCloudBase(bc, b.GetCloudBaseTransaction())
 
 	if valid {
