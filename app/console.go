@@ -154,7 +154,7 @@ func toggleMiner(ctx *ishell.Context, app *App) {
 			shell.Println("Miner is already running.")
 			return
 		}
-		go app.Mine()
+		go app.RunMiner()
 		shell.Println("Started miner.")
 	case "stop":
 		if !miner.IsMining() {

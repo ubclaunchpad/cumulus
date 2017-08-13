@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
@@ -61,9 +62,7 @@ func TestBlockHeaderLen(t *testing.T) {
 
 func TestEqual(t *testing.T) {
 	block1 := NewTestBlock()
-	if !(&block1.BlockHeader).Equal(&block1.BlockHeader) {
-		t.FailNow()
-	}
+	assert.True(t, (&block1.BlockHeader).Equal(&block1.BlockHeader))
 
 	equalBlockHeader := BlockHeader{
 		BlockNumber: block1.BlockNumber,
@@ -74,12 +73,8 @@ func TestEqual(t *testing.T) {
 		ExtraData:   []byte("OneOrTwoOrMaybeEvenThreeOrFour"),
 	}
 
-	if !(&block1.BlockHeader).Equal(&equalBlockHeader) {
-		t.FailNow()
-	}
+	assert.True(t, (&block1.BlockHeader).Equal(&equalBlockHeader))
 
 	block2 := NewTestBlock()
-	if (&block1.BlockHeader).Equal(&block2.BlockHeader) {
-		t.FailNow()
-	}
+	assert.False(t, (&block1.BlockHeader).Equal(&block2.BlockHeader))
 }

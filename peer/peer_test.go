@@ -10,6 +10,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
@@ -307,32 +308,19 @@ func TestSendBlock(t *testing.T) {
 	}
 
 	err := p.Push(push)
-	if err != nil {
-		t.FailNow()
-	}
+	assert.Nil(t, err)
 	payload, err := msg.Read(p.Connection)
-	if err != nil {
-		t.FailNow()
-	}
+	assert.Nil(t, err)
 
 	switch payload.(type) {
 	case *msg.Push:
 		receivedPush := payload.(*msg.Push)
-		if receivedPush.ResourceType != msg.ResourceBlock {
-			t.FailNow()
-		}
-		fmt.Println(receivedPush.Resource)
+		assert.Equal(t, receivedPush.ResourceType, msg.ResourceBlock)
 		blockBytes, err := json.Marshal(receivedPush.Resource)
-		if err != nil {
-			t.FailNow()
-		}
+		assert.Nil(t, err)
 		receivedBlock, err := blockchain.DecodeBlockJSON(blockBytes)
-		if err != nil {
-			t.FailNow()
-		}
-		if blockchain.HashSum(receivedBlock) != blockchain.HashSum(block) {
-			t.FailNow()
-		}
+		assert.Nil(t, err)
+		assert.Equal(t, blockchain.HashSum(receivedBlock), blockchain.HashSum(block))
 	default:
 		t.FailNow()
 	}

@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/peer"
+
 	"github.com/ubclaunchpad/cumulus/miner"
 
 	log "github.com/Sirupsen/logrus"
@@ -180,19 +183,76 @@ func TestHandleTransaction(t *testing.T) {
 	assert.Equal(t, len(a.transactionQueue), 0)
 }
 
-func TestMine(t *testing.T) {
+func TestRunMiner(t *testing.T) {
 	a := createNewTestApp()
-	if miner.IsMining() {
-		t.FailNow()
-	}
-	go a.Mine()
+	assert.False(t, miner.IsMining())
+	go a.RunMiner()
 	time.Sleep(time.Second)
-	if !miner.IsMining() {
-		t.FailNow()
-	}
+	assert.True(t, miner.IsMining())
+	a.RestartMiner()
+	time.Sleep(time.Second)
+	assert.True(t, miner.IsMining())
 	miner.StopMining()
-	time.Sleep(time.Second)
-	if miner.IsMining() {
-		t.FailNow()
+	assert.False(t, miner.IsMining())
+	a.RestartMiner()
+	assert.False(t, miner.IsMining())
+}
+
+func TestMakeBlockRequest(t *testing.T) {
+	bc := conn.NewBufConn(false, true)
+	a := createNewTestApp()
+	p := peer.New(bc, a.PeerStore, "")
+	a.PeerStore.Add(p)
+	done := make(chan bool, 1)
+
+	rh := func(res *msg.Response) {}
+	bc.OnWrite = func(b []byte) {
+		done <- true
 	}
+
+	err := a.makeBlockRequest(a.Chain.LastBlock(), rh)
+	assert.Nil(t, err)
+	assert.True(t, <-done)
+}
+
+func TestMakeBlockRequestNoPeers(t *testing.T) {
+	a := createNewTestApp()
+	rh := func(res *msg.Response) {}
+	err := a.makeBlockRequest(a.Chain.LastBlock(), rh)
+	assert.NotNil(t, err)
+}
+
+func TestHandleBlockResponse(t *testing.T) {
+	a := createNewTestApp()
+	newBlockChan := make(chan *blockchain.Block, 1)
+	errChan := make(chan *msg.ProtocolError, 1)
+	newBlockChan <- a.Chain.RollBack()
+	changed, upToDate := a.handleBlockResponse(newBlockChan, errChan)
+	assert.True(t, changed)
+	assert.False(t, upToDate)
+	newBlockChan <- a.Chain.Blocks[1]
+	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
+	assert.False(t, changed)
+	assert.False(t, upToDate)
+	errChan <- msg.NewProtocolError(msg.UpToDate, "")
+	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
+	assert.False(t, changed)
+	assert.True(t, upToDate)
+	errChan <- msg.NewProtocolError(msg.ResourceNotFound, "")
+	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
+	assert.True(t, changed)
+	assert.False(t, upToDate)
+	assert.Equal(t, len(a.Chain.Blocks), 1)
+}
+
+func TestHandleWork(t *testing.T) {
+	a := createNewTestApp()
+	go a.HandleWork()
+	a.blockQueue <- a.Chain.RollBack()
+	time.Sleep(time.Second)
+	assert.Equal(t, len(a.Chain.Blocks), 2)
+	a.quitChan <- true
+	a.blockQueue <- a.Chain.RollBack()
+	time.Sleep(time.Second)
+	assert.Equal(t, len(a.Chain.Blocks), 1)
 }

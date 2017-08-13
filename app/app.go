@@ -89,7 +89,7 @@ func Run(cfg conf.Config) {
 
 	if config.Mine {
 		// Start the miner
-		go a.Mine()
+		go a.RunMiner()
 	}
 
 	// Set Peer default Push and Request handlers. These functions will handle
@@ -238,7 +238,6 @@ func (a *App) PushHandler(push *msg.Push) {
 // createBlockchain returns a new instance of a blockchain with only a genesis
 // block.
 func createBlockchain(user *User) *blockchain.BlockChain {
-	// around on the internets for one.
 	bc := blockchain.BlockChain{
 		Blocks: make([]*blockchain.Block, 0),
 		Head:   blockchain.NilHash,
@@ -291,9 +290,8 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 		// The block was invalid wrt our chain. Maybe our chain is out of date.
 		// Update it and try again.
 		chainChanged, err := a.SyncBlockChain()
-		if chainChanged && miner.IsMining() {
-			miner.StopMining()
-			go a.Mine()
+		if chainChanged {
+			a.RestartMiner()
 		}
 		if err != nil {
 			log.WithError(err).Error("Error synchronizing blockchain")
@@ -310,19 +308,16 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	// Append to the chain before requesting the next block so that the block
 	// numbers make sense.
 	a.Chain.AppendBlock(blk)
-	if miner.IsMining() {
-		miner.StopMining()
-		go a.Mine()
-	}
+	a.RestartMiner()
 	log.Debug("Added block number %d to chain", blk.BlockNumber)
 	return
 }
 
-// Mine continuously pulls transactions form the transaction pool, uses them to
+// RunMiner continuously pulls transactions form the transaction pool, uses them to
 // create blocks, and mines those blocks. When a block is mined it is added
-// to the blockchain and broadcasted into the network. Mine() returns when
+// to the blockchain and broadcasted into the network. RunMiner() returns when
 // miner.StopMining() is called.
-func (a *App) Mine() {
+func (a *App) RunMiner() {
 	log.Info("Starting miner")
 	for {
 		// Make a new block form the transactions in the transaction pool
@@ -343,15 +338,22 @@ func (a *App) Mine() {
 	}
 }
 
+// RestartMiner restarts the miner only if it is running when this is called.
+func (a *App) RestartMiner() {
+	if miner.IsMining() {
+		miner.StopMining()
+		go a.RunMiner()
+	}
+}
+
 // SyncBlockChain updates the local copy of the blockchain by requesting missing
 // blocks from peers. Returns true if the blockchain changed as a result of
 // calling this function, false if it didn't and an error if we are not connected
 // to any peers.
 func (a *App) SyncBlockChain() (bool, error) {
-	var currentHeadHash blockchain.Hash
 	newBlockChan := make(chan *blockchain.Block)
 	errChan := make(chan *msg.ProtocolError)
-	changed := false
+	chainChanged := false
 
 	// Define a handler for responses to our block requests
 	blockResponseHandler := func(blockResponse *msg.Response) {
@@ -378,67 +380,92 @@ func (a *App) SyncBlockChain() (bool, error) {
 	// Continually request the block after the latest block in our chain until
 	// we are totally up to date
 	for {
-		currentHead := a.Chain.LastBlock()
-		if currentHead == nil {
-			// Our blockchain is empty
-			currentHeadHash = blockchain.NilHash
-		} else {
-			currentHeadHash = blockchain.HashSum(currentHead)
+		err := a.makeBlockRequest(a.Chain.LastBlock(), blockResponseHandler)
+		if err != nil {
+			if a.PeerStore.Size() == 0 {
+				// No peers to make the request to
+				return chainChanged, err
+			}
+			continue
 		}
-
-		reqParams := map[string]interface{}{
-			"lastBlockHash": currentHeadHash,
-		}
-
-		blockRequest := msg.Request{
-			ID:           uuid.New().String(),
-			ResourceType: msg.ResourceBlock,
-			Params:       reqParams,
-		}
-
-		// Pick a peer to send the request to
-		p := a.PeerStore.GetRandom()
-		if p == nil {
-			return changed, errors.New(
-				"SyncBlockchain failed: no peers to request blocks from")
-		}
-		p.Request(blockRequest, blockResponseHandler)
 
 		// Wait for response
-		select {
-		case newBlock := <-newBlockChan:
-			if newBlock == nil {
-				// We received a response with no error but an invalid resource
-				// Try again
-				log.Debug("Received block response with invalid resource")
-				continue
-			}
-
-			valid, validationCode := consensus.VerifyBlock(a.Chain, newBlock)
-			if !valid {
-				// There is something wrong with this block. Try again
-				fields := log.Fields{"validationCode": validationCode}
-				log.WithFields(fields).Debug("SyncBlockchain received invalid block")
-				continue
-			}
-
-			// Valid block. Append it to the chain
-			log.Debug("Adding block to blockchain")
-			a.Chain.AppendBlock(newBlock)
-			changed = true
-
-		case err := <-errChan:
-			if err.Code == msg.ResourceNotFound {
-				// Our chain might be out of sync, roll it back by one block
-				// and request the next block
-				a.Chain.RollBack()
-				changed = true
-			} else if err.Code == msg.UpToDate {
-				return changed, nil
-			}
-
-			// Some other protocol error occurred. Try again
-			log.WithError(err).Debug("SyncBlockChain received error response")
+		change, done := a.handleBlockResponse(newBlockChan, errChan)
+		if change {
+			chainChanged = true
 		}
+		if done {
+			return chainChanged, nil
+		}
+	}
+}
+
+// makeBlockRequest creates and sends a request to a random peer for the block
+// following the given block and returns an error if the request could not be
+// created or sent.
+func (a *App) makeBlockRequest(currentHead *blockchain.Block,
+	responseHandler peer.ResponseHandler) error {
+	// In case the blockchain is empty
+	currentHeadHash := blockchain.NilHash
+	if currentHead != nil {
+		currentHeadHash = blockchain.HashSum(currentHead)
+	}
+
+	reqParams := map[string]interface{}{
+		"lastBlockHash": currentHeadHash,
+	}
+
+	blockRequest := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourceBlock,
+		Params:       reqParams,
+	}
+
+	// Pick a peer to send the request to
+	p := a.PeerStore.GetRandom()
+	if p == nil {
+		return errors.New("SyncBlockchain failed: no peers to request blocks from")
+	}
+	return p.Request(blockRequest, responseHandler)
+}
+
+// handleBlockResponse receives a block or nil from the newBlockChan and attempts
+// to validate it and add it to the blockchain, or it handles a protocol error
+// from the errChan. Returns whether the blockchain was modified and wether we
+// received an UpToDate response.
+func (a *App) handleBlockResponse(newBlockChan chan *blockchain.Block,
+	errChan chan *msg.ProtocolError) (changed bool, upToDate bool) {
+	select {
+	case newBlock := <-newBlockChan:
+		if newBlock == nil {
+			// We received a response with no error but an invalid resource
+			// Try again
+			log.Debug("Received block response with invalid resource")
+			return false, false
+		}
+
+		valid, validationCode := consensus.VerifyBlock(a.Chain, newBlock)
+		if !valid {
+			// There is something wrong with this block. Try again
+			fields := log.Fields{"validationCode": validationCode}
+			log.WithFields(fields).Debug("SyncBlockchain received invalid block")
+			return false, false
+		}
+
+		// Valid block. Append it to the chain
+		log.Debug("Adding block to blockchain")
+		a.Chain.AppendBlock(newBlock)
+		return true, false
+
+	case err := <-errChan:
+		if err.Code == msg.ResourceNotFound {
+			// Our chain might be out of sync, roll it back by one block
+			// and request the next block
+			a.Chain.RollBack()
+			return true, false
+		} else if err.Code == msg.UpToDate {
+			return false, true
+		}
+		return false, false
 	}
 }
