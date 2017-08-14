@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"os/signal"
 	"sync"
@@ -14,7 +13,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ubclaunchpad/cumulus/blockchain"
-	"github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/consensus"
@@ -89,11 +87,6 @@ func Run(cfg conf.Config) {
 	// stream in. Kick off a worker to handle requests and pushes.
 	go a.HandleWork()
 
-	if config.Mine {
-		// Start the miner
-		go a.RunMiner()
-	}
-
 	// Set Peer default Push and Request handlers. These functions will handle
 	// request and push messages from all peers we connect to unless overridden
 	// for specific peers by calls like p.SetRequestHandler(someHandler)
@@ -144,6 +137,11 @@ func Run(cfg conf.Config) {
 		}
 		log.Info("Blockchain synchronization complete")
 	}
+
+	if config.Mine {
+		// Start the miner
+		go a.RunMiner()
+	}
 }
 
 // ConnectAndDiscover tries to connect to a target and discover its peers.
@@ -170,7 +168,7 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 	typeErr := msg.NewProtocolError(msg.InvalidResourceType,
 		"Invalid resource type")
 	notFoundErr := msg.NewProtocolError(msg.ResourceNotFound,
-		"Resource not found.")
+		"Resource not found")
 	badRequestErr := msg.NewProtocolError(msg.BadRequest,
 		"Bad request")
 	upToDateErr := msg.NewProtocolError(msg.UpToDate,
@@ -185,6 +183,7 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 		// Block is requested by block hash.
 		hashBytes, err := json.Marshal(req.Params["lastBlockHash"])
 		if err != nil {
+			log.Debug("Returning response with status code: BadRequest")
 			res.Error = badRequestErr
 			break
 		}
@@ -192,17 +191,21 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 		var hash blockchain.Hash
 		err = json.Unmarshal(hashBytes, &hash)
 		if err != nil {
+			log.Debug("Returning response with status code: BadRequest")
 			res.Error = badRequestErr
 			break
 		} else if len(a.Chain.Blocks) > 0 && hash == blockchain.HashSum(a.Chain.LastBlock()) {
+			log.Debug("Returning response with status code: UpToDate")
 			res.Error = upToDateErr
 			break
 		}
 
 		block, err := a.Chain.GetBlockByLastBlockHash(hash)
 		if err != nil {
+			log.Debug("Returning response with status code: ResourceNotFound")
 			res.Error = notFoundErr
 		} else {
+			log.Debug("Returning response with block")
 			res.Resource = block
 		}
 	default:
@@ -217,20 +220,26 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 func (a *App) PushHandler(push *msg.Push) {
 	switch push.ResourceType {
 	case msg.ResourceBlock:
-		blk, ok := push.Resource.(*blockchain.Block)
-		if ok {
-			log.Info("Adding block to work queue.")
-			a.blockQueue <- blk
-		} else {
-			log.Error("Could not cast resource to block.")
+		blockBytes, err := json.Marshal(push.Resource)
+		if err != nil {
+			return
 		}
+		block, err := blockchain.DecodeBlockJSON(blockBytes)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		log.Debug("Adding block to work queue")
+		a.blockQueue <- block
+
 	case msg.ResourceTransaction:
 		txn, ok := push.Resource.(*blockchain.Transaction)
 		if ok {
-			log.Info("Adding transaction to work queue.")
+			log.Debug("Adding transaction to work queue")
 			a.transactionQueue <- txn
 		} else {
-			log.Error("Could not cast resource to transaction.")
+			log.Error("Could not cast resource to transaction")
 		}
 	default:
 		// Invalid resource type. Ignore
@@ -245,12 +254,8 @@ func createBlockchain(user *User) *blockchain.BlockChain {
 		Head:   blockchain.NilHash,
 	}
 
-	// TODO: update when we have adjustable difficulty
-	target := new(big.Int).Div(constants.MaxTarget, big.NewInt(2<<24))
-	targetHash := blockchain.BigIntToHash(target)
-
 	genesisBlock := blockchain.Genesis(user.Wallet.Public(),
-		targetHash, consensus.StartingBlockReward, []byte{})
+		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
 
 	bc.AppendBlock(genesisBlock)
 	return &bc
@@ -264,7 +269,7 @@ func getLocalPool() *pool.Pool {
 
 // HandleWork continually collects new work from existing work channels.
 func (a *App) HandleWork() {
-	log.Debug("Worker waiting for work.")
+	log.Debug("Worker waiting for work")
 	for {
 		select {
 		case work := <-a.transactionQueue:
@@ -290,23 +295,33 @@ func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 // HandleBlock handles new instance of BlockWork.
 func (a *App) HandleBlock(blk *blockchain.Block) {
 	log.Info("Received new block")
-	validBlock := a.Pool.Update(blk, a.Chain)
 
+	if len(a.Chain.Blocks) > 0 && blk.BlockNumber < a.Chain.LastBlock().BlockNumber {
+		// We already have this block
+		return
+	}
+
+	validBlock := a.Pool.Update(blk, a.Chain)
 	if !validBlock {
 		// The block was invalid wrt our chain. Maybe our chain is out of date.
-		// Update it and try again.
+		// Update it and try again. Stop miner before we try to sync.
+		mining := miner.IsMining()
+		miner.StopMining()
 		chainChanged, err := a.SyncBlockChain()
-		if chainChanged {
-			a.RestartMiner()
-		}
 		if err != nil {
 			log.WithError(err).Error("Error synchronizing blockchain")
+			if chainChanged && mining {
+				a.RunMiner()
+			}
 			return
 		}
 
 		validBlock = a.Pool.Update(blk, a.Chain)
 		if !validBlock {
 			// Synchronizing our chain didn't help, the block is still invalid.
+			if chainChanged && mining {
+				a.RunMiner()
+			}
 			return
 		}
 	}
@@ -315,7 +330,8 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	// numbers make sense.
 	a.Chain.AppendBlock(blk)
 	a.RestartMiner()
-	log.Debug("Added block number %d to chain", blk.BlockNumber)
+	log.Debugf("Added block number %d to chain", blk.BlockNumber)
+	log.Debug("Chain length: ", len(a.Chain.Blocks))
 	return
 }
 
@@ -329,20 +345,20 @@ func (a *App) RunMiner() {
 		// Make a new block form the transactions in the transaction pool
 		blockToMine := a.Pool.NextBlock(a.Chain, a.CurrentUser.Wallet.Public(),
 			a.CurrentUser.BlockSize)
-		blockToMine.Target = a.Chain.Blocks[0].Target
 
 		// TODO: update this when we have adjustable difficulty
+		blockToMine.Target = consensus.CurrentTarget()
 		miningResult := miner.Mine(a.Chain, blockToMine)
 
 		if miningResult.Complete {
-			log.Info("Sucessfully mined a block!")
+			log.Info("Successfully mined a block!")
 			push := msg.Push{
 				ResourceType: msg.ResourceBlock,
 				Resource:     blockToMine,
 			}
 			a.PeerStore.Broadcast(push)
 		} else if miningResult.Info == miner.MiningHalted {
-			log.Info("Miner stopped.")
+			log.Info("Miner stopped")
 			return
 		}
 	}
@@ -463,7 +479,8 @@ func (a *App) handleBlockResponse(newBlockChan chan *blockchain.Block,
 		}
 
 		// Valid block. Append it to the chain
-		log.Debug("Adding block to blockchain")
+		log.Debugf("Adding block %d to blockchain", newBlock.BlockNumber)
+		log.Debug("Blockchain length: ", len(a.Chain.Blocks))
 		a.Chain.AppendBlock(newBlock)
 		return true, false
 
@@ -471,11 +488,14 @@ func (a *App) handleBlockResponse(newBlockChan chan *blockchain.Block,
 		if err.Code == msg.ResourceNotFound {
 			// Our chain might be out of sync, roll it back by one block
 			// and request the next block
+			log.Debug("Received response with status code: ResourceNotFound")
 			a.Chain.RollBack()
 			return true, false
 		} else if err.Code == msg.UpToDate {
+			log.Debug("Received response with status code: UpToDate")
 			return false, true
 		}
+		log.Debug("Received response with unexpected status code: ", err.Code)
 		return false, false
 	}
 }

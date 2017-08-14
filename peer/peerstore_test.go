@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
@@ -155,16 +155,16 @@ func TestSetDefaultPushHandler(t *testing.T) {
 }
 
 func TestConnectionHandler(t *testing.T) {
-	req := msg.Request{
-		ID:           uuid.New().String(),
+	push := msg.Push{
 		ResourceType: msg.ResourcePeerInfo,
+		Resource:     "127.0.0.1:8000",
 	}
-	requestPayloadBytes, _ := json.Marshal(req)
-	requestMsg := msg.Message{
-		Type:    msg.RequestMessage,
-		Payload: requestPayloadBytes,
+	pushPayloadBytes, _ := json.Marshal(push)
+	pushMsg := msg.Message{
+		Type:    msg.PushMessage,
+		Payload: pushPayloadBytes,
 	}
-	requestBytes, _ := json.Marshal(requestMsg)
+	pushBytes, _ := json.Marshal(pushMsg)
 	readChan := make(chan []byte)
 	writeChan := make(chan []byte)
 
@@ -184,52 +184,28 @@ func TestConnectionHandler(t *testing.T) {
 		connectionHandlerDone <- true
 	}()
 
-	receivedRequest := false
-	receivedResponse := false
+	receivedPush := false
 
-	for !receivedRequest || !receivedResponse {
+	for !receivedPush {
 		select {
 		case receivedMsg := <-writeChan:
 			var message msg.Message
-			var request msg.Request
-			var response msg.Response
+			var push msg.Push
 
 			json.Unmarshal(receivedMsg, &message)
 
 			switch message.Type {
-			case msg.RequestMessage:
-				err := json.Unmarshal([]byte(message.Payload), &request)
-				if err != nil {
-					panic(err)
-				}
-				receivedRequest = true
-				readChan <- requestBytes
-			case msg.ResponseMessage:
-				err := json.Unmarshal([]byte(message.Payload), &response)
-				if err != nil {
-					panic(err)
-				}
-				receivedResponse = true
-
-				res := msg.Response{
-					ID:       request.ID,
-					Resource: "127.0.0.1:8000",
-				}
-				resBytes, _ := json.Marshal(res)
-				responseMsg := msg.Message{
-					Type:    msg.ResponseMessage,
-					Payload: resBytes,
-				}
-				responseBytes, _ := json.Marshal(responseMsg)
-				readChan <- responseBytes
+			case msg.PushMessage:
+				err := json.Unmarshal([]byte(message.Payload), &push)
+				assert.Nil(t, err)
+				receivedPush = true
+				readChan <- pushBytes
 			}
 		}
 	}
 
 	select {
 	case <-connectionHandlerDone:
-		if ps.Get("127.0.0.1:8000") == nil {
-			t.Fail()
-		}
+		assert.NotNil(t, ps.Get("127.0.0.1:8000"))
 	}
 }

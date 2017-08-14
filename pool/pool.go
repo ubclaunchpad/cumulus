@@ -150,8 +150,7 @@ func (p *Pool) NextBlock(chain *blockchain.BlockChain,
 	var txns []*blockchain.Transaction
 
 	// Hash the last block in the chain.
-	ix := len(chain.Blocks) - 1
-	lastHash := blockchain.HashSum(chain.Blocks[ix])
+	lastHash := blockchain.HashSum(chain.LastBlock())
 
 	// Build a new block for mining.
 	b := &blockchain.Block{

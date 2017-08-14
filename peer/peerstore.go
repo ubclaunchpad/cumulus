@@ -8,7 +8,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/google/uuid"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -68,22 +67,22 @@ func (ps *PeerStore) exchangeListenAddrs(c net.Conn, d time.Duration) (string, e
 	addrChan := make(chan string)
 	errChan := make(chan error)
 
-	req := msg.Request{
-		ID:           uuid.New().String(),
+	push := msg.Push{
 		ResourceType: msg.ResourcePeerInfo,
+		Resource:     ps.ListenAddr,
 	}
-	err := req.Write(c)
+	err := push.Write(c)
 	if err != nil {
 		return "", err
 	}
 
-	// Wait for peer to request our listen address and send us its listen address.
+	// Wait for peer to send us it's listen addr
 	go func() {
 		receivedAddr := false
-		sentAddr := false
 		var addr string
+		var ok bool
 
-		for !receivedAddr || !sentAddr {
+		for !receivedAddr {
 			time.Sleep(MessageWaitTime)
 
 			message, err := msg.Read(c)
@@ -94,31 +93,12 @@ func (ps *PeerStore) exchangeListenAddrs(c net.Conn, d time.Duration) (string, e
 			}
 
 			switch message.(type) {
-			case *msg.Response:
-				// We got the listen address back
-				var ok bool
-				addr, ok = message.(*msg.Response).Resource.(string)
+			case *msg.Push:
+				addr, ok = message.(*msg.Push).Resource.(string)
 				if !ok {
 					continue
 				}
-				if validAddress(addr) || addr != ps.ListenAddr {
-					receivedAddr = true
-				}
-			case *msg.Request:
-				if message.(*msg.Request).ResourceType != msg.ResourcePeerInfo {
-					continue
-				}
-				// We got a listen address request.
-				// Send the remote peer our listen address
-				res := &msg.Response{
-					ID:       uuid.New().String(),
-					Resource: ps.ListenAddr,
-				}
-				err = res.Write(c)
-				if err != nil {
-					errChan <- err
-				}
-				sentAddr = true
+				receivedAddr = true
 			}
 		}
 
@@ -223,7 +203,6 @@ func (ps *PeerStore) PeerInfoHandler(res *msg.Response) {
 		peers = append(peers, p)
 	}
 
-	log.Debugf("Found peers %s", peers)
 	for i := 0; i < len(peers) && ps.Size() < MaxPeers; i++ {
 		addr, ok := peers[i].(string)
 		if !ok {
