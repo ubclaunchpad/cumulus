@@ -40,9 +40,17 @@ func DecodeBlockChain(r io.Reader) *BlockChain {
 
 // AppendBlock adds a block to the end of the block chain.
 func (bc *BlockChain) AppendBlock(b *Block) {
-	b.BlockNumber = uint32(len(bc.Blocks))
-	b.LastBlock = HashSum(bc.Blocks[b.BlockNumber-1])
 	bc.Blocks = append(bc.Blocks, b)
+	bc.Head = HashSum(b)
+}
+
+// LastBlock returns a pointer to the last block in the given blockchain, or nil
+// if the blockchain is empty.
+func (bc *BlockChain) LastBlock() *Block {
+	if len(bc.Blocks) == 0 {
+		return nil
+	}
+	return bc.Blocks[len(bc.Blocks)-1]
 }
 
 // GetInputTransaction returns the input Transaction to t. If the input does
@@ -69,14 +77,31 @@ func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (b
 	return false, 0, 0
 }
 
-// CopyLocalBlockByIndex returns a copy of a block in the local chain by index.
-func (bc *BlockChain) CopyBlockByIndex(i uint32) (*Block, error) {
-	if i >= 0 && i < uint32(len(bc.Blocks)) {
-		blk := bc.Blocks[i]
-		b := *blk
-		b.Transactions = make([]*Transaction, len(blk.Transactions))
-		copy(b.Transactions, blk.Transactions)
-		return &b, nil
+// GetBlockByLastBlockHash returns a copy of the block in the local chain that
+// comes directly after the block with the given hash. Returns error if no such
+// block is found.
+func (bc *BlockChain) GetBlockByLastBlockHash(hash Hash) (*Block, error) {
+	// Find the block with the given hash
+	for _, block := range bc.Blocks {
+		if block.LastBlock == hash {
+			return block, nil
+		}
 	}
-	return nil, errors.New("block request out of bounds")
+	return nil, errors.New("No such block")
+}
+
+// RollBack removes the last block from the blockchain. Returns the block that
+// was removed from the end of the chain, or nil if the blockchain is empty.
+func (bc *BlockChain) RollBack() *Block {
+	if len(bc.Blocks) == 0 {
+		return nil
+	}
+	prevHead := bc.LastBlock()
+	bc.Blocks = bc.Blocks[:len(bc.Blocks)-1]
+	if len(bc.Blocks) == 0 {
+		bc.Head = NilHash
+	} else {
+		bc.Head = HashSum(bc.LastBlock())
+	}
+	return prevHead
 }

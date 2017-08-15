@@ -1,20 +1,20 @@
 package blockchain
 
 import (
-	"bytes"
+	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
-func TestEncodeDecodeBlock(t *testing.T) {
+func TestEncodeDecodeBlockJSON(t *testing.T) {
 	b1 := NewTestBlock()
-
-	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
-
-	b1.Encode(buf)
-	b2 := DecodeBlock(buf)
-
+	b1Bytes, err := json.Marshal(b1)
+	b2, err := DecodeBlockJSON(b1Bytes)
+	if err != nil {
+		t.FailNow()
+	}
 	if HashSum(b1) != HashSum(b2) {
 		t.Fail()
 	}
@@ -58,4 +58,23 @@ func TestBlockHeaderLen(t *testing.T) {
 	if bh.Len() != len {
 		t.Fail()
 	}
+}
+
+func TestEqual(t *testing.T) {
+	block1 := NewTestBlock()
+	assert.True(t, (&block1.BlockHeader).Equal(&block1.BlockHeader))
+
+	equalBlockHeader := BlockHeader{
+		BlockNumber: block1.BlockNumber,
+		LastBlock:   block1.LastBlock,
+		Target:      block1.Target,
+		Time:        block1.Time,
+		Nonce:       block1.Nonce,
+		ExtraData:   []byte("OneOrTwoOrMaybeEvenThreeOrFour"),
+	}
+
+	assert.True(t, (&block1.BlockHeader).Equal(&equalBlockHeader))
+
+	block2 := NewTestBlock()
+	assert.False(t, (&block1.BlockHeader).Equal(&block2.BlockHeader))
 }

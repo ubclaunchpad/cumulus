@@ -1,13 +1,18 @@
 package peer
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"testing"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/msg"
 )
 
@@ -45,31 +50,7 @@ var (
 		"19.253.228.59", "195.118.45.237", "159.78.10.205", "206.31.54.66",
 		"31.191.153.165", "130.235.208.32", "130.5.207.98", "5.226.180.24",
 	}
-
-	peerStore PeerStore
 )
-
-// fakeConn implements net.Conn
-type fakeConn struct {
-	Addr net.Addr
-}
-
-func (fc fakeConn) Read(b []byte) (n int, err error)   { return 0, nil }
-func (fc fakeConn) Write(b []byte) (n int, err error)  { return 0, nil }
-func (fc fakeConn) Close() error                       { return nil }
-func (fc fakeConn) LocalAddr() net.Addr                { return fc.Addr }
-func (fc fakeConn) RemoteAddr() net.Addr               { return fc.Addr }
-func (fc fakeConn) SetDeadline(t time.Time) error      { return nil }
-func (fc fakeConn) SetReadDeadline(t time.Time) error  { return nil }
-func (fc fakeConn) SetWriteDeadline(t time.Time) error { return nil }
-
-// fakeAddr implementes net.Addr
-type fakeAddr struct {
-	Addr string
-}
-
-func (fa fakeAddr) Network() string { return fa.Addr }
-func (fa fakeAddr) String() string  { return fa.Addr }
 
 func inList(item string, list []string) bool {
 	for _, listItem := range list {
@@ -87,120 +68,12 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// This will error if there are concurrent accesses to the PeerStore, or error
-// if an atomic operation returns un unexpected result.
-func TestConcurrentPeerStore(t *testing.T) {
-	ps := NewPeerStore("")
-
-	resChan1 := make(chan bool)
-	resChan2 := make(chan bool)
-
-	// Asynchronously add and find peers
-	go func() {
-		var fa net.Addr
-		var fc net.Conn
-		for _, addr := range addrs2 {
-			fa = fakeAddr{Addr: addr}
-			fc = fakeConn{Addr: fa}
-			ps.Add(New(fc, ps, addr))
-			p := ps.Get(addr)
-			if p.ListenAddr != addr {
-				resChan1 <- false
-			}
-		}
-		resChan1 <- true
-	}()
-
-	// Asynchronously add and remove peers
-	go func() {
-		var fa net.Addr
-		var fc net.Conn
-		for _, addr := range addrs1 {
-			fa = fakeAddr{Addr: addr}
-			fc = fakeConn{Addr: fa}
-			ps.Add(New(fc, ps, addr))
-			ps.Remove(addr)
-		}
-		resChan2 <- true
-	}()
-
-	returnCount := 0
-	for returnCount != 2 {
-		select {
-		case res1 := <-resChan1:
-			if !res1 {
-				t.FailNow()
-			}
-			returnCount++
-		case res2 := <-resChan2:
-			if !res2 {
-				t.FailNow()
-			}
-			returnCount++
-		}
-	}
-
-	if ps.Size() != len(addrs2) {
-		t.FailNow()
-	}
-
-	for i := 0; i < len(addrs2); i++ {
-		p := ps.Get(addrs2[i])
-		if p == nil {
-			t.FailNow()
-		}
-		ps.Remove(addrs2[i])
-	}
-
-	if ps.Size() != 0 {
-		t.FailNow()
-	}
-}
-
-func TestRemoveRandom(t *testing.T) {
-	var fa fakeAddr
-	var fc fakeConn
-	ps := NewPeerStore("")
-	for _, addr := range addrs1 {
-		fa = fakeAddr{Addr: addr}
-		fc = fakeConn{Addr: fa}
-		ps.Add(New(fc, ps, addr))
-	}
-
-	for i := ps.Size(); i > 0; i-- {
-		ps.RemoveRandom()
-		if ps.Size() != i-1 {
-			t.FailNow()
-		}
-	}
-}
-
-func TestAddrs(t *testing.T) {
-	var fa fakeAddr
-	var fc fakeConn
-	ps := NewPeerStore("")
-	for _, addr := range addrs1 {
-		fa = fakeAddr{Addr: addr}
-		fc = fakeConn{Addr: fa}
-		ps.Add(New(fc, ps, addr))
-	}
-
-	addrs := ps.Addrs()
-	for _, addr := range addrs {
-		if !inList(addr, addrs1) {
-			t.FailNow()
-		}
-	}
-}
-
 func TestSetRequestHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
+	fa := conn.TestAddr{Addr: "127.0.0.1"}
+	bc := conn.NewBufConn(false, false)
 	ps := NewPeerStore("")
 
-	p := New(fc, ps, fa.String())
+	p := New(bc, ps, fa.String())
 	if p.requestHandler != nil {
 		t.FailNow()
 	}
@@ -218,20 +91,18 @@ func TestSetRequestHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, ps, fa.String())
+	p2 := New(bc, ps, fa.String())
 	if p2.requestHandler != nil {
 		t.FailNow()
 	}
 }
 
 func TestSetPushHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
+	fa := conn.TestAddr{Addr: "127.0.0.1"}
+	bc := conn.NewBufConn(false, false)
 	ps := NewPeerStore("")
 
-	p := New(fc, ps, fa.String())
+	p := New(bc, ps, fa.String())
 	if p.pushHandler != nil {
 		t.FailNow()
 	}
@@ -244,65 +115,213 @@ func TestSetPushHandler(t *testing.T) {
 		t.FailNow()
 	}
 
-	p2 := New(fc, ps, fa.String())
+	p2 := New(bc, ps, fa.String())
 	if p2.pushHandler != nil {
 		t.FailNow()
 	}
 }
 
-func TestSetDefaultRequestHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
-	ps := NewPeerStore("")
+func TestRequestTimeout(t *testing.T) {
+	bc := conn.NewBufConn(false, false)
 
-	p := New(fc, ps, fa.String())
-	if p.requestHandler != nil {
-		t.FailNow()
+	ps := NewPeerStore("")
+	p := New(bc, ps, "")
+	responseChan := make(chan *msg.Response)
+
+	responseHandler := func(res *msg.Response) {
+		responseChan <- res
 	}
 
-	rh := func(req *msg.Request) msg.Response {
-		return msg.Response{
-			ID:       "heyyou",
-			Resource: "i can see you",
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+
+	p.Request(req, responseHandler)
+	select {
+	case res := <-responseChan:
+		if res.Error == nil || res.Error.Code != msg.RequestTimeout {
+			t.Fail()
 		}
 	}
 
-	ps.SetDefaultRequestHandler(rh)
-
-	if p.requestHandler != nil {
-		t.FailNow()
-	}
-
-	p2 := New(fc, ps, fa.String())
-	if p2.requestHandler == nil {
-		t.FailNow()
+	if p.getResponseHandler(req.ID) != nil {
+		t.Fail()
 	}
 }
 
-func TestSetDefaultPushHandler(t *testing.T) {
-	var fa net.Addr
-	var fc net.Conn
-	fa = fakeAddr{Addr: "127.0.0.1"}
-	fc = fakeConn{Addr: fa}
+func TestValidAddress(t *testing.T) {
+	if !validAddress("124.53.12.53:8080") {
+		t.Fail()
+	} else if validAddress("132.76.211.0:333") {
+		t.Fail()
+	} else if validAddress("400.12.43.1:8080") {
+		t.Fail()
+	} else if validAddress("222.12.43.1:12") {
+		t.Fail()
+	} else if validAddress("222.12.43.1") {
+		t.Fail()
+	} else if validAddress("lksdjfliosrut8r") {
+		t.Fail()
+	} else if validAddress("") {
+		t.Fail()
+	}
+}
+
+func TestResponse(t *testing.T) {
+	responseChan := make(chan *msg.Response)
+	bc := conn.NewBufConn(true, false)
+
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+
+	response := msg.Response{
+		ID:       req.ID,
+		Resource: "HI!",
+	}
+
+	responsePayloadBytes, _ := json.Marshal(response)
+	responseMsg := msg.Message{
+		Type:    msg.ResponseMessage,
+		Payload: responsePayloadBytes,
+	}
+	responseBytes, err := json.Marshal(responseMsg)
+	if err != nil {
+		t.FailNow()
+	}
+	bc.Buf = bytes.NewBuffer(responseBytes)
+
 	ps := NewPeerStore("")
+	p := New(bc, ps, "")
 
+	responseHandler := func(res *msg.Response) {
+		responseChan <- res
+	}
+
+	go p.Dispatch()
+
+	err = p.Request(req, responseHandler)
+	if err != nil {
+		t.FailNow()
+	}
+
+	select {
+	case res := <-responseChan:
+		if res.ID != req.ID {
+			t.FailNow()
+		} else if res.Resource.(string) != "HI!" {
+			t.FailNow()
+		}
+	}
+}
+
+func TestPush(t *testing.T) {
+	pushChan := make(chan *msg.Push)
+	bc := conn.NewBufConn(false, false)
+
+	push := msg.Push{
+		ResourceType: msg.ResourceTransaction,
+		Resource:     "HEY!",
+	}
+
+	pushPayloadBytes, _ := json.Marshal(push)
+
+	pushMsg := msg.Message{
+		Type:    msg.PushMessage,
+		Payload: pushPayloadBytes,
+	}
+
+	pushBytes, _ := json.Marshal(pushMsg)
+	bc.Buf = bytes.NewBuffer(pushBytes)
+
+	ps := NewPeerStore("")
+	p := New(bc, ps, "")
+
+	p.SetPushHandler(func(push *msg.Push) {
+		pushChan <- push
+	})
+
+	go p.Dispatch()
+
+	select {
+	case push := <-pushChan:
+		if push.ResourceType != msg.ResourceTransaction ||
+			push.Resource.(string) != "HEY!" {
+			t.FailNow()
+		}
+	}
+}
+
+func TestRequest(t *testing.T) {
+	requestChan := make(chan *msg.Request)
+	bc := conn.NewBufConn(false, false)
+
+	req := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourcePeerInfo,
+	}
+
+	requestPayloadBytes, _ := json.Marshal(req)
+
+	requestMsg := msg.Message{
+		Type:    msg.RequestMessage,
+		Payload: requestPayloadBytes,
+	}
+
+	requestBytes, _ := json.Marshal(requestMsg)
+	bc.Buf = bytes.NewBuffer(requestBytes)
+
+	ps := NewPeerStore("")
+	p := New(bc, ps, "")
+
+	p.SetRequestHandler(func(req *msg.Request) msg.Response {
+		requestChan <- req
+		return msg.Response{}
+	})
+
+	go p.Dispatch()
+
+	select {
+	case request := <-requestChan:
+		if request.ResourceType != msg.ResourcePeerInfo ||
+			request.ID != req.ID {
+			t.FailNow()
+		}
+	}
+}
+
+func TestSendBlock(t *testing.T) {
+	fa := conn.TestAddr{Addr: "127.0.0.1"}
+
+	var fc net.Conn
+	fc = conn.NewBufConn(false, false)
+	ps := NewPeerStore("")
 	p := New(fc, ps, fa.String())
-	if p.pushHandler != nil {
-		t.FailNow()
+
+	block := blockchain.NewTestBlock()
+
+	push := msg.Push{
+		ResourceType: msg.ResourceBlock,
+		Resource:     block,
 	}
 
-	ph := func(req *msg.Push) {}
+	err := p.Push(push)
+	assert.Nil(t, err)
+	payload, err := msg.Read(p.Connection)
+	assert.Nil(t, err)
 
-	ps.SetDefaultPushHandler(ph)
-
-	if p.pushHandler != nil {
-		t.FailNow()
-	}
-
-	p2 := New(fc, ps, fa.String())
-	if p2.pushHandler == nil {
+	switch payload.(type) {
+	case *msg.Push:
+		receivedPush := payload.(*msg.Push)
+		assert.Equal(t, receivedPush.ResourceType, msg.ResourceBlock)
+		blockBytes, err := json.Marshal(receivedPush.Resource)
+		assert.Nil(t, err)
+		receivedBlock, err := blockchain.DecodeBlockJSON(blockBytes)
+		assert.Nil(t, err)
+		assert.Equal(t, blockchain.HashSum(receivedBlock), blockchain.HashSum(block))
+	default:
 		t.FailNow()
 	}
 }

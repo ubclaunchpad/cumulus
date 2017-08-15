@@ -1,6 +1,8 @@
 package app
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -13,6 +15,7 @@ import (
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/conf"
 	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/consensus"
 	"github.com/ubclaunchpad/cumulus/miner"
 	"github.com/ubclaunchpad/cumulus/msg"
 	"github.com/ubclaunchpad/cumulus/peer"
@@ -20,10 +23,7 @@ import (
 )
 
 var (
-	logFile          = os.Stdout
-	blockQueue       = make(chan *blockchain.Block, blockQueueSize)
-	transactionQueue = make(chan *blockchain.Transaction, transactionQueueSize)
-	quitChan         = make(chan bool)
+	logFile = os.Stdout
 )
 
 const (
@@ -33,10 +33,13 @@ const (
 
 // App contains information about a running instance of a Cumulus node
 type App struct {
-	CurrentUser *User
-	PeerStore   *peer.PeerStore
-	Chain       *blockchain.BlockChain
-	Pool        *pool.Pool
+	CurrentUser      *User
+	PeerStore        *peer.PeerStore
+	Chain            *blockchain.BlockChain
+	Pool             *pool.Pool
+	blockQueue       chan *blockchain.Block
+	transactionQueue chan *blockchain.Transaction
+	quitChan         chan bool
 }
 
 // Run sets up and starts a new Cumulus node with the
@@ -46,11 +49,15 @@ func Run(cfg conf.Config) {
 	config := &cfg
 
 	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
+	user := getCurrentUser()
 	a := App{
-		PeerStore:   peer.NewPeerStore(addr),
-		CurrentUser: getCurrentUser(),
-		Chain:       getLocalChain(),
-		Pool:        getLocalPool(),
+		PeerStore:        peer.NewPeerStore(addr),
+		CurrentUser:      user,
+		Chain:            createBlockchain(user),
+		Pool:             getLocalPool(),
+		blockQueue:       make(chan *blockchain.Block, blockQueueSize),
+		transactionQueue: make(chan *blockchain.Transaction, transactionQueueSize),
+		quitChan:         make(chan bool),
 	}
 
 	// Set logging level
@@ -121,6 +128,19 @@ func Run(cfg conf.Config) {
 	if len(config.Target) > 0 {
 		// Connect to the target and discover its peers.
 		a.ConnectAndDiscover(cfg.Target)
+
+		// Download blockchain
+		log.Info("Syncronizing blockchain")
+		_, err := a.SyncBlockChain()
+		if err != nil {
+			log.WithError(err).Fatal("Failed to download blockchain")
+		}
+		log.Info("Blockchain synchronization complete")
+	}
+
+	if config.Mine {
+		// Start the miner
+		go a.RunMiner()
 	}
 }
 
@@ -148,30 +168,47 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 	typeErr := msg.NewProtocolError(msg.InvalidResourceType,
 		"Invalid resource type")
 	notFoundErr := msg.NewProtocolError(msg.ResourceNotFound,
-		"Resource not found.")
+		"Resource not found")
+	badRequestErr := msg.NewProtocolError(msg.BadRequest,
+		"Bad request")
+	upToDateErr := msg.NewProtocolError(msg.UpToDate,
+		"The requested block has not yet been mined")
 
 	switch req.ResourceType {
 	case msg.ResourcePeerInfo:
 		res.Resource = a.PeerStore.Addrs()
 	case msg.ResourceBlock:
-		// Block is requested by number.
-		blockNumber, ok := req.Params["blockNumber"].(uint32)
-		if ok {
-			// If its ok, we make try to a copy of it.
-			// TODO: Make this CopyBlockByHash.
-			blk, err := a.Chain.CopyBlockByIndex(blockNumber)
-			if err != nil {
-				// Bad index parameter.
-				res.Error = notFoundErr
-			} else {
-				res.Resource = blk
-			}
-		} else {
-			// No index parameter.
+		log.Debug("Received block request")
+
+		// Block is requested by block hash.
+		hashBytes, err := json.Marshal(req.Params["lastBlockHash"])
+		if err != nil {
+			log.Debug("Returning response with status code: BadRequest")
+			res.Error = badRequestErr
+			break
+		}
+
+		var hash blockchain.Hash
+		err = json.Unmarshal(hashBytes, &hash)
+		if err != nil {
+			log.Debug("Returning response with status code: BadRequest")
+			res.Error = badRequestErr
+			break
+		} else if len(a.Chain.Blocks) > 0 && hash == blockchain.HashSum(a.Chain.LastBlock()) {
+			log.Debug("Returning response with status code: UpToDate")
+			res.Error = upToDateErr
+			break
+		}
+
+		block, err := a.Chain.GetBlockByLastBlockHash(hash)
+		if err != nil {
+			log.Debug("Returning response with status code: ResourceNotFound")
 			res.Error = notFoundErr
+		} else {
+			log.Debug("Returning response with block")
+			res.Resource = block
 		}
 	default:
-		// Return err by default.
 		res.Error = typeErr
 	}
 
@@ -183,32 +220,45 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 func (a *App) PushHandler(push *msg.Push) {
 	switch push.ResourceType {
 	case msg.ResourceBlock:
-		blk, ok := push.Resource.(*blockchain.Block)
-		if ok {
-			log.Info("Adding block to work queue.")
-			blockQueue <- blk
-		} else {
-			log.Error("Could not cast resource to block.")
+		blockBytes, err := json.Marshal(push.Resource)
+		if err != nil {
+			return
 		}
+		block, err := blockchain.DecodeBlockJSON(blockBytes)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		log.Debug("Adding block to work queue")
+		a.blockQueue <- block
+
 	case msg.ResourceTransaction:
 		txn, ok := push.Resource.(*blockchain.Transaction)
 		if ok {
-			log.Info("Adding transaction to work queue.")
-			transactionQueue <- txn
+			log.Debug("Adding transaction to work queue")
+			a.transactionQueue <- txn
 		} else {
-			log.Error("Could not cast resource to transaction.")
+			log.Error("Could not cast resource to transaction")
 		}
 	default:
 		// Invalid resource type. Ignore
 	}
 }
 
-// getLocalChain returns an instance of the blockchain.
-func getLocalChain() *blockchain.BlockChain {
-	// TODO: Look for local chain on disk. If doesn't exist, go rummaging
-	// around on the internets for one.
-	bc, _ := blockchain.NewValidTestChainAndBlock()
-	return bc
+// createBlockchain returns a new instance of a blockchain with only a genesis
+// block.
+func createBlockchain(user *User) *blockchain.BlockChain {
+	bc := blockchain.BlockChain{
+		Blocks: make([]*blockchain.Block, 0),
+		Head:   blockchain.NilHash,
+	}
+
+	genesisBlock := blockchain.Genesis(user.Wallet.Public(),
+		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
+
+	bc.AppendBlock(genesisBlock)
+	return &bc
 }
 
 // getLocalPool returns an instance of the pool.
@@ -219,14 +269,14 @@ func getLocalPool() *pool.Pool {
 
 // HandleWork continually collects new work from existing work channels.
 func (a *App) HandleWork() {
-	log.Debug("Worker waiting for work.")
+	log.Debug("Worker waiting for work")
 	for {
 		select {
-		case work := <-transactionQueue:
+		case work := <-a.transactionQueue:
 			a.HandleTransaction(work)
-		case work := <-blockQueue:
+		case work := <-a.blockQueue:
 			a.HandleBlock(work)
-		case <-quitChan:
+		case <-a.quitChan:
 			return
 		}
 	}
@@ -236,32 +286,216 @@ func (a *App) HandleWork() {
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 	validTransaction := a.Pool.Push(txn, a.Chain)
 	if validTransaction {
-		log.Debug("added transaction to pool from address: " + txn.Sender.Repr())
+		log.Debug("Added transaction to pool from address: " + txn.Sender.Repr())
 	} else {
-		log.Debug("bad transaction rejected from sender: " + txn.Sender.Repr())
+		log.Debug("Bad transaction rejected from sender: " + txn.Sender.Repr())
 	}
 }
 
 // HandleBlock handles new instance of BlockWork.
 func (a *App) HandleBlock(blk *blockchain.Block) {
+	log.Info("Received new block")
+
+	if len(a.Chain.Blocks) > 0 && blk.BlockNumber < a.Chain.LastBlock().BlockNumber {
+		// We already have this block
+		return
+	}
+
 	validBlock := a.Pool.Update(blk, a.Chain)
-
-	if validBlock {
-		// Append to the chain before requesting
-		// the next block so that the block
-		// numbers make sense.
-		a.Chain.AppendBlock(blk)
-
-		// Drop pending transactions (if they occur in this block).
-		a.CurrentUser.Wallet.DropAllPending(blk.Transactions)
-
-		// Handle miner behaviour (set up a new block).
-		if miner.IsMining() {
-			address := a.CurrentUser.Wallet.Public()
-			blk := a.Pool.NextBlock(a.Chain, address, a.CurrentUser.BlockSize)
-			miner.RestartMiner(a.Chain, blk)
+	if !validBlock {
+		// The block was invalid wrt our chain. Maybe our chain is out of date.
+		// Update it and try again. Stop miner before we try to sync.
+		mining := miner.IsMining()
+		miner.StopMining()
+		chainChanged, err := a.SyncBlockChain()
+		if err != nil {
+			log.WithError(err).Error("Error synchronizing blockchain")
+			if chainChanged && mining {
+				a.RunMiner()
+			}
+			return
 		}
 
-		log.Debug("added blk number %d to chain", blk.BlockNumber)
+		validBlock = a.Pool.Update(blk, a.Chain)
+		if !validBlock {
+			// Synchronizing our chain didn't help, the block is still invalid.
+			if chainChanged && mining {
+				a.RunMiner()
+			}
+			return
+		}
+	}
+
+	// Append to the chain before requesting the next block so that the block
+	// numbers make sense.
+	a.Chain.AppendBlock(blk)
+	a.RestartMiner()
+	log.Debugf("Added block number %d to chain", blk.BlockNumber)
+	log.Debug("Chain length: ", len(a.Chain.Blocks))
+	return
+}
+
+// RunMiner continuously pulls transactions form the transaction pool, uses them to
+// create blocks, and mines those blocks. When a block is mined it is added
+// to the blockchain and broadcasted into the network. RunMiner() returns when
+// miner.StopMining() is called.
+func (a *App) RunMiner() {
+	log.Info("Starting miner")
+	for {
+		// Make a new block form the transactions in the transaction pool
+		blockToMine := a.Pool.NextBlock(a.Chain, a.CurrentUser.Wallet.Public(),
+			a.CurrentUser.BlockSize)
+
+		// TODO: update this when we have adjustable difficulty
+		blockToMine.Target = consensus.CurrentTarget()
+		miningResult := miner.Mine(a.Chain, blockToMine)
+
+		if miningResult.Complete {
+			log.Info("Successfully mined a block!")
+			push := msg.Push{
+				ResourceType: msg.ResourceBlock,
+				Resource:     blockToMine,
+			}
+			a.PeerStore.Broadcast(push)
+		} else if miningResult.Info == miner.MiningHalted {
+			log.Info("Miner stopped")
+			return
+		}
+	}
+}
+
+// RestartMiner restarts the miner only if it is running when this is called.
+func (a *App) RestartMiner() {
+	if miner.IsMining() {
+		miner.StopMining()
+		go a.RunMiner()
+	}
+}
+
+// SyncBlockChain updates the local copy of the blockchain by requesting missing
+// blocks from peers. Returns true if the blockchain changed as a result of
+// calling this function, false if it didn't and an error if we are not connected
+// to any peers.
+func (a *App) SyncBlockChain() (bool, error) {
+	newBlockChan := make(chan *blockchain.Block)
+	errChan := make(chan *msg.ProtocolError)
+	chainChanged := false
+
+	// Define a handler for responses to our block requests
+	blockResponseHandler := func(blockResponse *msg.Response) {
+		if blockResponse.Error != nil {
+			errChan <- blockResponse.Error
+			return
+		}
+
+		blockBytes, err := json.Marshal(blockResponse.Resource)
+		if err != nil {
+			newBlockChan <- nil
+			return
+		}
+
+		block, err := blockchain.DecodeBlockJSON(blockBytes)
+		if err != nil {
+			newBlockChan <- nil
+			return
+		}
+
+		newBlockChan <- block
+	}
+
+	// Continually request the block after the latest block in our chain until
+	// we are totally up to date
+	for {
+		err := a.makeBlockRequest(a.Chain.LastBlock(), blockResponseHandler)
+		if err != nil {
+			if a.PeerStore.Size() == 0 {
+				// No peers to make the request to
+				return chainChanged, err
+			}
+			continue
+		}
+
+		// Wait for response
+		change, done := a.handleBlockResponse(newBlockChan, errChan)
+		if change {
+			chainChanged = true
+		}
+		if done {
+			return chainChanged, nil
+		}
+	}
+}
+
+// makeBlockRequest creates and sends a request to a random peer for the block
+// following the given block and returns an error if the request could not be
+// created or sent.
+func (a *App) makeBlockRequest(currentHead *blockchain.Block,
+	responseHandler peer.ResponseHandler) error {
+	// In case the blockchain is empty
+	currentHeadHash := blockchain.NilHash
+	if currentHead != nil {
+		currentHeadHash = blockchain.HashSum(currentHead)
+	}
+
+	reqParams := map[string]interface{}{
+		"lastBlockHash": currentHeadHash,
+	}
+
+	blockRequest := msg.Request{
+		ID:           uuid.New().String(),
+		ResourceType: msg.ResourceBlock,
+		Params:       reqParams,
+	}
+
+	// Pick a peer to send the request to
+	p := a.PeerStore.GetRandom()
+	if p == nil {
+		return errors.New("SyncBlockchain failed: no peers to request blocks from")
+	}
+	return p.Request(blockRequest, responseHandler)
+}
+
+// handleBlockResponse receives a block or nil from the newBlockChan and attempts
+// to validate it and add it to the blockchain, or it handles a protocol error
+// from the errChan. Returns whether the blockchain was modified and wether we
+// received an UpToDate response.
+func (a *App) handleBlockResponse(newBlockChan chan *blockchain.Block,
+	errChan chan *msg.ProtocolError) (changed bool, upToDate bool) {
+	select {
+	case newBlock := <-newBlockChan:
+		if newBlock == nil {
+			// We received a response with no error but an invalid resource
+			// Try again
+			log.Debug("Received block response with invalid resource")
+			return false, false
+		}
+
+		valid, validationCode := consensus.VerifyBlock(a.Chain, newBlock)
+		if !valid {
+			// There is something wrong with this block. Try again
+			fields := log.Fields{"validationCode": validationCode}
+			log.WithFields(fields).Debug("SyncBlockchain received invalid block")
+			return false, false
+		}
+
+		// Valid block. Append it to the chain
+		log.Debugf("Adding block %d to blockchain", newBlock.BlockNumber)
+		log.Debug("Blockchain length: ", len(a.Chain.Blocks))
+		a.Chain.AppendBlock(newBlock)
+		return true, false
+
+	case err := <-errChan:
+		if err.Code == msg.ResourceNotFound {
+			// Our chain might be out of sync, roll it back by one block
+			// and request the next block
+			log.Debug("Received response with status code: ResourceNotFound")
+			a.Chain.RollBack()
+			return true, false
+		} else if err.Code == msg.UpToDate {
+			log.Debug("Received response with status code: UpToDate")
+			return false, true
+		}
+		log.Debug("Received response with unexpected status code: ", err.Code)
+		return false, false
 	}
 }

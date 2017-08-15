@@ -11,14 +11,15 @@ import (
 
 // User holds basic user information.
 type User struct {
-	*blockchain.Wallet
+	blockchain.Wallet
+	Name      string
 	BlockSize uint32
 }
 
 // NewUser creates a new user
 func NewUser() *User {
 	return &User{
-		Wallet:    blockchain.NewWallet(),
+		Wallet:    *blockchain.NewWallet(),
 		BlockSize: blockchain.DefaultBlockSize,
 	}
 }
@@ -50,7 +51,7 @@ func (a *App) Pay(to string, amount uint64) error {
 	}
 
 	// The transaction must be signed.
-	if txn, err := tbody.Sign(*a.CurrentUser.Wallet, crand.Reader); err == nil {
+	if txn, err := tbody.Sign(a.CurrentUser.Wallet, crand.Reader); err == nil {
 
 		// The transaction must be broadcasted to the peers.
 		if err := wallet.SetPending(txn); err != nil {

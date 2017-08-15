@@ -18,12 +18,14 @@ var runCmd = &cobra.Command{
 		iface, _ := cmd.Flags().GetString("interface")
 		target, _ := cmd.Flags().GetString("target")
 		verbose, _ := cmd.Flags().GetBool("verbose")
+		mine, _ := cmd.Flags().GetBool("mine")
 		console, _ := cmd.Flags().GetBool("console")
 		config := conf.Config{
 			Interface: iface,
 			Port:      uint16(port),
 			Target:    target,
 			Verbose:   verbose,
+			Mine:      mine,
 			Console:   console,
 		}
 
@@ -51,4 +53,5 @@ func init() {
 	runCmd.Flags().StringP("target", "t", "", "Address of peer to connect to")
 	runCmd.Flags().BoolP("verbose", "v", false, "Enable verbose logging")
 	runCmd.Flags().BoolP("console", "c", false, "Start Cumulus console")
+	runCmd.Flags().BoolP("mine", "m", false, "Enable mining on this node")
 }
