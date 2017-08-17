@@ -116,10 +116,12 @@ func connect(ctx *ishell.Context, a *App) {
 
 func toggleMiner(ctx *ishell.Context, app *App) {
 	if len(ctx.Args) != 1 {
-		if miner.IsMining() {
+		if miner.State() == miner.Running {
 			shell.Println("Miner is running.")
+		} else if miner.State() == miner.Paused {
+			shell.Println("Miner is paused.")
 		} else {
-			shell.Println("Miner is not running.")
+			shell.Println("Miner is stopped.")
 		}
 		shell.Println("Use 'miner start' or 'miner stop' to start or stop the miner.")
 		return
@@ -127,19 +129,29 @@ func toggleMiner(ctx *ishell.Context, app *App) {
 
 	switch ctx.Args[0] {
 	case "start":
-		if miner.IsMining() {
+		if miner.State() == miner.Running {
 			shell.Println("Miner is already running.")
-			return
+		} else if miner.State() == miner.Paused {
+			miner.ResumeMining()
+			shell.Println("Resumed mining.")
+		} else {
+			go app.RunMiner()
+			shell.Println("Started miner.")
 		}
-		go app.RunMiner()
-		shell.Println("Started miner.")
 	case "stop":
-		if !miner.IsMining() {
+		if miner.State() == miner.Stopped {
 			shell.Println("Miner is already stopped.")
 			return
 		}
 		miner.StopMining()
 		shell.Println("Stopped miner.")
+	case "pause":
+		wasRunning := miner.PauseIfRunning()
+		if wasRunning {
+			shell.Println("Paused miner.")
+		} else {
+			shell.Println("Miner was not running.")
+		}
 	default:
 		shell.Println("Usage: miner [start] | [stop]")
 	}

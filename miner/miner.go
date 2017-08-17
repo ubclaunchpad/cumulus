@@ -9,11 +9,18 @@ import (
 	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
-// currentlyMining is a flag to control the miner.
-var currentlyMining bool
+// MinerState represents the state of the miner
+type MinerState int
 
-// currentlyMiningLock is a read/write lock to change the Mining flag.
-var currentlyMiningLock sync.RWMutex
+const (
+	// Paused represents the MinerState where the miner is not running but the
+	// previously running mining job can be resumed or stopped.
+	Paused = iota
+	// Stopped represents the MinerState where the miner is not mining anything.
+	Stopped
+	// Running represents the MinerState where the miner is actively mining.
+	Running
+)
 
 const (
 	// MiningSuccessful is returned when the miner mines a block.
@@ -24,29 +31,62 @@ const (
 	MiningHalted
 )
 
+var (
+	// checkState signals to the miner to check for a new mining state when true.
+	checkState bool
+	// checkStateLock is a read/write lock to change the checkState flag.
+	checkStateLock = &sync.RWMutex{}
+	// minerState represents the state of the miner at any given time
+	minerState MinerState
+	// minerStateLock is a read/write lock to check the minerState variable
+	minerStateLock = &sync.RWMutex{}
+	// stop signals to the miner to abort the current mining job immediately.
+	stop = make(chan bool)
+	// resume signals to the miner that it can continue mining from its previous
+	// state.
+	resume = make(chan bool)
+	// pause signals to the miner to pause mining and wait for a stop or resume
+	// signal.
+	pause = make(chan bool)
+)
+
 // MiningResult contains the result of the mining operation.
 type MiningResult struct {
 	Complete bool
 	Info     int
 }
 
-// RestartMiner restarts the miner with a new block.
-func RestartMiner(bc *blockchain.BlockChain, b *blockchain.Block) {
-	StopMining()
-	Mine(bc, b)
-}
-
 // Mine continuously increases the nonce and tries to verify the proof of work
 // until the puzzle is solved.
-func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
-	setStart()
+func Mine(b *blockchain.Block) *MiningResult {
+	setStateChanged(false)
+	setState(Running)
+
+	miningHalted := &MiningResult{
+		Complete: false,
+		Info:     MiningHalted,
+	}
 
 	for !VerifyProofOfWork(b) {
 		// Check if we should keep mining.
-		if !IsMining() {
-			return &MiningResult{
-				Complete: false,
-				Info:     MiningHalted,
+		if stateChanged() {
+			select {
+			case <-pause:
+				setState(Paused)
+				select {
+				case <-resume:
+					setState(Running)
+				case <-stop:
+					setState(Stopped)
+					return miningHalted
+				case <-pause:
+					panic("Miner already paused")
+				}
+			case <-stop:
+				setState(Stopped)
+				return miningHalted
+			case <-resume:
+				panic("Miner already running")
 			}
 		}
 
@@ -60,31 +100,68 @@ func Mine(bc *blockchain.BlockChain, b *blockchain.Block) *MiningResult {
 		b.Nonce++
 	}
 
+	setState(Stopped)
 	return &MiningResult{
 		Complete: true,
 		Info:     MiningSuccessful,
 	}
 }
 
-func setStart() {
-	currentlyMiningLock.Lock()
-	defer currentlyMiningLock.Unlock()
-	currentlyMining = true
-}
-
-// StopMining stops the miner from mining.
+// StopMining causes the miner to abort the current mining job immediately.
 func StopMining() {
-	currentlyMiningLock.Lock()
-	defer currentlyMiningLock.Unlock()
-	currentlyMining = false
+	setStateChanged(true)
+	stop <- true
 }
 
-// IsMining returns the mining status of the miner.
-// Many threads can read this status, only one can write.
-func IsMining() bool {
-	currentlyMiningLock.RLock()
-	defer currentlyMiningLock.RUnlock()
-	return currentlyMining
+// PauseIfRunning pauses the current mining job if it is current running. Returns
+// true if the miner was running and false otherwise.
+func PauseIfRunning() bool {
+	minerStateLock.RLock()
+	defer minerStateLock.RUnlock()
+
+	if minerState == Running {
+		checkStateLock.Lock()
+		checkState = true
+		checkStateLock.Unlock()
+		pause <- true
+		return true
+	}
+	return false
+}
+
+// ResumeMining causes the miner to continue mining from a paused state.
+func ResumeMining() {
+	setStateChanged(true)
+	resume <- true
+}
+
+// setStateChanged synchronously sets the checkState variable to the given value.
+func setStateChanged(check bool) {
+	checkStateLock.Lock()
+	defer checkStateLock.Unlock()
+	checkState = check
+}
+
+// stateChanged synchronously returns wheter or not the miner state has changed
+// since it was last checked by the miner.
+func stateChanged() bool {
+	checkStateLock.RLock()
+	defer checkStateLock.RUnlock()
+	return checkState
+}
+
+// setState synchronously sets the current state of the miner to the given state.
+func setState(state MinerState) {
+	minerStateLock.Lock()
+	defer minerStateLock.Unlock()
+	minerState = state
+}
+
+// State synchronously returns the current state of the miner.
+func State() MinerState {
+	minerStateLock.RLock()
+	defer minerStateLock.RUnlock()
+	return minerState
 }
 
 // CloudBase prepends the cloudbase transaction to the front of a list of

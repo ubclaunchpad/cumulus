@@ -4,12 +4,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
+	"sync"
 )
 
 // BlockChain represents a linked list of blocks
 type BlockChain struct {
 	Blocks []*Block
 	Head   Hash
+	Lock   *sync.RWMutex
 }
 
 // Len returns the length of the BlockChain when marshalled
