@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/consensus"
+
 	"github.com/ubclaunchpad/cumulus/conn"
 	"github.com/ubclaunchpad/cumulus/peer"
 
@@ -184,18 +187,26 @@ func TestHandleTransaction(t *testing.T) {
 }
 
 func TestRunMiner(t *testing.T) {
+	oldDifficulty := consensus.CurrentDifficulty
+	consensus.CurrentDifficulty = constants.MaxTarget
 	a := createNewTestApp()
-	assert.False(t, miner.IsMining())
 	go a.RunMiner()
-	time.Sleep(time.Second)
-	assert.True(t, miner.IsMining())
-	a.RestartMiner()
-	time.Sleep(time.Second)
-	assert.True(t, miner.IsMining())
+	time.Sleep(time.Second / 2)
+	assert.Equal(t, int(miner.State()), int(miner.Running))
+	assert.True(t, miner.PauseIfRunning())
+	assert.Equal(t, int(miner.State()), int(miner.Paused))
+	a.ResumeMiner(false)
+	time.Sleep(time.Second / 2)
+	assert.Equal(t, int(miner.State()), int(miner.Running))
+	miner.PauseIfRunning()
+	time.Sleep(time.Second / 2)
+	assert.Equal(t, int(miner.State()), int(miner.Paused))
+	a.ResumeMiner(true)
+	time.Sleep(time.Second / 2)
+	assert.Equal(t, int(miner.State()), int(miner.Running))
 	miner.StopMining()
-	assert.False(t, miner.IsMining())
-	a.RestartMiner()
-	assert.False(t, miner.IsMining())
+	assert.Equal(t, int(miner.State()), int(miner.Stopped))
+	consensus.CurrentDifficulty = oldDifficulty
 }
 
 func TestMakeBlockRequest(t *testing.T) {

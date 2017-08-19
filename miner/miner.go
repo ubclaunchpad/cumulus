@@ -109,7 +109,9 @@ func Mine(b *blockchain.Block) *MiningResult {
 
 // StopMining causes the miner to abort the current mining job immediately.
 func StopMining() {
-	setStateChanged(true)
+	if State() == Running {
+		setStateChanged(true)
+	}
 	stop <- true
 }
 
@@ -131,7 +133,6 @@ func PauseIfRunning() bool {
 
 // ResumeMining causes the miner to continue mining from a paused state.
 func ResumeMining() {
-	setStateChanged(true)
 	resume <- true
 }
 

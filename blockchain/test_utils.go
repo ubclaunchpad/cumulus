@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"math/big"
 	mrand "math/rand"
+	"sync"
 
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/common/util"
@@ -91,6 +92,7 @@ func NewTestBlockChain() *BlockChain {
 		bc.Blocks[i] = NewTestBlock()
 	}
 	bc.Head = HashSum(bc.Blocks[nBlocks-1])
+	bc.Lock = &sync.RWMutex{}
 	return &bc
 }
 
@@ -169,6 +171,7 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	return &BlockChain{
 		Blocks: []*Block{inputBlock, outputBlock},
 		Head:   NewTestHash(),
+		Lock:   &sync.RWMutex{},
 	}, *recipient
 }
 

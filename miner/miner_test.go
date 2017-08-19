@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ubclaunchpad/cumulus/common/constants"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
@@ -12,7 +14,7 @@ import (
 )
 
 func TestMine(t *testing.T) {
-	bc, b := blockchain.NewValidTestChainAndBlock()
+	_, b := blockchain.NewValidTestChainAndBlock()
 	tempMaxTarget := c.MaxTarget
 
 	// Set min difficulty to be equal to the target so that the block validation
@@ -23,7 +25,7 @@ func TestMine(t *testing.T) {
 	// below the target straight away (2**256 - 1)
 	b.Target = blockchain.BigIntToHash(c.MaxTarget)
 	b.Time = util.UnixNow()
-	mineResult := Mine(bc, b)
+	mineResult := Mine(b)
 	c.MaxTarget = tempMaxTarget
 
 	assert.True(t, mineResult.Complete)
@@ -31,7 +33,7 @@ func TestMine(t *testing.T) {
 }
 
 func TestMineHaltMiner(t *testing.T) {
-	bc, b := blockchain.NewValidTestChainAndBlock()
+	_, b := blockchain.NewValidTestChainAndBlock()
 
 	// Set target to be as hard as possible so that we stall.
 	b.Target = blockchain.BigIntToHash(c.MinTarget)
@@ -44,7 +46,7 @@ func TestMineHaltMiner(t *testing.T) {
 	}()
 
 	// Start the miner.
-	mineResult := Mine(bc, b)
+	mineResult := Mine(b)
 
 	assert.False(t, mineResult.Complete)
 	assert.Equal(t, mineResult.Info, MiningHalted)
@@ -89,4 +91,22 @@ func TestVerifyProofOfWork(t *testing.T) {
 	if !VerifyProofOfWork(b) {
 		t.Fail()
 	}
+}
+
+func TestStopPauseMining(t *testing.T) {
+	b := blockchain.NewTestBlock()
+	b.Target = blockchain.BigIntToHash(constants.MinTarget)
+
+	go Mine(b)
+	time.Sleep(time.Second / 2)
+	assert.Equal(t, int(State()), int(Running))
+	assert.True(t, PauseIfRunning())
+	assert.Equal(t, int(State()), int(Paused))
+	ResumeMining()
+	time.Sleep(time.Second / 2)
+	assert.Equal(t, int(State()), int(Running))
+	StopMining()
+	time.Sleep(time.Second / 2)
+	assert.Equal(t, int(State()), int(Stopped))
+	consensus.CurrentDifficulty = constants.MinTarget
 }
