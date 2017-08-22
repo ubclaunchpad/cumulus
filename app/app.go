@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"os/signal"
 	"sync"
@@ -36,6 +37,7 @@ type App struct {
 	CurrentUser      *User
 	PeerStore        *peer.PeerStore
 	Chain            *blockchain.BlockChain
+	Miner            *miner.Miner
 	Pool             *pool.Pool
 	blockQueue       chan *blockchain.Block
 	transactionQueue chan *blockchain.Transaction
@@ -48,12 +50,16 @@ func Run(cfg conf.Config) {
 	log.Info("Starting Cumulus node")
 	config := &cfg
 
+	// TODO: remove this when we have scaleable difficulty
+	consensus.CurrentDifficulty = big.NewInt(2 << 21)
+
 	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
 	user := getCurrentUser()
 	a := App{
 		PeerStore:        peer.NewPeerStore(addr),
 		CurrentUser:      user,
 		Chain:            createBlockchain(user),
+		Miner:            miner.New(),
 		Pool:             getLocalPool(),
 		blockQueue:       make(chan *blockchain.Block, blockQueueSize),
 		transactionQueue: make(chan *blockchain.Transaction, transactionQueueSize),
@@ -302,7 +308,7 @@ func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 // HandleBlock handles new instance of BlockWork.
 func (a *App) HandleBlock(blk *blockchain.Block) {
 	log.Info("Received new block")
-	wasMining := miner.PauseIfRunning()
+	wasMining := a.Miner.PauseIfRunning()
 
 	a.Chain.Lock.Lock()
 	defer a.Chain.Lock.Unlock()
@@ -363,7 +369,7 @@ func (a *App) RunMiner() {
 
 		// TODO: update this when we have adjustable difficulty
 		blockToMine.Target = consensus.CurrentTarget()
-		miningResult := miner.Mine(blockToMine)
+		miningResult := a.Miner.Mine(blockToMine)
 
 		if miningResult.Complete {
 			log.Info("Successfully mined a block!")
@@ -384,9 +390,9 @@ func (a *App) RunMiner() {
 // restarts the miner with a new mining job.
 func (a *App) ResumeMiner(restart bool) {
 	if !restart {
-		miner.ResumeMining()
+		a.Miner.ResumeMining()
 	} else {
-		miner.StopMining()
+		a.Miner.StopMining()
 		go a.RunMiner()
 	}
 }
