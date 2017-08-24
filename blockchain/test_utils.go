@@ -163,7 +163,7 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 
 	// Transaction B is in block 1 at index 0 (sender sends 2 coins to recipient).
 	trB, _ := NewTestTransactionValue(sender, recipient, 2, 1, 1)
-	trB.Inputs[1].Hash = HashSum(trA)
+	trB.Inputs[0].Hash = HashSum(trA)
 
 	trB, _ = trB.TxBody.Sign(*sender, crand.Reader)
 
@@ -192,7 +192,7 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 
 	// Collect the transaction following the CloudBase.
 	inputTransaction := inputBlock.Transactions[1]
-	a := inputTransaction.Outputs[1].Amount
+	a := inputTransaction.Outputs[0].Amount
 
 	// Create a legit block that does *not* appear in bc.
 	tbody := TxBody{
@@ -214,6 +214,13 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 	cb, _ := NewValidCloudBaseTestTransaction()
 	newBlock := NewTestOutputBlock([]*Transaction{cb, tr}, inputBlock)
 	return bc, newBlock
+}
+
+// NewValidTestChainAndTxn creates a valid BlockChain of 2 blocks,
+// and a Transaction that is valid with respect to the BlockChain.
+func NewValidChainAndTxn() (*BlockChain, *Transaction) {
+	bc, b := NewValidTestChainAndBlock()
+	return bc, b.Transactions[1]
 }
 
 // NewValidTestTarget creates a new valid target that is a random value between the

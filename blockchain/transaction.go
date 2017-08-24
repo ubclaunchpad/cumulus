@@ -5,8 +5,8 @@ import (
 	"io"
 	"math"
 
-	intersect "github.com/juliangruber/go-intersect"
 	"github.com/ubclaunchpad/cumulus/common/util"
+	"gopkg.in/fatih/set.v0"
 )
 
 // TxHashPointer is a reference to a transaction on the blockchain.
@@ -135,7 +135,8 @@ func (t *Transaction) GetTotalInput(bc *BlockChain) uint64 {
 	result := uint64(0)
 	// This is a bit crazy; filter all input transactions
 	// by this senders address and sum the outputs.
-	for _, in := range bc.GetAllInputs(t) {
+	inputs := bc.GetAllInputs(t)
+	for _, in := range inputs {
 		result += in.GetTotalOutputFor(t.Sender.Repr())
 	}
 	return result
@@ -157,12 +158,43 @@ func (bc *BlockChain) GetBlockRange(t *Transaction) (uint32, uint32) {
 	return min, max
 }
 
-// InputsIntersect returns true if the inputs of t intersect with those of
-// other.
+// InputsIntersect returns true if the inputs of t intersect with those of other.
 func (t *Transaction) InputsIntersect(other *Transaction) bool {
-	intersection := intersect.Hash(t.Inputs, other.Inputs)
-	if len(intersection.([]TxHashPointer)) > 0 {
-		return true
+	return !t.InputIntersection(other).IsEmpty()
+}
+
+// InputIntersection returns the intersection of the inputs of t and other.
+func (t *Transaction) InputIntersection(other *Transaction) set.Interface {
+	return set.Intersection(t.InputSet(), other.InputSet())
+}
+
+// InputSet returns the transaction inputs as a set object.
+func (t *Transaction) InputSet() *set.Set {
+	a := make([]interface{}, len(t.Inputs))
+	for i, v := range t.Inputs {
+		a[i] = v
+	}
+	return set.New(a...)
+}
+
+// InputsSpentElsewhere returns true if inputs perported to be only spent
+// on transaction t have been spent elsewhere after block index `start`.
+func (t *Transaction) InputsSpentElsewhere(bc *BlockChain, start uint32) bool {
+	// This implementation runs in O(n * m * l * x)
+	// where n = number of blocks in range.
+	// 		 m = number of transactions per block.
+	// 		 l = number of inputs in a transaction.
+	// 		 x = a factor of the hash efficiency function on (1, 2).
+	for _, b := range bc.Blocks[start:] {
+		for _, txn := range b.Transactions {
+			if HashSum(txn) == HashSum(t) {
+				continue
+			} else {
+				if t.InputsIntersect(txn) {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }

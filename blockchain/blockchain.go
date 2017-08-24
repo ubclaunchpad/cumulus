@@ -61,7 +61,7 @@ func (bc *BlockChain) GetInputTransaction(t *TxHashPointer) *Transaction {
 // GetAllInputs returns all the transactions referenced by a transaction
 // as inputs.
 func (bc *BlockChain) GetAllInputs(t *Transaction) []*Transaction {
-	txns := make([]*Transaction, len(t.Inputs))
+	txns := []*Transaction{}
 	for _, tx := range t.Inputs {
 		txns = append(txns, bc.GetInputTransaction(&tx))
 	}
@@ -89,26 +89,4 @@ func (bc *BlockChain) CopyBlockByIndex(i uint32) (*Block, error) {
 		return &b, nil
 	}
 	return nil, errors.New("block request out of bounds")
-}
-
-// InputsSpentElsewhere returns true if inputs perported to be only spent
-// on transaction t have been spent elsewhere after block index `start`.
-func (bc *BlockChain) InputsSpentElsewhere(t *Transaction, start uint32) bool {
-	// This implementation runs in O(n * m * l * x)
-	// where n = number of blocks in range.
-	// 		 m = number of transactions per block.
-	// 		 l = number of inputs in a transaction.
-	// 		 x = a factor of the hash efficiency function on (1, 2).
-	for _, b := range bc.Blocks[start:] {
-		for _, txn := range b.Transactions {
-			if HashSum(txn) == HashSum(t) {
-				continue
-			} else {
-				if t.InputsIntersect(txn) {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
