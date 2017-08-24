@@ -1,5 +1,5 @@
-hash: 1954740399ad628bee9d88f3092c1c51283b8aa55e281f413d031f03fb734703
-updated: 2017-08-12T21:45:36.257782645-07:00
+hash: 590a23b6a165cc5f74245c58f6a0e0f4810c6ac08caafc10e56f37fe3c8f36d1
+updated: 2017-08-13T11:26:08.782717055-07:00
 imports:
 - name: github.com/abiosoft/ishell
   version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
@@ -26,8 +26,6 @@ imports:
   - json/token
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
-- name: github.com/juliangruber/go-intersect
-  version: b60b3a5b35ade098834e63cf9e094108650641a2
 - name: github.com/magiconair/properties
   version: 51463bfca2576e06c62a8504b5c0f06d61312647
 - name: github.com/mattn/go-colorable
@@ -75,6 +73,8 @@ imports:
   subpackages:
   - transform
   - unicode/norm
+- name: gopkg.in/fatih/set.v0
+  version: 27c40922c40b43fe04554d8223a402af3ea333f3
 - name: gopkg.in/kyokomi/emoji.v1
   version: 7e06b236c489543f53868841f188a294e3383eab
 - name: gopkg.in/yaml.v2
