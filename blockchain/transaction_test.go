@@ -56,3 +56,17 @@ func TestInputIntersection(t *testing.T) {
 	}
 	assert.True(t, txn.InputsIntersect(txn))
 }
+
+func TestGetTotalOutputFor(t *testing.T) {
+	bc, wallets := NewValidBlockChainFixture()
+
+	// We know alice gets sent 3 coins in block 1, txn 1.
+	t1 := bc.Blocks[1].Transactions[1]
+	actual := t1.GetTotalOutputFor(wallets["alice"].Public().Repr())
+	assert.Equal(t, actual, uint64(3))
+
+	// We know bob gets sent 1 coins in block 2, txn 1.
+	t2 := bc.Blocks[2].Transactions[1]
+	actual = t2.GetTotalOutputFor(wallets["bob"].Public().Repr())
+	assert.Equal(t, actual, uint64(1))
+}

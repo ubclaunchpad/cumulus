@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 
@@ -185,16 +186,29 @@ func (t *Transaction) InputsSpentElsewhere(bc *BlockChain, start uint32) bool {
 	// 		 m = number of transactions per block.
 	// 		 l = number of inputs in a transaction.
 	// 		 x = a factor of the hash efficiency function on (1, 2).
+	refs := set.New()
 	for _, b := range bc.Blocks[start:] {
 		for _, txn := range b.Transactions {
 			if HashSum(txn) == HashSum(t) {
 				continue
 			} else {
-				if t.InputsIntersect(txn) {
-					return true
-				}
+				refs.Add(t.InputIntersection(txn))
 			}
 		}
 	}
+
+	// refs represents all of the places in the BlockChain where
+	// the inputs to t were referenced. Transaction pointers in refs are
+	// problematic only if the output in the transaction pointed to
+	// contains t.Senders address. That means that t.Sender is trying to
+	// respend this same input.
+	fmt.Println(refs.Size())
+	for _, ref := range refs.List() {
+		refTxn, _ := ref.(Transaction)
+		if refTxn.GetTotalOutputFor(t.Sender.Repr()) > 0 {
+			return true
+		}
+	}
+
 	return false
 }

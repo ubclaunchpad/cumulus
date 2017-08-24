@@ -229,9 +229,9 @@ func NewValidBlockChainFixture() (*BlockChain, map[string]*Wallet) {
 		Sender: sender.Public(),
 		Inputs: []TxHashPointer{
 			TxHashPointer{
-				// Again look at block 1 (ignore CB)
+				// Again look at block 1.
 				BlockNumber: 1,
-				Index:       1,
+				Index:       1, // skip cb
 				Hash:        HashSum(tB),
 			},
 		},
