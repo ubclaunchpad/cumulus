@@ -147,76 +147,193 @@ func NewTestTransactionValue(s, r *Wallet, a uint64, i uint32, b uint32) (*Trans
 	return tbody.Sign(*s, crand.Reader)
 }
 
-// NewValidBlockChainFixture creates a valid blockchain of two blocks
-// and returns the recipient of the only transaction in block 1.
-func NewValidBlockChainFixture() (*BlockChain, Wallet) {
-	original := NewWallet()
+// NewValidBlockChainFixture creates a valid blockchain of three blocks
+// and returns the wallets involved in the transactions.
+// The returning wallets will have balances of 3, 1, and 0 respectively.
+func NewValidBlockChainFixture() (*BlockChain, map[string]*Wallet) {
 	sender := NewWallet()
-	recipient := NewWallet()
+	alice := NewWallet()
+	bob := NewWallet()
 
-	// Transaction A is in block 0 at index 0 (sender awarded 2 coins).
-	trA, _ := NewTestTransactionValue(original, sender, 2, 1, 0)
-	trA.Outputs = append(trA.Outputs, TxOutput{
-		Amount:    2,
-		Recipient: sender.Public().Repr(),
-	})
-
-	// Transaction B is in block 1 at index 0 (sender sends 2 coins to recipient).
-	trB, _ := NewTestTransactionValue(sender, recipient, 2, 1, 1)
-	trB.Inputs[0].Hash = HashSum(trA)
-
-	trB, _ = trB.TxBody.Sign(*sender, crand.Reader)
-
-	// CloudBase will bump our transactions forward.
+	// Cloud base txns for our blocks.
 	cbA, _ := NewValidCloudBaseTestTransaction()
 	cbB, _ := NewValidCloudBaseTestTransaction()
-	inputTransactions := []*Transaction{cbA, trA}
-	outputTransactions := []*Transaction{cbB, trB}
+	cbC, _ := NewValidCloudBaseTestTransaction()
 
-	// Create the blocks in the blockchain.
-	inputBlock := NewTestInputBlock(inputTransactions)
-	outputBlock := NewTestOutputBlock(outputTransactions, inputBlock)
+	// Transaction A is at index 1 in block 0 (sender awarded 4 coins).
+	tA, _ := TxBody{
+		Sender: sender.Public(),
+		Inputs: []TxHashPointer{},
+		Outputs: []TxOutput{
+			TxOutput{
+				Amount:    2,
+				Recipient: sender.Public().Repr(),
+			},
+			TxOutput{
+				Amount:    2,
+				Recipient: sender.Public().Repr(),
+			},
+		},
+	}.Sign(*sender, crand.Reader)
+
+	block0 := Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: 0,
+			LastBlock:   NewTestHash(),
+			Target:      NewValidTestTarget(),
+			Time:        mrand.Uint32(),
+			Nonce:       0,
+		},
+		// Block0 is a cb and a transaction.
+		Transactions: []*Transaction{cbA, tA},
+	}
+
+	// Transaction B is at index 1 in block 1 (sender sends 3 coins to recipientA).
+	tB, _ := TxBody{
+		Sender: sender.Public(),
+		Inputs: []TxHashPointer{
+			TxHashPointer{
+				// Reference block 0, index 0 for inputs.
+				BlockNumber: 0,
+				Index:       1, // Cloudbase will bump transactions forward.
+				Hash:        HashSum(tA),
+			},
+		},
+		// Send some outputs to recipientA, some back to self.
+		Outputs: []TxOutput{
+			TxOutput{
+				Amount:    3,
+				Recipient: alice.Public().Repr(),
+			},
+			TxOutput{
+				Amount:    1,
+				Recipient: sender.Public().Repr(),
+			},
+		},
+	}.Sign(*sender, crand.Reader)
+
+	// Block1 is a cb and a transaction.
+	block1 := Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: 1,
+			LastBlock:   HashSum(block0),
+			Target:      NewValidTestTarget(),
+			Time:        mrand.Uint32(),
+			Nonce:       0,
+		},
+		Transactions: []*Transaction{cbB, tB},
+	}
+
+	// Sender has 1 coin left to send to bob.
+	tC, _ := TxBody{
+		Sender: sender.Public(),
+		Inputs: []TxHashPointer{
+			TxHashPointer{
+				// Again look at block 1 (ignore CB)
+				BlockNumber: 1,
+				Index:       1,
+				Hash:        HashSum(tB),
+			},
+		},
+		// One coin output to recipientB.
+		Outputs: []TxOutput{
+			TxOutput{
+				Amount:    1,
+				Recipient: bob.Public().Repr(),
+			},
+		},
+	}.Sign(*sender, crand.Reader)
+
+	// Block2 is a cb and a transaction.
+	block2 := Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: 2,
+			LastBlock:   HashSum(block1),
+			Target:      NewValidTestTarget(),
+			Time:        mrand.Uint32(),
+			Nonce:       0,
+		},
+		Transactions: []*Transaction{cbC, tC},
+	}
+
+	wallets := map[string]*Wallet{
+		"alice":  alice,
+		"bob":    bob,
+		"sender": sender,
+	}
 
 	return &BlockChain{
-		Blocks: []*Block{inputBlock, outputBlock},
+		Blocks: []*Block{&block0, &block1, &block2},
 		Head:   NewTestHash(),
-	}, *recipient
+	}, wallets // Wallet balances 3, 1, 0.
 }
 
-// NewValidTestChainAndBlock creates a valid BlockChain of 2 blocks,
-// and a Block that is valid with respect to the BlockChain.
-//	 [ 2in | 2out ]   ->>   [ 2in | 2out ]	 ,	[ 2in | 2out ]
+// NewValidTestChainAndBlock creates a valid BlockChain of 3 blocks,
+// and a new block which is valid with respect to the blockchain.
 func NewValidTestChainAndBlock() (*BlockChain, *Block) {
-	bc, s := NewValidBlockChainFixture()
-	inputBlock := bc.Blocks[1]
+	bc, wallets := NewValidBlockChainFixture()
 
-	// Collect the transaction following the CloudBase.
-	inputTransaction := inputBlock.Transactions[1]
-	a := inputTransaction.Outputs[0].Amount
+	// Alice wants to send 2 coins to bob and bob wants to send
+	// his coin back to the sender.
+	aliceToBob, _ := TxBody{
+		Sender: wallets["alice"].Public(),
+		Inputs: []TxHashPointer{
+			TxHashPointer{
+				// Block 1, transaction 1 is where this input comes from.
+				BlockNumber: 1,
+				Index:       1,
+				Hash:        HashSum(bc.Blocks[1].Transactions[1]),
+			},
+		},
+		// One output to bob.
+		Outputs: []TxOutput{
+			TxOutput{
+				Amount:    2,
+				Recipient: wallets["bob"].Public().Repr(),
+			},
+			TxOutput{
+				Amount:    1,
+				Recipient: wallets["alice"].Public().Repr(),
+			},
+		},
+	}.Sign(*wallets["alice"], crand.Reader)
 
-	// Create a legit block that does *not* appear in bc.
-	tbody := TxBody{
-		Sender:  s.Public(),
-		Inputs:  make([]TxHashPointer, 1),
-		Outputs: make([]TxOutput, 1),
-	}
-	tbody.Inputs[0] = TxHashPointer{
-		BlockNumber: 1,
-		Hash:        HashSum(inputTransaction),
-		Index:       1,
-	}
-	tbody.Outputs[0] = TxOutput{
-		Amount:    a,
-		Recipient: NewWallet().Public().Repr(),
-	}
+	bobToSender, _ := TxBody{
+		Sender: wallets["bob"].Public(),
+		Inputs: []TxHashPointer{
+			TxHashPointer{
+				// Block 2, transaction 1 is where this input comes from.
+				BlockNumber: 2,
+				Index:       1,
+				Hash:        HashSum(bc.Blocks[2].Transactions[1]),
+			},
+		},
+		// One output to sender.
+		Outputs: []TxOutput{
+			TxOutput{
+				Amount:    1,
+				Recipient: wallets["sender"].Public().Repr(),
+			},
+		},
+	}.Sign(*wallets["bob"], crand.Reader)
 
-	tr, _ := tbody.Sign(s, crand.Reader)
 	cb, _ := NewValidCloudBaseTestTransaction()
-	newBlock := NewTestOutputBlock([]*Transaction{cb, tr}, inputBlock)
-	return bc, newBlock
+
+	blk := Block{
+		BlockHeader: BlockHeader{
+			BlockNumber: 2,
+			LastBlock:   HashSum(bc.Blocks[2]),
+			Target:      NewValidTestTarget(),
+			Time:        mrand.Uint32(),
+			Nonce:       0,
+		},
+		Transactions: []*Transaction{cb, aliceToBob, bobToSender},
+	}
+
+	return bc, &blk
 }
 
-// NewValidTestChainAndTxn creates a valid BlockChain of 2 blocks,
+// NewValidChainAndTxn creates a valid BlockChain of 3 blocks,
 // and a Transaction that is valid with respect to the BlockChain.
 func NewValidChainAndTxn() (*BlockChain, *Transaction) {
 	bc, b := NewValidTestChainAndBlock()

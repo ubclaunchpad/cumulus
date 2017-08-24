@@ -60,7 +60,7 @@ func (b *Block) Len() int {
 }
 
 // Marshal converts a Block to a byte slice.
-func (b *Block) Marshal() []byte {
+func (b Block) Marshal() []byte {
 	var buf []byte
 	buf = append(buf, b.BlockHeader.Marshal()...)
 	for _, t := range b.Transactions {
