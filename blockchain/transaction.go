@@ -147,7 +147,7 @@ func (t *Transaction) GetTotalInput(bc *BlockChain) uint64 {
 // to a transaction.
 func (bc *BlockChain) GetBlockRange(t *Transaction) (uint32, uint32) {
 	min := uint32(math.MaxUint32)
-	max := uint32(math.MaxUint32) // Why I have to cast this? No idea.
+	max := uint32(0)
 	for _, in := range t.Inputs {
 		if in.BlockNumber < min {
 			min = in.BlockNumber
