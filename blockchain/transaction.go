@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math"
 
@@ -178,22 +177,16 @@ func (t *Transaction) InputSet() *set.Set {
 	return set.New(a...)
 }
 
-// InputsSpentElsewhere returns true if inputs perported to be only spent
+// InputsSpentElsewhere returns true if inputs purported to be only spent
 // on transaction t have been spent elsewhere after block index `start`.
 func (t *Transaction) InputsSpentElsewhere(bc *BlockChain, start uint32) bool {
-	// This implementation runs in O(n * m * l * x)
-	// where n = number of blocks in range.
-	// 		 m = number of transactions per block.
-	// 		 l = number of inputs in a transaction.
-	// 		 x = a factor of the hash efficiency function on (1, 2).
+	// First build up a set of pointers to transactions on the BlockChain
+	// that share inputs with t.
 	refs := set.New()
 	for _, b := range bc.Blocks[start:] {
 		for _, txn := range b.Transactions {
-			if HashSum(txn) == HashSum(t) {
-				continue
-			} else {
-				refs.Add(t.InputIntersection(txn))
-			}
+			ixn := t.InputIntersection(txn)
+			refs.Merge(ixn)
 		}
 	}
 
@@ -202,9 +195,9 @@ func (t *Transaction) InputsSpentElsewhere(bc *BlockChain, start uint32) bool {
 	// problematic only if the output in the transaction pointed to
 	// contains t.Senders address. That means that t.Sender is trying to
 	// respend this same input.
-	fmt.Println(refs.Size())
 	for _, ref := range refs.List() {
-		refTxn, _ := ref.(Transaction)
+		ptr := ref.(TxHashPointer)
+		refTxn := bc.Blocks[ptr.BlockNumber].Transactions[ptr.Index]
 		if refTxn.GetTotalOutputFor(t.Sender.Repr()) > 0 {
 			return true
 		}
