@@ -101,13 +101,12 @@ func TestVerifyBlockBadNonce(t *testing.T) {
 
 func TestVerifyBlockBadGenesisBlock(t *testing.T) {
 	miner := blockchain.NewWallet()
-	currentTarget := blockchain.BigIntToHash(c.MaxTarget)
+	currentTarget := blockchain.BigIntToHash(util.BigExp(2, 255))
 	currentBlockReward := uint64(25)
 	gb := blockchain.Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
-	gb.Target = blockchain.BigIntToHash(util.BigExp(2, 255))
 	bc := &blockchain.BlockChain{
-		Blocks: []*blockchain.Block{gb},
-		Head:   blockchain.HashSum(gb),
+		Blocks: []*blockchain.Block{},
+		Head:   blockchain.NilHash,
 	}
 
 	valid, code := VerifyBlock(bc, gb)
@@ -409,8 +408,8 @@ func TestVerifyGenesisBlock(t *testing.T) {
 	currentBlockReward := uint64(25)
 	gb := blockchain.Genesis(miner.Public(), currentTarget, currentBlockReward, []byte{})
 	bc := &blockchain.BlockChain{
-		Blocks: []*blockchain.Block{gb},
-		Head:   blockchain.HashSum(gb),
+		Blocks: []*blockchain.Block{},
+		Head:   blockchain.NilHash,
 	}
 
 	valid, code := VerifyGenesisBlock(bc, gb)

@@ -3,6 +3,7 @@ package consensus
 import (
 	"crypto/ecdsa"
 	"math"
+	"reflect"
 
 	"gopkg.in/fatih/set.v0"
 
@@ -59,7 +60,7 @@ func VerifyCloudBase(bc *blockchain.BlockChain,
 	}
 
 	// Check that the sender address is nil.
-	if t.Sender != blockchain.NilAddr {
+	if !reflect.DeepEqual(t.Sender, blockchain.NilAddr) {
 		return false, BadCloudBaseSender
 	}
 
@@ -95,7 +96,7 @@ func VerifyCloudBase(bc *blockchain.BlockChain,
 	}
 
 	// Assert that the signature is equal to nil.
-	if t.Sig != blockchain.NilSig {
+	if !reflect.DeepEqual(t.Sig, blockchain.NilSig) {
 		return false, BadCloudBaseSig
 	}
 
@@ -113,7 +114,7 @@ func VerifyGenesisBlock(bc *blockchain.BlockChain,
 
 	// Check if the genesis block's block number is equal to 0.
 	if gb.BlockHeader.BlockNumber != 0 ||
-		bc.Blocks[0] != gb {
+		(len(bc.Blocks) > 0 && bc.Blocks[0] != gb) {
 		return false, BadGenesisBlockNumber
 	}
 
@@ -163,7 +164,7 @@ func VerifyBlock(bc *blockchain.BlockChain,
 	}
 
 	// Check if the block is the genesis block.
-	if b.BlockHeader.BlockNumber == 0 || bc.Blocks[0] == b {
+	if b.BlockHeader.BlockNumber == 0 {
 		if valid, code := VerifyGenesisBlock(bc, b); !valid {
 			log.Errorf("Invalid GenesisBlock, GenesisBlockCode: %d", code)
 			return false, BadGenesisBlock

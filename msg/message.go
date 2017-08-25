@@ -1,11 +1,10 @@
 package msg
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 type (
@@ -13,6 +12,15 @@ type (
 	ResourceType int
 	// ErrorCode is a code associated with an error
 	ErrorCode int
+)
+
+const (
+	// PushMessage fills the Type field in the Message struct for Push messages
+	PushMessage = "Push"
+	// RequestMessage fills the Type field in the Message struct for Request messages
+	RequestMessage = "Request"
+	// ResponseMessage fills the Type field in the Message struct for Response messages
+	ResponseMessage = "Response"
 )
 
 const (
@@ -25,11 +33,20 @@ const (
 )
 
 const (
+	// BadRequest occurs when a malformatted request is received.
+	BadRequest = 400
 	// InvalidResourceType occurs when a request is received with an unknown
 	// ResourceType value.
 	InvalidResourceType = 401
 	// ResourceNotFound occurs when a node reports the requested resource missing.
 	ResourceNotFound = 404
+	// RequestTimeout occurs when a peer does not respond to a request within
+	// some predefined period of time (see peer.DefaultRequestTimeout)
+	RequestTimeout = 408
+	// UpToDate occurs when a block request is received for a block that has
+	// not yet been mined (i.e. the lastBlockHash param in the request is the
+	// hash of the latest block in the blockchain).
+	UpToDate = 416
 	// NotImplemented occurs when a message or request is received whos response
 	// requires functionality that does not yet exist.
 	NotImplemented = 501
@@ -100,7 +117,7 @@ func (r *Request) Write(w io.Writer) error {
 		return err
 	}
 	msg := Message{
-		Type:    "Request",
+		Type:    RequestMessage,
 		Payload: payload,
 	}
 	return json.NewEncoder(w).Encode(msg)
@@ -112,7 +129,7 @@ func (r *Response) Write(w io.Writer) error {
 		return err
 	}
 	msg := Message{
-		Type:    "Response",
+		Type:    ResponseMessage,
 		Payload: payload,
 	}
 	return json.NewEncoder(w).Encode(msg)
@@ -124,7 +141,7 @@ func (p *Push) Write(w io.Writer) error {
 		return err
 	}
 	msg := Message{
-		Type:    "Push",
+		Type:    PushMessage,
 		Payload: payload,
 	}
 	return json.NewEncoder(w).Encode(msg)
@@ -132,7 +149,8 @@ func (p *Push) Write(w io.Writer) error {
 
 // Read decodes a message from a Reader and returns the message payload, or an
 // error if the read fails. On success, the payload returned will be either a
-// Request, Response, or Push.
+// Request, Response, or Push. Resource fields will contain the appropriate
+// type chosen by the json.Decode() function.
 func Read(r io.Reader) (MessagePayload, error) {
 	var m Message
 	err := json.NewDecoder(r).Decode(&m)
@@ -141,28 +159,27 @@ func Read(r io.Reader) (MessagePayload, error) {
 	}
 
 	var returnPayload MessagePayload
+	dec := json.NewDecoder(bytes.NewReader(m.Payload))
+	dec.UseNumber() // So big numbers aren't turned into float64
 
 	// Check the message type and use it to unmarshal the payload
 	switch m.Type {
-	case "Request":
+	case RequestMessage:
 		var req Request
-		err = json.Unmarshal([]byte(m.Payload), &req)
+		err = dec.Decode(&req)
 		if err == nil {
-			log.Debug("Read request ", req)
 			returnPayload = &req
 		}
-	case "Response":
+	case ResponseMessage:
 		var res Response
-		err = json.Unmarshal([]byte(m.Payload), &res)
+		err = dec.Decode(&res)
 		if err == nil {
-			log.Debug("Read response ", res)
 			returnPayload = &res
 		}
-	case "Push":
+	case PushMessage:
 		var push Push
-		err = json.Unmarshal([]byte(m.Payload), &push)
+		err = dec.Decode(&push)
 		if err == nil {
-			log.Debug("Read push ", push)
 			returnPayload = &push
 		}
 	default:

@@ -5,6 +5,7 @@ import (
 
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/miner"
 	"github.com/ubclaunchpad/cumulus/peer"
 	"gopkg.in/kyokomi/emoji.v1"
 )
@@ -51,6 +52,13 @@ func RunConsole(a *App) *ishell.Shell {
 		Help: "connect to another peer",
 		Func: func(ctx *ishell.Context) {
 			connect(ctx, a)
+		},
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "miner",
+		Help: "view or toggle miner status",
+		Func: func(ctx *ishell.Context) {
+			toggleMiner(ctx, a)
 		},
 	})
 
@@ -106,10 +114,41 @@ func connect(ctx *ishell.Context, a *App) {
 	}
 }
 
+func toggleMiner(ctx *ishell.Context, app *App) {
+	if len(ctx.Args) != 1 {
+		if miner.IsMining() {
+			shell.Println("Miner is running.")
+		} else {
+			shell.Println("Miner is not running.")
+		}
+		shell.Println("Use 'miner start' or 'miner stop' to start or stop the miner.")
+		return
+	}
+
+	switch ctx.Args[0] {
+	case "start":
+		if miner.IsMining() {
+			shell.Println("Miner is already running.")
+			return
+		}
+		go app.RunMiner()
+		shell.Println("Started miner.")
+	case "stop":
+		if !miner.IsMining() {
+			shell.Println("Miner is already stopped.")
+			return
+		}
+		miner.StopMining()
+		shell.Println("Stopped miner.")
+	default:
+		shell.Println("Usage: miner [start] | [stop]")
+	}
+}
+
 func createWallet(ctx *ishell.Context, app *App) {
 	// Create a new wallet and set as CurrentUser's wallet.
 	wallet := blockchain.NewWallet()
-	app.CurrentUser.Wallet = wallet
+	app.CurrentUser.Wallet = *wallet
 	emoji.Println(":credit_card: New wallet created!")
 
 	// Give a printout of the address(es).
@@ -138,7 +177,7 @@ func createTransaction(ctx *ishell.Context, app *App) {
 	err = app.Pay(toAddress, amount)
 	if err != nil {
 		emoji.Println(":disappointed: Transaction failed!")
-		ctx.Println(err.Error)
+		ctx.Println(err.Error())
 	} else {
 		emoji.Println(":mailbox_with_mail: Its in the mail!")
 	}

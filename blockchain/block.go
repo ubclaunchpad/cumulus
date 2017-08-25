@@ -2,9 +2,8 @@ package blockchain
 
 // BlockHeader contains metadata about a block
 import (
-	"encoding/gob"
-	"fmt"
-	"io"
+	"bytes"
+	"encoding/json"
 
 	"github.com/ubclaunchpad/cumulus/common/util"
 )
@@ -21,7 +20,7 @@ type BlockHeader struct {
 	// Target is the current target
 	Target Hash
 	// Time is represented as the number of seconds elapsed
-	// since January 1, 1970 UTC. It increments every second when mining.
+	// since January 1, 1970 UTC.
 	Time uint32
 	// Nonce starts at 0 and increments by 1 for every hash when mining
 	Nonce uint64
@@ -41,6 +40,16 @@ func (bh *BlockHeader) Marshal() []byte {
 	buf = append(buf, bh.ExtraData...)
 
 	return buf
+}
+
+// Equal returns true if all the fields (other than ExtraData) in each of
+// the BlockHeaders match, and false otherwise.
+func (bh *BlockHeader) Equal(otherHeader *BlockHeader) bool {
+	return bh.BlockNumber == otherHeader.BlockNumber &&
+		bh.LastBlock == otherHeader.LastBlock &&
+		bh.Target == otherHeader.Target &&
+		bh.Time == otherHeader.Time &&
+		bh.Nonce == otherHeader.Nonce
 }
 
 // Len returns the length in bytes of the BlockHeader.
@@ -69,19 +78,14 @@ func (b Block) Marshal() []byte {
 	return buf
 }
 
-// Encode writes the marshalled block to the given io.Writer
-func (b *Block) Encode(w io.Writer) {
-	err := gob.NewEncoder(w).Encode(b)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-}
-
-// DecodeBlock reads the marshalled block from the given io.Reader and populates b
-func DecodeBlock(r io.Reader) *Block {
+// DecodeBlockJSON returns a block read from the given marshalled block, or an
+// error if blockBytes cannot be decoded as JSON.
+func DecodeBlockJSON(blockBytes []byte) (*Block, error) {
 	var b Block
-	gob.NewDecoder(r).Decode(&b)
-	return &b
+	dec := json.NewDecoder(bytes.NewReader(blockBytes))
+	dec.UseNumber()
+	err := dec.Decode(&b)
+	return &b, err
 }
 
 // ContainsTransaction returns true and the transaction itself if the Block

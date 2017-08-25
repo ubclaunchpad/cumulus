@@ -4,6 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/peer"
+
+	"github.com/ubclaunchpad/cumulus/miner"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
@@ -24,7 +29,7 @@ func TestPushHandlerNewBlock(t *testing.T) {
 	}
 	a.PushHandler(&push)
 	select {
-	case blk, ok := <-blockQueue:
+	case blk, ok := <-a.blockQueue:
 		assert.True(t, ok)
 		assert.Equal(t, blk, b)
 	}
@@ -40,24 +45,23 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 	}
 	a.PushHandler(&push)
 	select {
-	case tr, ok := <-transactionQueue:
+	case tr, ok := <-a.transactionQueue:
 		assert.True(t, ok)
 		assert.Equal(t, tr, txn)
 	}
 }
 
-// TODO: Enable once block request by hash implemented.
-// func TestRequestHandlerNewBlockOK(t *testing.T) {
-// 	// Request a new block by hash and verify we get the right one.
-// 	a := createNewTestApp()
+func TestRequestHandlerNewBlockOK(t *testing.T) {
+	// Request a new block by hash and verify we get the right one.
+	a := createNewTestApp()
 
-// 	req := createNewTestBlockRequest(a.Chain.Blocks[1].LastBlock)
-// 	resp := a.RequestHandler(req)
-// 	block, ok := resp.Resource.(*blockchain.Block)
+	req := createNewTestBlockRequest(a.Chain.Blocks[1].LastBlock)
+	resp := a.RequestHandler(req)
+	block, ok := resp.Resource.(*blockchain.Block)
 
-// 	assert.True(t, ok, "resource should contain block")
-// 	assert.Equal(t, block, a.Chain.Blocks[1])
-// }
+	assert.True(t, ok, "resource should contain block")
+	assert.Equal(t, block, a.Chain.Blocks[1])
+}
 
 func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 	a := createNewTestApp()
@@ -71,7 +75,7 @@ func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 
 	// Make sure request failed.
 	assert.False(t, ok, "resource should not contain block")
-	assert.Equal(t, msg.ResourceNotFound, int(resp.Error.Code), resp.Error.Message)
+	assert.Equal(t, msg.BadRequest, int(resp.Error.Code), resp.Error.Message)
 }
 
 func TestRequestHandlerNewBlockBadType(t *testing.T) {
@@ -120,7 +124,7 @@ func TestHandleTransactionNotOK(t *testing.T) {
 	assert.True(t, a.Pool.Empty())
 }
 
-func TestHandleBlockOK(t *testing.T) {
+func TestHandleValidBlock(t *testing.T) {
 	a := createNewTestApp()
 	i := 0
 
@@ -140,7 +144,7 @@ func TestHandleBlockOK(t *testing.T) {
 	// TODO: Assert pool appropriately emptied.
 }
 
-func TestHandleBlockNotOK(t *testing.T) {
+func TestHandleInvalidBlock(t *testing.T) {
 	a := createNewTestApp()
 	i := 0
 
@@ -159,24 +163,98 @@ func TestGetLocalPool(t *testing.T) {
 	assert.NotNil(t, getLocalPool())
 }
 
-func TestGetLocalChain(t *testing.T) {
-	assert.NotNil(t, getLocalChain())
+func TestCreateBlockchain(t *testing.T) {
+	assert.NotNil(t, createBlockchain(NewUser()))
 }
 
 func TestHandleBlock(t *testing.T) {
 	a := createNewTestApp()
 	go a.HandleWork()
 	time.Sleep(50 * time.Millisecond)
-	blockQueue <- blockchain.NewTestBlock()
-	assert.Equal(t, len(blockQueue), 0)
+	a.blockQueue <- blockchain.NewTestBlock()
+	assert.Equal(t, len(a.blockQueue), 0)
 }
 
 func TestHandleTransaction(t *testing.T) {
 	a := createNewTestApp()
 	go a.HandleWork()
 	time.Sleep(50 * time.Millisecond)
-	transactionQueue <- blockchain.NewTestTransaction()
-	assert.Equal(t, len(transactionQueue), 0)
+	a.transactionQueue <- blockchain.NewTestTransaction()
+	assert.Equal(t, len(a.transactionQueue), 0)
+}
+
+func TestRunMiner(t *testing.T) {
+	a := createNewTestApp()
+	assert.False(t, miner.IsMining())
+	go a.RunMiner()
+	time.Sleep(time.Second)
+	assert.True(t, miner.IsMining())
+	a.RestartMiner()
+	time.Sleep(time.Second)
+	assert.True(t, miner.IsMining())
+	miner.StopMining()
+	assert.False(t, miner.IsMining())
+	a.RestartMiner()
+	assert.False(t, miner.IsMining())
+}
+
+func TestMakeBlockRequest(t *testing.T) {
+	bc := conn.NewBufConn(false, true)
+	a := createNewTestApp()
+	p := peer.New(bc, a.PeerStore, "")
+	a.PeerStore.Add(p)
+	done := make(chan bool, 1)
+
+	rh := func(res *msg.Response) {}
+	bc.OnWrite = func(b []byte) {
+		done <- true
+	}
+
+	err := a.makeBlockRequest(a.Chain.LastBlock(), rh)
+	assert.Nil(t, err)
+	assert.True(t, <-done)
+}
+
+func TestMakeBlockRequestNoPeers(t *testing.T) {
+	a := createNewTestApp()
+	rh := func(res *msg.Response) {}
+	err := a.makeBlockRequest(a.Chain.LastBlock(), rh)
+	assert.NotNil(t, err)
+}
+
+func TestHandleBlockResponse(t *testing.T) {
+	a := createNewTestApp()
+	newBlockChan := make(chan *blockchain.Block, 1)
+	errChan := make(chan *msg.ProtocolError, 1)
+	newBlockChan <- a.Chain.RollBack()
+	changed, upToDate := a.handleBlockResponse(newBlockChan, errChan)
+	assert.True(t, changed)
+	assert.False(t, upToDate)
+	newBlockChan <- a.Chain.Blocks[1]
+	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
+	assert.False(t, changed)
+	assert.False(t, upToDate)
+	errChan <- msg.NewProtocolError(msg.UpToDate, "")
+	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
+	assert.False(t, changed)
+	assert.True(t, upToDate)
+	errChan <- msg.NewProtocolError(msg.ResourceNotFound, "")
+	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
+	assert.True(t, changed)
+	assert.False(t, upToDate)
+	assert.Equal(t, len(a.Chain.Blocks), 1)
+}
+
+func TestHandleWork(t *testing.T) {
+	a := createNewTestApp()
+	go a.HandleWork()
+	a.blockQueue <- a.Chain.RollBack()
+	time.Sleep(time.Second)
+	assert.Equal(t, len(a.Chain.Blocks), 2)
+	a.quitChan <- true
+	a.blockQueue <- a.Chain.RollBack()
+	time.Sleep(time.Second)
+	assert.Equal(t, len(a.Chain.Blocks), 1)
 }
 
 func TestPay(t *testing.T) {

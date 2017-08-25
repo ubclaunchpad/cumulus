@@ -26,16 +26,11 @@ func TestEncodeDecodeBlockChain(t *testing.T) {
 	}
 }
 
-func TestCopyBlock(t *testing.T) {
+func TestGetBlock(t *testing.T) {
 	bc, _ := NewValidTestChainAndBlock()
-	b, _ := bc.CopyBlockByIndex(0)
+	b, _ := bc.GetBlockByLastBlockHash(bc.Blocks[1].LastBlock)
 
-	if !reflect.DeepEqual(b, bc.Blocks[0]) {
-		t.FailNow()
-	}
-
-	// Enforce copy.
-	if b == bc.Blocks[0] {
+	if !reflect.DeepEqual(b, bc.Blocks[1]) {
 		t.FailNow()
 	}
 }
@@ -43,4 +38,34 @@ func TestCopyBlock(t *testing.T) {
 func TestWalletRepr(t *testing.T) {
 	w := NewWallet()
 	assert.Equal(t, len(w.Public().Repr()), 40)
+}
+
+func TestAppend(t *testing.T) {
+	bc, block := NewValidTestChainAndBlock()
+	bc.AppendBlock(block)
+	if bc.Head != HashSum(block) || bc.LastBlock() != block {
+		t.Fail()
+	}
+}
+
+func TestRollBack(t *testing.T) {
+	bc, block1 := NewValidTestChainAndBlock()
+	block2 := NewTestBlock()
+	initialHead := bc.LastBlock()
+	bc.AppendBlock(block1)
+	if bc.Head != HashSum(block1) || bc.LastBlock() != block1 {
+		t.FailNow()
+	}
+	bc.AppendBlock(block2)
+	if bc.Head != HashSum(block2) {
+		t.FailNow()
+	}
+	rollbackBlock1 := bc.RollBack()
+	if bc.Head != HashSum(block1) || bc.LastBlock() != block1 || rollbackBlock1 != block2 {
+		t.FailNow()
+	}
+	rollbackBlock2 := bc.RollBack()
+	if bc.Head != HashSum(initialHead) || bc.LastBlock() != initialHead || rollbackBlock2 != block1 {
+		t.FailNow()
+	}
 }

@@ -145,14 +145,14 @@ func (p *Pool) Peek() *blockchain.Transaction {
 	return nil
 }
 
-// NextBlock produces a new block from the pool for mining.
+// NextBlock produces a new block from the pool for mining. The block returned
+// may not contain transactions if there are none left in the transaction pool.
 func (p *Pool) NextBlock(chain *blockchain.BlockChain,
 	address blockchain.Address, size uint32) *blockchain.Block {
 	var txns []*blockchain.Transaction
 
 	// Hash the last block in the chain.
-	ix := len(chain.Blocks) - 1
-	lastHash := blockchain.HashSum(chain.Blocks[ix])
+	lastHash := blockchain.HashSum(chain.LastBlock())
 
 	// Build a new block for mining.
 	b := &blockchain.Block{
