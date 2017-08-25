@@ -321,7 +321,7 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 
 	blk := Block{
 		BlockHeader: BlockHeader{
-			BlockNumber: 2,
+			BlockNumber: 3,
 			LastBlock:   HashSum(bc.Blocks[2]),
 			Target:      NewValidTestTarget(),
 			Time:        mrand.Uint32(),
