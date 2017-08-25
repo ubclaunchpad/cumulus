@@ -180,28 +180,25 @@ func (t *Transaction) InputSet() *set.Set {
 // InputsSpentElsewhere returns true if inputs purported to be only spent
 // on transaction t have been spent elsewhere after block index `start`.
 func (t *Transaction) InputsSpentElsewhere(bc *BlockChain, start uint32) bool {
-	// First build up a set of pointers to transactions on the BlockChain
-	// that share inputs with t.
-	refs := set.New()
+	// Get the set of inputs for t.
+	inSet := t.InputSet()
+
+	// Look at each transaction in the chain from start on.
 	for _, b := range bc.Blocks[start:] {
 		for _, txn := range b.Transactions {
-			ixn := t.InputIntersection(txn)
-			refs.Merge(ixn)
+
+			// If the inputs to t intersect with the inputs to txn...
+			if !set.Intersection(inSet, txn.InputSet()).IsEmpty() {
+
+				// ... and the sender is the same, then we have a respend.
+				if txn.Sender.Repr() == t.Sender.Repr() {
+					return true
+				}
+			}
 		}
 	}
 
-	// refs represents all of the places in the BlockChain where
-	// the inputs to t were referenced. Transaction pointers in refs are
-	// problematic only if the output in the transaction pointed to
-	// contains t.Senders address. That means that t.Sender is trying to
-	// respend this same input.
-	for _, ref := range refs.List() {
-		ptr := ref.(TxHashPointer)
-		refTxn := bc.Blocks[ptr.BlockNumber].Transactions[ptr.Index]
-		if refTxn.GetTotalOutputFor(t.Sender.Repr()) > 0 {
-			return true
-		}
-	}
-
+	// If we made it through all the transactions, without finding
+	// inputs respent anywhere, then we're good.
 	return false
 }

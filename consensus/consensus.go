@@ -25,7 +25,9 @@ func VerifyTransaction(bc *blockchain.BlockChain,
 	}
 
 	// Check that output to sender in input is equal to outputs in t
-	if !(t.GetTotalOutput() == t.GetTotalInput(bc)) {
+	out := t.GetTotalOutput()
+	in := t.GetTotalInput(bc)
+	if out != in {
 		return false, Overspend
 	}
 
@@ -37,7 +39,7 @@ func VerifyTransaction(bc *blockchain.BlockChain,
 
 	// Test if inputs already spent elsewhere.
 	start, _ := bc.GetBlockRange(t)
-	if bc.InputsSpentElsewhere(t, start) {
+	if t.InputsSpentElsewhere(bc, start) {
 		return false, Respend
 	}
 

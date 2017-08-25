@@ -1,12 +1,12 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 
 	crand "crypto/rand"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/common/util"
@@ -19,28 +19,18 @@ func TestVerifyTransactionNilTransaction(t *testing.T) {
 
 	valid, code := VerifyTransaction(bc, nil)
 
-	if valid {
-		t.Fail()
-	}
-	if code != NilTransaction {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, NilTransaction)
 }
 
 func TestVerifyTransactionNoInputTransaction(t *testing.T) {
-	s := blockchain.NewWallet()
-	r := blockchain.NewWallet()
-	tr, _ := blockchain.NewTestTransactionValue(s, r, 1, 0, 0)
+	txn := blockchain.NewTestTransaction()
 	bc, _ := blockchain.NewValidBlockChainFixture()
+	txn.Inputs = []blockchain.TxHashPointer{}
+	valid, code := VerifyTransaction(bc, txn)
 
-	valid, code := VerifyTransaction(bc, tr)
-
-	if valid {
-		t.Fail()
-	}
-	if code != NoInputTransactions {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, NoInputTransactions)
 }
 
 func TestVerifyTransactionOverspend(t *testing.T) {
@@ -51,60 +41,40 @@ func TestVerifyTransactionOverspend(t *testing.T) {
 
 	valid, code := VerifyTransaction(bc, tr)
 
-	if valid {
-		t.Fail()
-	}
-	if code != Overspend {
-		fmt.Println(code)
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, Overspend)
 }
 
 func TestVerifyTransactionSignatureFail(t *testing.T) {
-	bc, _ := blockchain.NewValidBlockChainFixture()
-	tr := bc.Blocks[1].Transactions[1]
+	bc, txn := blockchain.NewValidChainAndTxn()
 
+	// Resign txn with fake wallet.
 	fakeSender := blockchain.NewWallet()
-	tr, _ = tr.TxBody.Sign(*fakeSender, crand.Reader)
-	bc.Blocks[1].Transactions[1] = tr
+	txn, _ = txn.TxBody.Sign(*fakeSender, crand.Reader)
 
-	valid, code := VerifyTransaction(bc, tr)
-	if valid {
-		t.Fail()
-	}
-	if code != BadSig {
-		t.Fail()
-	}
+	valid, code := VerifyTransaction(bc, txn)
+
+	assert.False(t, valid)
+	assert.Equal(t, code, BadSig)
 }
 
 func TestVerifyTransactionPass(t *testing.T) {
-	bc, b := blockchain.NewValidTestChainAndBlock()
-	tr := b.Transactions[1]
+	bc, txn := blockchain.NewValidChainAndTxn()
 
-	valid, code := VerifyTransaction(bc, tr)
+	valid, code := VerifyTransaction(bc, txn)
 
-	if !valid {
-		t.Fail()
-	}
-	if code != ValidTransaction {
-		t.Fail()
-	}
+	assert.True(t, valid)
+	assert.Equal(t, code, ValidTransaction)
 }
 
 func TestTransactionRespend(t *testing.T) {
-	bc, _ := blockchain.NewValidBlockChainFixture()
-	trC := bc.Blocks[1].Transactions[1]
-	b := blockchain.NewTestOutputBlock([]*blockchain.Transaction{trC}, bc.Blocks[1])
-	bc.AppendBlock(b)
+	bc, _ := blockchain.NewValidTestChainAndBlock()
+	trC := bc.Blocks[2].Transactions[1]
 
 	valid, code := VerifyTransaction(bc, trC)
 
-	if valid {
-		t.Fail()
-	}
-	if code != Respend {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, Respend)
 }
 
 // VerifyBlock Tests
@@ -114,12 +84,8 @@ func TestVerifyBlockNilBlock(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, nil)
 
-	if valid {
-		t.Fail()
-	}
-	if code != NilBlock {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, NilBlock)
 }
 
 func TestVerifyBlockBadNonce(t *testing.T) {
@@ -129,13 +95,8 @@ func TestVerifyBlockBadNonce(t *testing.T) {
 	valid, code := VerifyBlock(bc, b)
 	CurrentDifficulty = c.MinTarget
 
-	if valid {
-		t.Fail()
-	}
-
-	if code != BadNonce {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, BadNonce)
 }
 
 func TestVerifyBlockBadGenesisBlock(t *testing.T) {

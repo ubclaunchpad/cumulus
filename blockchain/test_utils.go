@@ -285,7 +285,7 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 				Hash:        HashSum(bc.Blocks[1].Transactions[1]),
 			},
 		},
-		// One output to bob.
+		// One output to bob, one back to alice.
 		Outputs: []TxOutput{
 			TxOutput{
 				Amount:    2,
