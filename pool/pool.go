@@ -31,14 +31,14 @@ func New() *Pool {
 	}
 }
 
-// Len returns the number of transactions in the Pool.
-func (p *Pool) Len() int {
+// Size returns the number of transactions in the Pool.
+func (p *Pool) Size() int {
 	return len(p.ValidTransactions)
 }
 
 // Empty returns true if the pool has exactly zero transactions in it.
 func (p *Pool) Empty() bool {
-	return p.Len() == 0
+	return p.Size() == 0
 }
 
 // Get returns the tranasction with input transaction Hash h.
@@ -55,7 +55,7 @@ func (p *Pool) GetN(N int) *blockchain.Transaction {
 func (p *Pool) GetIndex(t *blockchain.Transaction) int {
 	hash := blockchain.HashSum(t)
 	target := p.ValidTransactions[hash].Time
-	return getIndex(p.Order, target, 0, p.Len()-1)
+	return getIndex(p.Order, target, 0, p.Size()-1)
 }
 
 // getIndex does a binary search for a PooledTransaction by timestamp.
@@ -129,7 +129,7 @@ func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
 
 // Pop returns the next transaction and removes it from the pool.
 func (p *Pool) Pop() *blockchain.Transaction {
-	if p.Len() > 0 {
+	if p.Size() > 0 {
 		next := p.GetN(0)
 		p.Delete(next)
 		return next
@@ -139,7 +139,7 @@ func (p *Pool) Pop() *blockchain.Transaction {
 
 // Peek returns the next transaction and does not remove it from the pool.
 func (p *Pool) Peek() *blockchain.Transaction {
-	if p.Len() > 0 {
+	if p.Size() > 0 {
 		return p.GetN(0)
 	}
 	return nil
@@ -169,7 +169,7 @@ func (p *Pool) NextBlock(chain *blockchain.BlockChain,
 
 	// Try to grab as many transactions as the block will allow.
 	// Test each transaction to see if we break size before adding.
-	for p.Len() > 0 {
+	for p.Size() > 0 {
 		nextSize := p.Peek().Len()
 		if b.Len()+nextSize < int(size) {
 			b.Transactions = append(b.Transactions, p.Pop())
