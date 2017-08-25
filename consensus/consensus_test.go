@@ -112,28 +112,20 @@ func TestVerifyBlockBadGenesisBlock(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, gb)
 
-	if valid {
-		t.Fail()
-	}
-
-	if code != BadGenesisBlock {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, BadGenesisBlock)
 }
 
 func TestVerifyBlockBadTransaction(t *testing.T) {
-	bc, _ := blockchain.NewValidBlockChainFixture()
-	tr := bc.Blocks[1].Transactions[1]
-	tr.Outputs[0].Amount = 5
+	bc, b := blockchain.NewValidTestChainAndBlock()
 
-	valid, code := VerifyBlock(bc, bc.Blocks[1])
+	// This would be an overspend on alices part (she only has 3 coins here).
+	b.Transactions[1].Outputs[0].Amount = 5
 
-	if valid {
-		t.Fail()
-	}
-	if code != BadTransaction {
-		t.Fail()
-	}
+	valid, code := VerifyBlock(bc, b)
+
+	assert.False(t, valid)
+	assert.Equal(t, code, BadTransaction)
 }
 
 func TestVerifyBlockBadBlockNumber(t *testing.T) {
@@ -142,12 +134,8 @@ func TestVerifyBlockBadBlockNumber(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, bc.Blocks[1])
 
-	if valid {
-		t.Fail()
-	}
-	if code != BadBlockNumber {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, BadBlockNumber)
 }
 
 func TestVerifyBlockBadHash(t *testing.T) {

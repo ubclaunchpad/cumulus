@@ -170,14 +170,14 @@ func VerifyBlock(bc *blockchain.BlockChain,
 	}
 
 	// Check that block number is valid.
-	ix := b.BlockNumber - 1
-	if int(ix) > len(bc.Blocks)-1 || ix < 0 {
+	lastBlockIdx := b.BlockNumber - 1
+	if int(lastBlockIdx) != len(bc.Blocks)-1 {
 		return false, BadBlockNumber
 	}
 
 	// Check that block number is one greater than last block
-	lastBlock := bc.Blocks[ix]
-	if lastBlock.BlockNumber != ix {
+	lastBlock := bc.Blocks[lastBlockIdx]
+	if lastBlock.BlockNumber != lastBlockIdx {
 		return false, BadBlockNumber
 	}
 
