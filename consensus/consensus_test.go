@@ -209,12 +209,8 @@ func TestBlockDoubleSpend(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, b)
 
-	if valid {
-		t.Fail()
-	}
-	if code != DoubleSpend {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, DoubleSpend)
 }
 
 func TestVerifyBlockBigNumber(t *testing.T) {

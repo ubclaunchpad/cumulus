@@ -4,6 +4,8 @@ import (
 	"crypto/ecdsa"
 	"math"
 
+	"gopkg.in/fatih/set.v0"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
@@ -221,14 +223,27 @@ func VerifyBlock(bc *blockchain.BlockChain,
 		return false, BadNonce
 	}
 
-	// Check for multiple transactions referencing same input transaction.
-	for i, trA := range b.Transactions {
-		for j, trB := range b.Transactions {
-			if i != j {
-				if trA.InputsIntersect(trB) {
-					return false, DoubleSpend
-				}
+	// Check for multiple transactions referencing same input transaction,
+	// where the sender is the same.
+	inputSets := map[blockchain.Address]*set.Set{}
+	for _, txn := range b.Transactions {
+
+		// We'll inspect these inputs next.
+		nextInputSet := txn.InputSet()
+
+		// If the sender already exists in the map, check for
+		// a non-empty intersection in inputs.
+		if inSet, ok := inputSets[txn.Sender]; ok {
+			if !set.Intersection(inSet, nextInputSet).IsEmpty() {
+				return false, DoubleSpend
 			}
+
+			// No intersection, but more inputs to add to sender.
+			inputSets[txn.Sender].Merge(nextInputSet)
+
+		} else {
+			// First time seeing sender, give them inputs.
+			inputSets[txn.Sender] = nextInputSet
 		}
 	}
 
