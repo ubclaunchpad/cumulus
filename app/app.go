@@ -284,8 +284,8 @@ func (a *App) HandleWork() {
 
 // HandleTransaction handles new instance of TransactionWork.
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
-	validTransaction := a.Pool.Push(txn, a.Chain)
-	if validTransaction {
+	code := a.Pool.Push(txn, a.Chain)
+	if code == consensus.ValidTransaction {
 		log.Debug("Added transaction to pool from address: " + txn.Sender.Repr())
 	} else {
 		log.Debug("Bad transaction rejected from sender: " + txn.Sender.Repr())
@@ -351,7 +351,7 @@ func (a *App) RunMiner() {
 		miningResult := miner.Mine(a.Chain, blockToMine)
 
 		if miningResult.Complete {
-			log.Info("Successfully mined a block!")
+			// log.Debug("Successfully mined a block!")
 			push := msg.Push{
 				ResourceType: msg.ResourceBlock,
 				Resource:     blockToMine,
@@ -457,7 +457,7 @@ func (a *App) makeBlockRequest(currentHead *blockchain.Block,
 
 // handleBlockResponse receives a block or nil from the newBlockChan and attempts
 // to validate it and add it to the blockchain, or it handles a protocol error
-// from the errChan. Returns whether the blockchain was modified and wether we
+// from the errChan. Returns whether the blockchain was modified and whether we
 // received an UpToDate response.
 func (a *App) handleBlockResponse(newBlockChan chan *blockchain.Block,
 	errChan chan *msg.ProtocolError) (changed bool, upToDate bool) {
