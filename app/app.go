@@ -351,7 +351,7 @@ func (a *App) RunMiner() {
 		miningResult := miner.Mine(a.Chain, blockToMine)
 
 		if miningResult.Complete {
-			// log.Debug("Successfully mined a block!")
+			log.Info("Successfully mined a block!")
 			push := msg.Push{
 				ResourceType: msg.ResourceBlock,
 				Resource:     blockToMine,

@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.ErrorLevel)
 }
 
 func TestPushHandlerNewBlock(t *testing.T) {
@@ -47,7 +47,7 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 	select {
 	case tr, ok := <-a.transactionQueue:
 		assert.True(t, ok)
-		assert.ObjectsAreEqual(tr, txn)
+		assert.Equal(t, tr, txn)
 	}
 }
 
@@ -138,7 +138,7 @@ func TestHandleValidBlock(t *testing.T) {
 	bc, blk := blockchain.NewValidTestChainAndBlock()
 	a.Chain = bc
 	a.HandleBlock(blk)
-	assert.ObjectsAreEqual(blk, a.Chain.Blocks[2])
+	assert.Equal(t, blk, a.Chain.Blocks[3])
 
 	// TODO: Assert miner restarted.
 	// TODO: Assert pool appropriately emptied.

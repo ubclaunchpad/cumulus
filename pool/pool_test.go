@@ -16,7 +16,7 @@ func TestGetAndSetTransaction(t *testing.T) {
 	tr := b.Transactions[1]
 	assert.Equal(t, p.Push(tr, bc), consensus.ValidTransaction)
 	assert.Equal(t, p.Size(), 1)
-	assert.ObjectsAreEqual(tr, p.Get(blockchain.HashSum(tr)))
+	assert.Equal(t, tr, p.Get(blockchain.HashSum(tr)))
 
 	p.Delete(tr)
 	assert.Equal(t, p.Size(), 0)
