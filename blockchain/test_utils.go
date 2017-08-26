@@ -188,7 +188,7 @@ func NewValidBlockChainFixture() (*BlockChain, map[string]*Wallet) {
 		Transactions: []*Transaction{cbA, tA},
 	}
 
-	// Transaction B is at index 1 in block 1 (sender sends 3 coins to recipientA).
+	// Transaction B is at index 1 in block 1 (sender sends 3 coins to alice).
 	tB, _ := TxBody{
 		Sender: sender.Public(),
 		Inputs: []TxHashPointer{
@@ -199,7 +199,7 @@ func NewValidBlockChainFixture() (*BlockChain, map[string]*Wallet) {
 				Hash:        HashSum(tA),
 			},
 		},
-		// Send some outputs to recipientA, some back to self.
+		// Send some outputs to alice, some back to sender.
 		Outputs: []TxOutput{
 			TxOutput{
 				Amount:    3,
@@ -235,7 +235,7 @@ func NewValidBlockChainFixture() (*BlockChain, map[string]*Wallet) {
 				Hash:        HashSum(tB),
 			},
 		},
-		// One coin output to recipientB.
+		// One coin output to bob.
 		Outputs: []TxOutput{
 			TxOutput{
 				Amount:    1,
