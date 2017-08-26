@@ -13,5 +13,3 @@ import:
 - package: github.com/abiosoft/ishell
 - package: gopkg.in/kyokomi/emoji.v1
   version: ^1.5.0
-- package: gopkg.in/fatih/set.v0
-  version: ^0.1.0
