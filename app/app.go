@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"os/signal"
 	"sync"
@@ -36,6 +37,7 @@ type App struct {
 	CurrentUser      *User
 	PeerStore        *peer.PeerStore
 	Chain            *blockchain.BlockChain
+	Miner            *miner.Miner
 	Pool             *pool.Pool
 	blockQueue       chan *blockchain.Block
 	transactionQueue chan *blockchain.Transaction
@@ -48,12 +50,16 @@ func Run(cfg conf.Config) {
 	log.Info("Starting Cumulus node")
 	config := &cfg
 
+	// TODO: remove this when we have scaleable difficulty
+	consensus.CurrentDifficulty = big.NewInt(2 << 21)
+
 	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
 	user := getCurrentUser()
 	a := App{
 		PeerStore:        peer.NewPeerStore(addr),
 		CurrentUser:      user,
 		Chain:            createBlockchain(user),
+		Miner:            miner.New(),
 		Pool:             getLocalPool(),
 		blockQueue:       make(chan *blockchain.Block, blockQueueSize),
 		transactionQueue: make(chan *blockchain.Transaction, transactionQueueSize),
@@ -139,7 +145,7 @@ func Run(cfg conf.Config) {
 	}
 
 	if config.Mine {
-		// Start the miner
+		log.Info("Starting miner")
 		go a.RunMiner()
 	}
 }
@@ -188,6 +194,9 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 			break
 		}
 
+		a.Chain.RLock()
+		defer a.Chain.RUnlock()
+
 		var hash blockchain.Hash
 		err = json.Unmarshal(hashBytes, &hash)
 		if err != nil {
@@ -226,7 +235,7 @@ func (a *App) PushHandler(push *msg.Push) {
 		}
 		block, err := blockchain.DecodeBlockJSON(blockBytes)
 		if err != nil {
-			log.Error(err)
+			// Invalid block payload
 			return
 		}
 
@@ -249,16 +258,12 @@ func (a *App) PushHandler(push *msg.Push) {
 // createBlockchain returns a new instance of a blockchain with only a genesis
 // block.
 func createBlockchain(user *User) *blockchain.BlockChain {
-	bc := blockchain.BlockChain{
-		Blocks: make([]*blockchain.Block, 0),
-		Head:   blockchain.NilHash,
-	}
-
+	bc := blockchain.New()
 	genesisBlock := blockchain.Genesis(user.Wallet.Public(),
 		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
 
 	bc.AppendBlock(genesisBlock)
-	return &bc
+	return bc
 }
 
 // getLocalPool returns an instance of the pool.
@@ -284,6 +289,9 @@ func (a *App) HandleWork() {
 
 // HandleTransaction handles new instance of TransactionWork.
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
+	a.Chain.RLock()
+	defer a.Chain.RUnlock()
+
 	validTransaction := a.Pool.Push(txn, a.Chain)
 	if validTransaction {
 		log.Debug("Added transaction to pool from address: " + txn.Sender.Repr())
@@ -295,8 +303,12 @@ func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 // HandleBlock handles new instance of BlockWork.
 func (a *App) HandleBlock(blk *blockchain.Block) {
 	log.Info("Received new block")
+	wasMining := a.Miner.PauseIfRunning()
 
-	if len(a.Chain.Blocks) > 0 && blk.BlockNumber < a.Chain.LastBlock().BlockNumber {
+	a.Chain.Lock()
+	defer a.Chain.Unlock()
+
+	if blk.BlockNumber < uint32(len(a.Chain.Blocks)) {
 		// We already have this block
 		return
 	}
@@ -304,14 +316,12 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	validBlock := a.Pool.Update(blk, a.Chain)
 	if !validBlock {
 		// The block was invalid wrt our chain. Maybe our chain is out of date.
-		// Update it and try again. Stop miner before we try to sync.
-		mining := miner.IsMining()
-		miner.StopMining()
+		// Update it and try again.
 		chainChanged, err := a.SyncBlockChain()
 		if err != nil {
 			log.WithError(err).Error("Error synchronizing blockchain")
-			if chainChanged && mining {
-				a.RunMiner()
+			if wasMining {
+				a.ResumeMiner(chainChanged)
 			}
 			return
 		}
@@ -319,8 +329,8 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 		validBlock = a.Pool.Update(blk, a.Chain)
 		if !validBlock {
 			// Synchronizing our chain didn't help, the block is still invalid.
-			if chainChanged && mining {
-				a.RunMiner()
+			if wasMining {
+				a.ResumeMiner(chainChanged)
 			}
 			return
 		}
@@ -329,7 +339,9 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	// Append to the chain before requesting the next block so that the block
 	// numbers make sense.
 	a.Chain.AppendBlock(blk)
-	a.RestartMiner()
+	if wasMining {
+		a.ResumeMiner(true)
+	}
 	log.Debugf("Added block number %d to chain", blk.BlockNumber)
 	log.Debug("Chain length: ", len(a.Chain.Blocks))
 	return
@@ -337,37 +349,45 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 
 // RunMiner continuously pulls transactions form the transaction pool, uses them to
 // create blocks, and mines those blocks. When a block is mined it is added
-// to the blockchain and broadcasted into the network. RunMiner() returns when
-// miner.StopMining() is called.
+// to the blockchain and broadcasted into the network. RunMiner returns when
+// miner.StopMining() or miner.PauseIfRunning() are called.
 func (a *App) RunMiner() {
-	log.Info("Starting miner")
+	log.Debug("Miner started")
 	for {
+		a.Chain.RLock()
+
 		// Make a new block form the transactions in the transaction pool
 		blockToMine := a.Pool.NextBlock(a.Chain, a.CurrentUser.Wallet.Public(),
 			a.CurrentUser.BlockSize)
 
+		a.Chain.RUnlock()
+
 		// TODO: update this when we have adjustable difficulty
 		blockToMine.Target = consensus.CurrentTarget()
-		miningResult := miner.Mine(a.Chain, blockToMine)
+		miningResult := a.Miner.Mine(blockToMine)
 
 		if miningResult.Complete {
 			log.Info("Successfully mined a block!")
+			a.HandleBlock(blockToMine)
 			push := msg.Push{
 				ResourceType: msg.ResourceBlock,
 				Resource:     blockToMine,
 			}
 			a.PeerStore.Broadcast(push)
 		} else if miningResult.Info == miner.MiningHalted {
-			log.Info("Miner stopped")
+			log.Debug("Miner stopped")
 			return
 		}
 	}
 }
 
-// RestartMiner restarts the miner only if it is running when this is called.
-func (a *App) RestartMiner() {
-	if miner.IsMining() {
-		miner.StopMining()
+// ResumeMiner resumes the current mining job if restart is false, otherwise it
+// restarts the miner with a new mining job.
+func (a *App) ResumeMiner(restart bool) {
+	if !restart {
+		a.Miner.ResumeMining()
+	} else {
+		a.Miner.StopMining()
 		go a.RunMiner()
 	}
 }
