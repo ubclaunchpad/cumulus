@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ubclaunchpad/cumulus/common/constants"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
@@ -12,8 +14,9 @@ import (
 )
 
 func TestMine(t *testing.T) {
-	bc, b := blockchain.NewValidTestChainAndBlock()
+	_, b := blockchain.NewValidTestChainAndBlock()
 	tempMaxTarget := c.MaxTarget
+	m := New()
 
 	// Set min difficulty to be equal to the target so that the block validation
 	// passes
@@ -23,7 +26,7 @@ func TestMine(t *testing.T) {
 	// below the target straight away (2**256 - 1)
 	b.Target = blockchain.BigIntToHash(c.MaxTarget)
 	b.Time = util.UnixNow()
-	mineResult := Mine(bc, b)
+	mineResult := m.Mine(b)
 	c.MaxTarget = tempMaxTarget
 
 	assert.True(t, mineResult.Complete)
@@ -31,7 +34,8 @@ func TestMine(t *testing.T) {
 }
 
 func TestMineHaltMiner(t *testing.T) {
-	bc, b := blockchain.NewValidTestChainAndBlock()
+	_, b := blockchain.NewValidTestChainAndBlock()
+	m := New()
 
 	// Set target to be as hard as possible so that we stall.
 	b.Target = blockchain.BigIntToHash(c.MinTarget)
@@ -40,11 +44,11 @@ func TestMineHaltMiner(t *testing.T) {
 	// Use a thread to stop the miner a few moments after starting.
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		StopMining()
+		m.StopMining()
 	}()
 
 	// Start the miner.
-	mineResult := Mine(bc, b)
+	mineResult := m.Mine(b)
 
 	assert.False(t, mineResult.Complete)
 	assert.Equal(t, mineResult.Info, MiningHalted)
@@ -85,8 +89,26 @@ func TestVerifyProofOfWork(t *testing.T) {
 	b.Target = blockchain.BigIntToHash(
 		c.MaxUint256,
 	)
+	m := New()
 
-	if !VerifyProofOfWork(b) {
-		t.Fail()
-	}
+	assert.True(t, m.VerifyProofOfWork(b))
+}
+
+func TestStopPauseMining(t *testing.T) {
+	b := blockchain.NewTestBlock()
+	b.Target = blockchain.BigIntToHash(constants.MinTarget)
+	m := New()
+
+	go m.Mine(b)
+	time.Sleep(time.Millisecond * 50)
+	assert.Equal(t, int(m.State()), int(Running))
+	assert.True(t, m.PauseIfRunning())
+	assert.Equal(t, int(m.State()), int(Paused))
+	m.ResumeMining()
+	time.Sleep(time.Millisecond * 50)
+	assert.Equal(t, int(m.State()), int(Running))
+	m.StopMining()
+	time.Sleep(time.Millisecond * 50)
+	assert.Equal(t, int(m.State()), int(Stopped))
+	consensus.CurrentDifficulty = constants.MinTarget
 }
