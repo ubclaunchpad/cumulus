@@ -11,7 +11,36 @@ import (
 type BlockChain struct {
 	Blocks []*Block
 	Head   Hash
-	Lock   *sync.RWMutex
+	lock   *sync.RWMutex
+}
+
+// New returns a new blockchain
+func New() *BlockChain {
+	return &BlockChain{
+		Blocks: make([]*Block, 0),
+		Head:   NilHash,
+		lock:   &sync.RWMutex{},
+	}
+}
+
+// RLock locks the blockchain for reading
+func (bc *BlockChain) RLock() {
+	bc.lock.RLock()
+}
+
+// RUnlock locks the blockchain for reading
+func (bc *BlockChain) RUnlock() {
+	bc.lock.RUnlock()
+}
+
+// Lock locks the blockchain for reading
+func (bc *BlockChain) Lock() {
+	bc.lock.Lock()
+}
+
+// Unlock locks the blockchain for reading
+func (bc *BlockChain) Unlock() {
+	bc.lock.Unlock()
 }
 
 // Len returns the length of the BlockChain when marshalled

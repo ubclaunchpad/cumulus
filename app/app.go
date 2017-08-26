@@ -194,8 +194,8 @@ func (a *App) RequestHandler(req *msg.Request) msg.Response {
 			break
 		}
 
-		a.Chain.Lock.RLock()
-		defer a.Chain.Lock.RUnlock()
+		a.Chain.RLock()
+		defer a.Chain.RUnlock()
 
 		var hash blockchain.Hash
 		err = json.Unmarshal(hashBytes, &hash)
@@ -258,17 +258,12 @@ func (a *App) PushHandler(push *msg.Push) {
 // createBlockchain returns a new instance of a blockchain with only a genesis
 // block.
 func createBlockchain(user *User) *blockchain.BlockChain {
-	bc := blockchain.BlockChain{
-		Blocks: make([]*blockchain.Block, 0),
-		Head:   blockchain.NilHash,
-		Lock:   &sync.RWMutex{},
-	}
-
+	bc := blockchain.New()
 	genesisBlock := blockchain.Genesis(user.Wallet.Public(),
 		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
 
 	bc.AppendBlock(genesisBlock)
-	return &bc
+	return bc
 }
 
 // getLocalPool returns an instance of the pool.
@@ -294,8 +289,8 @@ func (a *App) HandleWork() {
 
 // HandleTransaction handles new instance of TransactionWork.
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
-	a.Chain.Lock.RLock()
-	defer a.Chain.Lock.RUnlock()
+	a.Chain.RLock()
+	defer a.Chain.RUnlock()
 
 	validTransaction := a.Pool.Push(txn, a.Chain)
 	if validTransaction {
@@ -310,8 +305,8 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	log.Info("Received new block")
 	wasMining := a.Miner.PauseIfRunning()
 
-	a.Chain.Lock.Lock()
-	defer a.Chain.Lock.Unlock()
+	a.Chain.Lock()
+	defer a.Chain.Unlock()
 
 	if blk.BlockNumber < uint32(len(a.Chain.Blocks)) {
 		// We already have this block
@@ -359,13 +354,13 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 func (a *App) RunMiner() {
 	log.Debug("Miner started")
 	for {
-		a.Chain.Lock.RLock()
+		a.Chain.RLock()
 
 		// Make a new block form the transactions in the transaction pool
 		blockToMine := a.Pool.NextBlock(a.Chain, a.CurrentUser.Wallet.Public(),
 			a.CurrentUser.BlockSize)
 
-		a.Chain.Lock.RUnlock()
+		a.Chain.RUnlock()
 
 		// TODO: update this when we have adjustable difficulty
 		blockToMine.Target = consensus.CurrentTarget()

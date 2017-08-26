@@ -92,7 +92,7 @@ func NewTestBlockChain() *BlockChain {
 		bc.Blocks[i] = NewTestBlock()
 	}
 	bc.Head = HashSum(bc.Blocks[nBlocks-1])
-	bc.Lock = &sync.RWMutex{}
+	bc.lock = &sync.RWMutex{}
 	return &bc
 }
 
@@ -168,11 +168,10 @@ func NewValidBlockChainFixture() (*BlockChain, Wallet) {
 	inputBlock := NewTestInputBlock(inputTransactions)
 	outputBlock := NewTestOutputBlock(outputTransactions, inputBlock)
 
-	return &BlockChain{
-		Blocks: []*Block{inputBlock, outputBlock},
-		Head:   NewTestHash(),
-		Lock:   &sync.RWMutex{},
-	}, *recipient
+	bc := New()
+	bc.Blocks = []*Block{inputBlock, outputBlock}
+	bc.Head = NewTestHash()
+	return bc, *recipient
 }
 
 // NewValidTestChainAndBlock creates a valid BlockChain and a Block that is valid

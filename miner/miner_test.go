@@ -100,15 +100,15 @@ func TestStopPauseMining(t *testing.T) {
 	m := New()
 
 	go m.Mine(b)
-	time.Sleep(time.Second / 2)
+	time.Sleep(time.Millisecond * 50)
 	assert.Equal(t, int(m.State()), int(Running))
 	assert.True(t, m.PauseIfRunning())
 	assert.Equal(t, int(m.State()), int(Paused))
 	m.ResumeMining()
-	time.Sleep(time.Second / 2)
+	time.Sleep(time.Millisecond * 50)
 	assert.Equal(t, int(m.State()), int(Running))
 	m.StopMining()
-	time.Sleep(time.Second / 2)
+	time.Sleep(time.Millisecond * 50)
 	assert.Equal(t, int(m.State()), int(Stopped))
 	consensus.CurrentDifficulty = constants.MinTarget
 }
