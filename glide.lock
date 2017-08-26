@@ -1,5 +1,5 @@
-hash: b8d3d8395d2867faced0c31743cd56384beb07b6290c0e339c84d2354de4fcbc
-updated: 2017-07-29T17:35:29.15377758-07:00
+hash: e768a54d8cc1f394193c672f3d61ab653cf65f1174bb7799586ed46257afeb91
+updated: 2017-08-25T21:54:14.356471973-07:00
 imports:
 - name: github.com/abiosoft/ishell
   version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
@@ -71,6 +71,8 @@ imports:
   subpackages:
   - transform
   - unicode/norm
+- name: gopkg.in/fatih/set.v0
+  version: 27c40922c40b43fe04554d8223a402af3ea333f3
 - name: gopkg.in/kyokomi/emoji.v1
   version: 7e06b236c489543f53868841f188a294e3383eab
 - name: gopkg.in/yaml.v2
