@@ -117,14 +117,6 @@ func CloudBase(
 
 	b.Transactions = append([]*blockchain.Transaction{&cbTx}, b.Transactions...)
 
-	// Increment the input index of every transaction that has an input in the
-	// new block
-	for _, tx := range b.Transactions[1:] {
-		if tx.Inputs[0].BlockNumber == uint32(len(bc.Blocks)) {
-			tx.Inputs[0].Index++
-		}
-	}
-
 	return b
 }
 
