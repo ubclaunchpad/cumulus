@@ -5,66 +5,52 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/consensus"
 )
 
 func TestGetAndSetTransaction(t *testing.T) {
 	p := New()
 	bc, b := blockchain.NewValidTestChainAndBlock()
-	if p.Len() != 0 {
-		t.FailNow()
-	}
+	assert.Equal(t, p.Size(), 0)
+
 	tr := b.Transactions[1]
-	if !p.Push(tr, bc) {
-		t.FailNow()
-	}
-
-	if p.Len() != 1 {
-		t.FailNow()
-	}
-
-	r := p.Get(tr.Input.Hash)
-	if r != tr {
-		t.FailNow()
-	}
+	assert.Equal(t, p.Push(tr, bc), consensus.ValidTransaction)
+	assert.Equal(t, p.Size(), 1)
+	assert.ObjectsAreEqual(tr, p.Get(blockchain.HashSum(tr)))
 
 	p.Delete(tr)
-	if p.Len() != 0 {
-		t.FailNow()
-	}
+	assert.Equal(t, p.Size(), 0)
 }
 
 func TestSetBadTransaction(t *testing.T) {
 	p := New()
-	bc := blockchain.NewTestBlockChain()
-	if p.Push(blockchain.NewTestTransaction(), bc) {
-		t.FailNow()
-	}
+	bc, _ := blockchain.NewValidTestChainAndBlock()
+
+	// This transaction will have bad inputs.
+	txn := blockchain.NewTestTransaction()
+	code := p.Push(txn, bc)
+	assert.NotEqual(t, code, consensus.ValidTransaction)
 }
 
 func TestUpdatePool(t *testing.T) {
 	p := New()
 	bc, legitBlk := blockchain.NewValidTestChainAndBlock()
 	badBlock := blockchain.NewTestBlock()
-	if p.Update(badBlock, bc) {
-		t.FailNow()
-	}
+
+	// Make sure we cant update with a bad block.
+	assert.False(t, p.Update(badBlock, bc))
 
 	for _, tr := range legitBlk.Transactions[1:] {
 		p.Push(tr, bc)
 	}
-	if p.Len() == 0 {
-		t.FailNow()
-	}
-	if p.Len() != len(legitBlk.Transactions[1:]) {
-		t.FailNow()
-	}
 
-	if !p.Update(legitBlk, bc) {
-		t.FailNow()
-	}
-	if p.Len() != 0 {
-		t.FailNow()
-	}
+	// Assert transactions added.
+	assert.NotEqual(t, p.Size(), 0)
+	assert.Equal(t, p.Size(), len(legitBlk.Transactions[1:]))
+
+	// Assert we can add update with a legit block and it drains pool.
+	assert.True(t, p.Update(legitBlk, bc))
+	assert.Equal(t, p.Size(), 0)
 }
 
 func TestGetNewBlockEmpty(t *testing.T) {
@@ -81,13 +67,10 @@ func TestGetIndex(t *testing.T) {
 	for i := 0; i < numTxns; i++ {
 		p.PushUnsafe(blockchain.NewTestTransaction())
 	}
-	if p.GetIndex(tr) != 0 {
-		t.FailNow()
-	}
+	assert.Equal(t, p.GetIndex(tr), 0)
+
 	for i := 0; i < numTxns; i++ {
-		if p.GetIndex(p.Order[i].Transaction) != i {
-			t.FailNow()
-		}
+		assert.Equal(t, p.GetIndex(p.Order[i].Transaction), i)
 	}
 }
 
@@ -101,12 +84,13 @@ func TestNextBlock(t *testing.T) {
 		p.PushUnsafe(blockchain.NewTestTransaction())
 	}
 	b := p.NextBlock(chain, blockchain.NewWallet().Public(), 1<<18)
+
 	assert.NotNil(t, b)
 	assert.True(t, b.Len() < 1<<18)
 	assert.True(t, b.Len() > 0)
 
 	// The difference is off by one thanks to cloud transaction.
-	assert.Equal(t, len(b.Transactions), numTxns-p.Len()+1)
+	assert.Equal(t, len(b.Transactions), numTxns-p.Size()+1)
 	assert.Equal(t, blockchain.HashSum(lastBlk), b.LastBlock)
 	assert.Equal(t, uint64(0), b.Nonce)
 	assert.Equal(t, uint32(nBlks), b.BlockNumber)
@@ -125,10 +109,8 @@ func TestPop(t *testing.T) {
 func TestSetDedupes(t *testing.T) {
 	p := New()
 	t1 := blockchain.NewTestTransaction()
-	t2 := blockchain.NewTestTransaction()
-	t1.Input.Hash = t2.Input.Hash
 	p.PushUnsafe(t1)
-	p.PushUnsafe(t2)
-	assert.Equal(t, p.Peek(), t2)
-	assert.Equal(t, p.Len(), 1)
+	p.PushUnsafe(t1)
+	assert.Equal(t, p.Size(), 1)
+	assert.Equal(t, p.Peek(), t1)
 }

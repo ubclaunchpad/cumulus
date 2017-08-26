@@ -67,13 +67,18 @@ func (bc *BlockChain) GetInputTransaction(t *TxHashPointer) *Transaction {
 }
 
 // GetAllInputs returns all the transactions referenced by a transaction
-// as inputs.
-func (bc *BlockChain) GetAllInputs(t *Transaction) []*Transaction {
+// as inputs. Returns an error if any of the transactios requested could
+// not be found.
+func (bc *BlockChain) GetAllInputs(t *Transaction) ([]*Transaction, error) {
 	txns := []*Transaction{}
 	for _, tx := range t.Inputs {
-		txns = append(txns, bc.GetInputTransaction(&tx))
+		nextTxn := bc.GetInputTransaction(&tx)
+		if nextTxn == nil {
+			return nil, errors.New("input transaction not found")
+		}
+		txns = append(txns, nextTxn)
 	}
-	return txns
+	return txns, nil
 }
 
 // ContainsTransaction returns true if the BlockChain contains the transaction

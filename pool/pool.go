@@ -3,8 +3,6 @@ package pool
 import (
 	"time"
 
-	log "github.com/Sirupsen/logrus"
-
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/common/util"
 	"github.com/ubclaunchpad/cumulus/consensus"
@@ -73,14 +71,12 @@ func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
 // Push inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
 // TODO: This should return an error if could not add.
-func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
-	if ok, err := consensus.VerifyTransaction(bc, t); ok {
+func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) consensus.TransactionCode {
+	ok, code := consensus.VerifyTransaction(bc, t)
+	if ok {
 		p.set(t)
-		return true
-	} else {
-		log.Debug(err)
-		return false
 	}
+	return code
 }
 
 // PushUnsafe adds a transaction to the pool without validation.

@@ -22,14 +22,14 @@ func VerifyTransaction(bc *blockchain.BlockChain,
 	}
 
 	// Find the transaction input in the chain (by hash)
-	inputs := bc.GetAllInputs(t)
-	if len(inputs) == 0 {
+	inputs, err := bc.GetAllInputs(t)
+	if err != nil || len(inputs) == 0 {
 		return false, NoInputTransactions
 	}
 
 	// Check that output to sender in input is equal to outputs in t
 	out := t.GetTotalOutput()
-	in := t.GetTotalInput(bc)
+	in, err := t.GetTotalInput(bc)
 	if out != in {
 		return false, Overspend
 	}

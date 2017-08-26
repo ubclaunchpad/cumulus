@@ -131,15 +131,19 @@ func (t *Transaction) GetTotalOutputFor(recipient string) uint64 {
 
 // GetTotalInput sums the input amounts from the transaction.
 // Requires the blockchain for lookups.
-func (t *Transaction) GetTotalInput(bc *BlockChain) uint64 {
+func (t *Transaction) GetTotalInput(bc *BlockChain) (uint64, error) {
+
 	result := uint64(0)
 	// This is a bit crazy; filter all input transactions
 	// by this senders address and sum the outputs.
-	inputs := bc.GetAllInputs(t)
+	inputs, err := bc.GetAllInputs(t)
+	if err != nil {
+		return 0, err
+	}
 	for _, in := range inputs {
 		result += in.GetTotalOutputFor(t.Sender.Repr())
 	}
-	return result
+	return result, nil
 }
 
 // GetBlockRange returns the start and end block indexes for the inputs
