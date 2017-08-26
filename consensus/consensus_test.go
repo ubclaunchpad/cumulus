@@ -400,6 +400,35 @@ func TestVerifyCloudBaseBadSig(t *testing.T) {
 	}
 }
 
+func TestVerifiyCloudBaseMultiInputs(t *testing.T) {
+	bc, b := blockchain.NewValidTestChainAndBlock()
+	cb := b.GetCloudBaseTransaction()
+
+	// Add an input to the CB, replace cb.
+	b.Transactions[0].Inputs = append(cb.Inputs, blockchain.TxHashPointer{
+		Index:       1,
+		BlockNumber: b.BlockNumber,
+		Hash:        blockchain.NewTestHash(),
+	})
+
+	// Should fail with multi-inputs.
+	valid, code := VerifyCloudBase(bc, b.GetCloudBaseTransaction())
+	assert.False(t, valid)
+	assert.Equal(t, code, BadCloudBaseInput)
+}
+
+func TestVerifiyCloudBaseNoInputs(t *testing.T) {
+	bc, b := blockchain.NewValidTestChainAndBlock()
+
+	// Remove all inputs.
+	b.Transactions[0].Inputs = []blockchain.TxHashPointer{}
+
+	// Should fail with multi-inputs.
+	valid, code := VerifyCloudBase(bc, b.GetCloudBaseTransaction())
+	assert.False(t, valid)
+	assert.Equal(t, code, BadCloudBaseInput)
+}
+
 // VerifyGenesisBlock Tests
 
 func TestVerifyGenesisBlock(t *testing.T) {

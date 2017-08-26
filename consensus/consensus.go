@@ -65,9 +65,11 @@ func VerifyCloudBase(bc *blockchain.BlockChain,
 	}
 
 	// Check that the input is 0 (only one input to CB).
-	input := t.TxBody.Inputs[0]
-	if input.BlockNumber != 0 || input.Hash != blockchain.NilHash ||
-		input.Index != 0 {
+	input := t.TxBody.Inputs
+	if len(input) != 1 ||
+		input[0].BlockNumber != 0 ||
+		input[0].Hash != blockchain.NilHash ||
+		input[0].Index != 0 {
 		return false, BadCloudBaseInput
 	}
 
