@@ -15,8 +15,8 @@ type BlockCode uint32
 const (
 	// ValidTransaction is returned when transaction is valid.
 	ValidTransaction TransactionCode = iota
-	// NoInputTransaction is returned when transaction has no valid input transaction.
-	NoInputTransaction
+	// NoInputTransactions is returned when transaction has no valid input transaction.
+	NoInputTransactions
 	// Overspend is returned when transaction outputs exceed transaction inputs.
 	Overspend
 	// BadSig is returned when the signature verification fails.

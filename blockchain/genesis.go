@@ -15,15 +15,16 @@ func Genesis(miner Address, target Hash, blockReward uint64, extraData []byte) *
 		Amount:    blockReward,
 		Recipient: miner.Repr(),
 	}
+	cbInput := TxHashPointer{
+		BlockNumber: 0,
+		Hash:        NilHash,
+		Index:       0,
+	}
 
 	cbTx := &Transaction{
 		TxBody: TxBody{
-			Sender: NilAddr,
-			Input: TxHashPointer{
-				BlockNumber: 0,
-				Hash:        NilHash,
-				Index:       0,
-			},
+			Sender:  NilAddr,
+			Inputs:  []TxHashPointer{cbInput},
 			Outputs: []TxOutput{cbReward},
 		},
 		Sig: NilSig,

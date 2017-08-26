@@ -292,8 +292,8 @@ func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 	a.Chain.RLock()
 	defer a.Chain.RUnlock()
 
-	validTransaction := a.Pool.Push(txn, a.Chain)
-	if validTransaction {
+	code := a.Pool.Push(txn, a.Chain)
+	if code == consensus.ValidTransaction {
 		log.Debug("Added transaction to pool from address: " + txn.Sender.Repr())
 	} else {
 		log.Debug("Bad transaction rejected from sender: " + txn.Sender.Repr())
@@ -477,7 +477,7 @@ func (a *App) makeBlockRequest(currentHead *blockchain.Block,
 
 // handleBlockResponse receives a block or nil from the newBlockChan and attempts
 // to validate it and add it to the blockchain, or it handles a protocol error
-// from the errChan. Returns whether the blockchain was modified and wether we
+// from the errChan. Returns whether the blockchain was modified and whether we
 // received an UpToDate response.
 func (a *App) handleBlockResponse(newBlockChan chan *blockchain.Block,
 	errChan chan *msg.ProtocolError) (changed bool, upToDate bool) {

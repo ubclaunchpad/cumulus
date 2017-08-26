@@ -3,8 +3,10 @@ package blockchain
 import (
 	"encoding/binary"
 	"io"
+	"math"
 
 	"github.com/ubclaunchpad/cumulus/common/util"
+	"gopkg.in/fatih/set.v0"
 )
 
 // TxHashPointer is a reference to a transaction on the blockchain.
@@ -40,7 +42,7 @@ func (to TxOutput) Marshal() []byte {
 // TxBody contains all relevant information about a transaction
 type TxBody struct {
 	Sender  Address
-	Input   TxHashPointer
+	Inputs  []TxHashPointer
 	Outputs []TxOutput
 }
 
@@ -53,7 +55,9 @@ func (tb TxBody) Len() int {
 func (tb TxBody) Marshal() []byte {
 	var buf []byte
 	buf = append(buf, tb.Sender.Marshal()...)
-	buf = append(buf, tb.Input.Marshal()...)
+	for _, in := range tb.Inputs {
+		buf = append(buf, in.Marshal()...)
+	}
 	for _, out := range tb.Outputs {
 		buf = append(buf, out.Marshal()...)
 	}
@@ -111,4 +115,94 @@ func (t *Transaction) GetTotalOutput() uint64 {
 		result += out.Amount
 	}
 	return result
+}
+
+// GetTotalOutputFor sums the outputs referenced to a specific recipient.
+// recipient is an address checksum hex string.
+func (t *Transaction) GetTotalOutputFor(recipient string) uint64 {
+	result := uint64(0)
+	for _, out := range t.Outputs {
+		if out.Recipient == recipient {
+			result += out.Amount
+		}
+	}
+	return result
+}
+
+// GetTotalInput sums the input amounts from the transaction.
+// Requires the blockchain for lookups.
+func (t *Transaction) GetTotalInput(bc *BlockChain) (uint64, error) {
+
+	result := uint64(0)
+	// This is a bit crazy; filter all input transactions
+	// by this senders address and sum the outputs.
+	inputs, err := bc.GetAllInputs(t)
+	if err != nil {
+		return 0, err
+	}
+	for _, in := range inputs {
+		result += in.GetTotalOutputFor(t.Sender.Repr())
+	}
+	return result, nil
+}
+
+// GetBlockRange returns the start and end block indexes for the inputs
+// to a transaction.
+func (bc *BlockChain) GetBlockRange(t *Transaction) (uint32, uint32) {
+	min := uint32(math.MaxUint32)
+	max := uint32(0)
+	for _, in := range t.Inputs {
+		if in.BlockNumber < min {
+			min = in.BlockNumber
+		}
+		if in.BlockNumber > max {
+			max = in.BlockNumber
+		}
+	}
+	return min, max
+}
+
+// InputsIntersect returns true if the inputs of t intersect with those of other.
+func (t *Transaction) InputsIntersect(other *Transaction) bool {
+	return !t.InputIntersection(other).IsEmpty()
+}
+
+// InputIntersection returns the intersection of the inputs of t and other.
+func (t *Transaction) InputIntersection(other *Transaction) set.Interface {
+	return set.Intersection(t.InputSet(), other.InputSet())
+}
+
+// InputSet returns the transaction inputs as a set object.
+func (t *Transaction) InputSet() *set.Set {
+	a := make([]interface{}, len(t.Inputs))
+	for i, v := range t.Inputs {
+		a[i] = v
+	}
+	return set.New(a...)
+}
+
+// InputsSpentElsewhere returns true if inputs purported to be only spent
+// on transaction t have been spent elsewhere after block index `start`.
+func (t *Transaction) InputsSpentElsewhere(bc *BlockChain, start uint32) bool {
+	// Get the set of inputs for t.
+	inSet := t.InputSet()
+
+	// Look at each transaction in the chain from start on.
+	for _, b := range bc.Blocks[start:] {
+		for _, txn := range b.Transactions {
+
+			// If the inputs to t intersect with the inputs to txn...
+			if !set.Intersection(inSet, txn.InputSet()).IsEmpty() {
+
+				// ... and the sender is the same, then we have a respend.
+				if txn.Sender.Repr() == t.Sender.Repr() {
+					return true
+				}
+			}
+		}
+	}
+
+	// If we made it through all the transactions, without finding
+	// inputs respent anywhere, then we're good.
+	return false
 }

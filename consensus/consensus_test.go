@@ -1,12 +1,12 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 
 	crand "crypto/rand"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
 	"github.com/ubclaunchpad/cumulus/common/util"
@@ -19,31 +19,18 @@ func TestVerifyTransactionNilTransaction(t *testing.T) {
 
 	valid, code := VerifyTransaction(bc, nil)
 
-	if valid {
-		t.Fail()
-	}
-	if code != NilTransaction {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, NilTransaction)
 }
 
 func TestVerifyTransactionNoInputTransaction(t *testing.T) {
-	tr, _ := blockchain.NewTestTransactionValue(
-		blockchain.NewWallet(),
-		blockchain.NewWallet(),
-		1,
-		0,
-	)
+	txn := blockchain.NewTestTransaction()
 	bc, _ := blockchain.NewValidBlockChainFixture()
+	txn.Inputs = []blockchain.TxHashPointer{}
+	valid, code := VerifyTransaction(bc, txn)
 
-	valid, code := VerifyTransaction(bc, tr)
-
-	if valid {
-		t.Fail()
-	}
-	if code != NoInputTransaction {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, NoInputTransactions)
 }
 
 func TestVerifyTransactionOverspend(t *testing.T) {
@@ -54,60 +41,40 @@ func TestVerifyTransactionOverspend(t *testing.T) {
 
 	valid, code := VerifyTransaction(bc, tr)
 
-	if valid {
-		t.Fail()
-	}
-	if code != Overspend {
-		fmt.Println(code)
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, Overspend)
 }
 
 func TestVerifyTransactionSignatureFail(t *testing.T) {
-	bc, _ := blockchain.NewValidBlockChainFixture()
-	tr := bc.Blocks[1].Transactions[1]
+	bc, txn := blockchain.NewValidChainAndTxn()
 
+	// Resign txn with fake wallet.
 	fakeSender := blockchain.NewWallet()
-	tr, _ = tr.TxBody.Sign(*fakeSender, crand.Reader)
-	bc.Blocks[1].Transactions[1] = tr
+	txn, _ = txn.TxBody.Sign(*fakeSender, crand.Reader)
 
-	valid, code := VerifyTransaction(bc, tr)
-	if valid {
-		t.Fail()
-	}
-	if code != BadSig {
-		t.Fail()
-	}
+	valid, code := VerifyTransaction(bc, txn)
+
+	assert.False(t, valid)
+	assert.Equal(t, code, BadSig)
 }
 
 func TestVerifyTransactionPass(t *testing.T) {
-	bc, b := blockchain.NewValidTestChainAndBlock()
-	tr := b.Transactions[1]
+	bc, txn := blockchain.NewValidChainAndTxn()
 
-	valid, code := VerifyTransaction(bc, tr)
+	valid, code := VerifyTransaction(bc, txn)
 
-	if !valid {
-		t.Fail()
-	}
-	if code != ValidTransaction {
-		t.Fail()
-	}
+	assert.True(t, valid)
+	assert.Equal(t, code, ValidTransaction)
 }
 
 func TestTransactionRespend(t *testing.T) {
-	bc, _ := blockchain.NewValidBlockChainFixture()
-	trC := bc.Blocks[1].Transactions[1]
-	b := blockchain.NewTestOutputBlock([]*blockchain.Transaction{trC}, bc.Blocks[1])
-	bc.AppendBlock(b)
+	bc, _ := blockchain.NewValidTestChainAndBlock()
+	trC := bc.Blocks[2].Transactions[1]
 
 	valid, code := VerifyTransaction(bc, trC)
 
-	if valid {
-		t.Fail()
-	}
-	if code != Respend {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, Respend)
 }
 
 // VerifyBlock Tests
@@ -117,12 +84,8 @@ func TestVerifyBlockNilBlock(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, nil)
 
-	if valid {
-		t.Fail()
-	}
-	if code != NilBlock {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, NilBlock)
 }
 
 func TestVerifyBlockBadNonce(t *testing.T) {
@@ -132,13 +95,8 @@ func TestVerifyBlockBadNonce(t *testing.T) {
 	valid, code := VerifyBlock(bc, b)
 	CurrentDifficulty = c.MinTarget
 
-	if valid {
-		t.Fail()
-	}
-
-	if code != BadNonce {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, BadNonce)
 }
 
 func TestVerifyBlockBadGenesisBlock(t *testing.T) {
@@ -153,28 +111,20 @@ func TestVerifyBlockBadGenesisBlock(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, gb)
 
-	if valid {
-		t.Fail()
-	}
-
-	if code != BadGenesisBlock {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, BadGenesisBlock)
 }
 
 func TestVerifyBlockBadTransaction(t *testing.T) {
-	bc, _ := blockchain.NewValidBlockChainFixture()
-	tr := bc.Blocks[1].Transactions[1]
-	tr.Outputs[0].Amount = 5
+	bc, b := blockchain.NewValidTestChainAndBlock()
 
-	valid, code := VerifyBlock(bc, bc.Blocks[1])
+	// This would be an overspend on alices part (she only has 3 coins here).
+	b.Transactions[1].Outputs[0].Amount = 5
 
-	if valid {
-		t.Fail()
-	}
-	if code != BadTransaction {
-		t.Fail()
-	}
+	valid, code := VerifyBlock(bc, b)
+
+	assert.False(t, valid)
+	assert.Equal(t, code, BadTransaction)
 }
 
 func TestVerifyBlockBadBlockNumber(t *testing.T) {
@@ -183,12 +133,8 @@ func TestVerifyBlockBadBlockNumber(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, bc.Blocks[1])
 
-	if valid {
-		t.Fail()
-	}
-	if code != BadBlockNumber {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, BadBlockNumber)
 }
 
 func TestVerifyBlockBadHash(t *testing.T) {
@@ -262,12 +208,8 @@ func TestBlockDoubleSpend(t *testing.T) {
 
 	valid, code := VerifyBlock(bc, b)
 
-	if valid {
-		t.Fail()
-	}
-	if code != DoubleSpend {
-		t.Fail()
-	}
+	assert.False(t, valid)
+	assert.Equal(t, code, DoubleSpend)
 }
 
 func TestVerifyBlockBigNumber(t *testing.T) {
@@ -360,7 +302,7 @@ func TestVerifyCloudBaseBadSender(t *testing.T) {
 func TestVerifyCloudBaseBadBadInput(t *testing.T) {
 	bc, _ := blockchain.NewValidBlockChainFixture()
 	b := bc.Blocks[0]
-	b.GetCloudBaseTransaction().TxBody.Input.BlockNumber = 1
+	b.GetCloudBaseTransaction().TxBody.Inputs[0].BlockNumber = 1
 	valid, code := VerifyCloudBase(bc, b.GetCloudBaseTransaction())
 
 	if valid {
@@ -372,7 +314,7 @@ func TestVerifyCloudBaseBadBadInput(t *testing.T) {
 
 	bc, _ = blockchain.NewValidBlockChainFixture()
 	b = bc.Blocks[0]
-	b.GetCloudBaseTransaction().TxBody.Input.Hash = blockchain.NewTestHash()
+	b.GetCloudBaseTransaction().TxBody.Inputs[0].Hash = blockchain.NewTestHash()
 	valid, code = VerifyCloudBase(bc, b.GetCloudBaseTransaction())
 
 	if valid {
@@ -384,7 +326,7 @@ func TestVerifyCloudBaseBadBadInput(t *testing.T) {
 
 	bc, _ = blockchain.NewValidBlockChainFixture()
 	b = bc.Blocks[0]
-	b.GetCloudBaseTransaction().TxBody.Input.Index = 1
+	b.GetCloudBaseTransaction().TxBody.Inputs[0].Index = 1
 	valid, code = VerifyCloudBase(bc, b.GetCloudBaseTransaction())
 
 	if valid {
@@ -456,6 +398,35 @@ func TestVerifyCloudBaseBadSig(t *testing.T) {
 	if code != BadCloudBaseSig {
 		t.Fail()
 	}
+}
+
+func TestVerifiyCloudBaseMultiInputs(t *testing.T) {
+	bc, b := blockchain.NewValidTestChainAndBlock()
+	cb := b.GetCloudBaseTransaction()
+
+	// Add an input to the CB, replace cb.
+	b.Transactions[0].Inputs = append(cb.Inputs, blockchain.TxHashPointer{
+		Index:       1,
+		BlockNumber: b.BlockNumber,
+		Hash:        blockchain.NewTestHash(),
+	})
+
+	// Should fail with multi-inputs.
+	valid, code := VerifyCloudBase(bc, b.GetCloudBaseTransaction())
+	assert.False(t, valid)
+	assert.Equal(t, code, BadCloudBaseInput)
+}
+
+func TestVerifiyCloudBaseNoInputs(t *testing.T) {
+	bc, b := blockchain.NewValidTestChainAndBlock()
+
+	// Remove all inputs.
+	b.Transactions[0].Inputs = []blockchain.TxHashPointer{}
+
+	// Should fail with multi-inputs.
+	valid, code := VerifyCloudBase(bc, b.GetCloudBaseTransaction())
+	assert.False(t, valid)
+	assert.Equal(t, code, BadCloudBaseInput)
 }
 
 // VerifyGenesisBlock Tests

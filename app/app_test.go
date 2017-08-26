@@ -19,7 +19,7 @@ import (
 )
 
 func init() {
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.ErrorLevel)
 }
 
 func TestPushHandlerNewBlock(t *testing.T) {
@@ -141,7 +141,7 @@ func TestHandleValidBlock(t *testing.T) {
 	bc, blk := blockchain.NewValidTestChainAndBlock()
 	a.Chain = bc
 	a.HandleBlock(blk)
-	assert.Equal(t, blk, a.Chain.Blocks[2])
+	assert.Equal(t, blk, a.Chain.Blocks[3])
 
 	// TODO: Assert miner restarted.
 	// TODO: Assert pool appropriately emptied.
@@ -237,14 +237,24 @@ func TestHandleBlockResponse(t *testing.T) {
 	a := createNewTestApp()
 	newBlockChan := make(chan *blockchain.Block, 1)
 	errChan := make(chan *msg.ProtocolError, 1)
-	newBlockChan <- a.Chain.RollBack()
+
+	// Roll the last block off of the chain, add to channel.
+	lastBlock := a.Chain.RollBack()
+	assert.NotNil(t, lastBlock)
+	newBlockChan <- lastBlock
+
+	// Handle the block.
 	changed, upToDate := a.handleBlockResponse(newBlockChan, errChan)
 	assert.True(t, changed)
 	assert.False(t, upToDate)
+
+	// Add an on-chain block to the handler (this shouldn't change the chain).
 	newBlockChan <- a.Chain.Blocks[1]
 	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
 	assert.False(t, changed)
 	assert.False(t, upToDate)
+
+	// More stuff happens.
 	errChan <- msg.NewProtocolError(msg.UpToDate, "")
 	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
 	assert.False(t, changed)
@@ -253,19 +263,30 @@ func TestHandleBlockResponse(t *testing.T) {
 	changed, upToDate = a.handleBlockResponse(newBlockChan, errChan)
 	assert.True(t, changed)
 	assert.False(t, upToDate)
-	assert.Equal(t, len(a.Chain.Blocks), 1)
+	assert.Equal(t, len(a.Chain.Blocks), 2)
 }
 
 func TestHandleWork(t *testing.T) {
 	a := createNewTestApp()
 	go a.HandleWork()
-	a.blockQueue <- a.Chain.RollBack()
-	time.Sleep(time.Second)
+
+	// Roll the last block off of the chain, add to channel (expect it added back).
+	lastBlock := a.Chain.RollBack()
 	assert.Equal(t, len(a.Chain.Blocks), 2)
+	a.blockQueue <- lastBlock
+	time.Sleep(time.Millisecond * 50)
+	assert.Equal(t, len(a.Chain.Blocks), 3)
+
+	// Kill the worker.
 	a.quitChan <- true
-	a.blockQueue <- a.Chain.RollBack()
-	time.Sleep(time.Second)
-	assert.Equal(t, len(a.Chain.Blocks), 1)
+
+	// Roll the last block off of the chain, add to channel
+	// (expect it not to be added back).
+	lastBlock = a.Chain.RollBack()
+	assert.Equal(t, len(a.Chain.Blocks), 2)
+	a.blockQueue <- lastBlock
+	time.Sleep(time.Millisecond * 50)
+	assert.Equal(t, len(a.Chain.Blocks), 2)
 }
 
 func TestPay(t *testing.T) {

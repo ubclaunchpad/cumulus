@@ -3,6 +3,8 @@ package app
 import (
 	"errors"
 
+	"github.com/ubclaunchpad/cumulus/consensus"
+
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/msg"
 
@@ -41,7 +43,7 @@ func (a *App) Pay(to string, amount uint64) error {
 	tbody := blockchain.TxBody{
 		Sender: wallet.Public(),
 		// TODO: Collect inputs.
-		Input: blockchain.TxHashPointer{},
+		Inputs: []blockchain.TxHashPointer{},
 		Outputs: []blockchain.TxOutput{
 			blockchain.TxOutput{
 				Recipient: to,
@@ -59,7 +61,8 @@ func (a *App) Pay(to string, amount uint64) error {
 		}
 
 		// The transaction must be added to the pool.
-		if !pool.Push(txn, a.Chain) {
+		code := pool.Push(txn, a.Chain)
+		if code != consensus.ValidTransaction {
 			return errors.New("transaction validation failed")
 		}
 

@@ -199,7 +199,7 @@ func (w *Wallet) DropAllPending(txns []*Transaction) {
 // DropPending a single pending transaction by index in the pending list.
 func (w *Wallet) DropPending(i int) {
 	if i < len(w.PendingTxns) && i >= 0 {
-		log.Info("dropping transaction with hash %s", w.PendingTxns[i].Input.Hash)
+		log.Info("dropping transaction with hash %s", HashSum(w.PendingTxns[i]))
 		w.PendingTxns = append(w.PendingTxns[:i], w.PendingTxns[i+1:]...)
 	}
 }
@@ -208,7 +208,7 @@ func (w *Wallet) DropPending(i int) {
 // If true, it also returns the integer index of the transaction.
 func (w *Wallet) IsPending(txn *Transaction) (bool, int) {
 	for i, t := range w.PendingTxns {
-		if t.Input.Hash == txn.Input.Hash {
+		if HashSum(t) == HashSum(txn) {
 			return true, i
 		}
 	}

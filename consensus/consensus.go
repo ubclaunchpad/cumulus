@@ -5,6 +5,8 @@ import (
 	"math"
 	"reflect"
 
+	"gopkg.in/fatih/set.v0"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	c "github.com/ubclaunchpad/cumulus/common/constants"
@@ -20,26 +22,27 @@ func VerifyTransaction(bc *blockchain.BlockChain,
 	}
 
 	// Find the transaction input in the chain (by hash)
-	input := bc.GetInputTransaction(t)
-	if input == nil || blockchain.HashSum(input) != t.Input.Hash {
-		return false, NoInputTransaction
+	inputs, err := bc.GetAllInputs(t)
+	if err != nil || len(inputs) == 0 {
+		return false, NoInputTransactions
 	}
 
 	// Check that output to sender in input is equal to outputs in t
-	if !input.InputsEqualOutputs(t) {
+	out := t.GetTotalOutput()
+	in, err := t.GetTotalInput(bc)
+	if out != in {
 		return false, Overspend
 	}
 
-	// Verify signature of t
+	// Verify signature of t.
 	hash := blockchain.HashSum(t.TxBody)
 	if !ecdsa.Verify(t.Sender.Key(), hash.Marshal(), t.Sig.R, t.Sig.S) {
 		return false, BadSig
 	}
 
-	// Test if identical transaction already exists in chain.
-	end := uint32(len(bc.Blocks))
-	start := t.Input.BlockNumber
-	if exists, _, _ := bc.ContainsTransaction(t, start, end); exists {
+	// Test if inputs already spent elsewhere.
+	start, _ := bc.GetBlockRange(t)
+	if t.InputsSpentElsewhere(bc, start) {
 		return false, Respend
 	}
 
@@ -61,10 +64,12 @@ func VerifyCloudBase(bc *blockchain.BlockChain,
 		return false, BadCloudBaseSender
 	}
 
-	// Check that the input is 0.
-	if t.TxBody.Input.BlockNumber != 0 ||
-		t.TxBody.Input.Hash != blockchain.NilHash ||
-		t.Input.Index != 0 {
+	// Check that the input is 0 (only one input to CB).
+	input := t.TxBody.Inputs
+	if len(input) != 1 ||
+		input[0].BlockNumber != 0 ||
+		input[0].Hash != blockchain.NilHash ||
+		input[0].Index != 0 {
 		return false, BadCloudBaseInput
 	}
 
@@ -170,14 +175,14 @@ func VerifyBlock(bc *blockchain.BlockChain,
 	}
 
 	// Check that block number is valid.
-	ix := b.BlockNumber - 1
-	if int(ix) > len(bc.Blocks)-1 || ix < 0 {
+	lastBlockIdx := b.BlockNumber - 1
+	if int(lastBlockIdx) != len(bc.Blocks)-1 {
 		return false, BadBlockNumber
 	}
 
 	// Check that block number is one greater than last block
-	lastBlock := bc.Blocks[ix]
-	if lastBlock.BlockNumber != ix {
+	lastBlock := bc.Blocks[lastBlockIdx]
+	if lastBlock.BlockNumber != lastBlockIdx {
 		return false, BadBlockNumber
 	}
 
@@ -221,15 +226,27 @@ func VerifyBlock(bc *blockchain.BlockChain,
 		return false, BadNonce
 	}
 
-	// Check for multiple transactions referencing same input transaction.
-	for i, trA := range b.Transactions {
-		for j, trB := range b.Transactions {
-			if (i != j) && (trA.Input.Hash == trB.Input.Hash) {
-				inputTr := bc.GetInputTransaction(trA)
-				if !inputTr.InputsEqualOutputs(trA, trB) {
-					return false, DoubleSpend
-				}
+	// Check for multiple transactions referencing same input transaction,
+	// where the sender is the same.
+	inputSets := map[blockchain.Address]*set.Set{}
+	for _, txn := range b.Transactions {
+
+		// We'll inspect these inputs next.
+		nextInputSet := txn.InputSet()
+
+		// If the sender already exists in the map, check for
+		// a non-empty intersection in inputs.
+		if inSet, ok := inputSets[txn.Sender]; ok {
+			if !set.Intersection(inSet, nextInputSet).IsEmpty() {
+				return false, DoubleSpend
 			}
+
+			// No intersection, but more inputs to add to sender.
+			inputSets[txn.Sender].Merge(nextInputSet)
+
+		} else {
+			// First time seeing sender, give them inputs.
+			inputSets[txn.Sender] = nextInputSet
 		}
 	}
 

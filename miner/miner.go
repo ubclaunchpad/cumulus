@@ -176,7 +176,7 @@ func CloudBase(
 	}
 	cbTxBody := blockchain.TxBody{
 		Sender:  blockchain.NilAddr,
-		Input:   cbInput,
+		Inputs:  []blockchain.TxHashPointer{cbInput},
 		Outputs: []blockchain.TxOutput{cbReward},
 	}
 	cbTx := blockchain.Transaction{
@@ -185,14 +185,6 @@ func CloudBase(
 	}
 
 	b.Transactions = append([]*blockchain.Transaction{&cbTx}, b.Transactions...)
-
-	// Increment the input index of every transaction that has an input in the
-	// new block
-	for _, tx := range b.Transactions[1:] {
-		if tx.Input.BlockNumber == uint32(len(bc.Blocks)) {
-			tx.Input.Index++
-		}
-	}
 
 	return b
 }

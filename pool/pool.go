@@ -3,15 +3,13 @@ package pool
 import (
 	"time"
 
-	log "github.com/Sirupsen/logrus"
-
 	"github.com/ubclaunchpad/cumulus/blockchain"
 	"github.com/ubclaunchpad/cumulus/common/util"
 	"github.com/ubclaunchpad/cumulus/consensus"
 	"github.com/ubclaunchpad/cumulus/miner"
 )
 
-// PooledTransaction is a Transaction with a timetamp.
+// PooledTransaction is a Transaction with a timestamp.
 type PooledTransaction struct {
 	Transaction *blockchain.Transaction
 	Time        time.Time
@@ -31,14 +29,14 @@ func New() *Pool {
 	}
 }
 
-// Len returns the number of transactions in the Pool.
-func (p *Pool) Len() int {
+// Size returns the number of transactions in the Pool.
+func (p *Pool) Size() int {
 	return len(p.ValidTransactions)
 }
 
 // Empty returns true if the pool has exactly zero transactions in it.
 func (p *Pool) Empty() bool {
-	return p.Len() == 0
+	return p.Size() == 0
 }
 
 // Get returns the tranasction with input transaction Hash h.
@@ -53,8 +51,9 @@ func (p *Pool) GetN(N int) *blockchain.Transaction {
 
 // GetIndex returns the index of the transaction in the ordering.
 func (p *Pool) GetIndex(t *blockchain.Transaction) int {
-	target := p.ValidTransactions[t.Input.Hash].Time
-	return getIndex(p.Order, target, 0, p.Len()-1)
+	hash := blockchain.HashSum(t)
+	target := p.ValidTransactions[hash].Time
+	return getIndex(p.Order, target, 0, p.Size()-1)
 }
 
 // getIndex does a binary search for a PooledTransaction by timestamp.
@@ -72,14 +71,12 @@ func getIndex(a []*PooledTransaction, target time.Time, low, high int) int {
 // Push inserts a transaction into the pool, returning
 // true if the Transaction was inserted (was valid).
 // TODO: This should return an error if could not add.
-func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) bool {
-	if ok, err := consensus.VerifyTransaction(bc, t); ok {
+func (p *Pool) Push(t *blockchain.Transaction, bc *blockchain.BlockChain) consensus.TransactionCode {
+	ok, code := consensus.VerifyTransaction(bc, t)
+	if ok {
 		p.set(t)
-		return true
-	} else {
-		log.Debug(err)
-		return false
 	}
+	return code
 }
 
 // PushUnsafe adds a transaction to the pool without validation.
@@ -88,10 +85,10 @@ func (p *Pool) PushUnsafe(t *blockchain.Transaction) {
 }
 
 // Silently adds a transaction to the pool.
-// Deletes a transaction if it exists from the same
-// input hash.
+// Deletes a transaction if it exists from the input hash.
 func (p *Pool) set(t *blockchain.Transaction) {
-	if txn, ok := p.ValidTransactions[t.Input.Hash]; ok {
+	hash := blockchain.HashSum(t)
+	if txn, ok := p.ValidTransactions[hash]; ok {
 		p.Delete(txn.Transaction)
 	}
 	vt := &PooledTransaction{
@@ -99,16 +96,17 @@ func (p *Pool) set(t *blockchain.Transaction) {
 		Time:        time.Now(),
 	}
 	p.Order = append(p.Order, vt)
-	p.ValidTransactions[t.Input.Hash] = vt
+	p.ValidTransactions[hash] = vt
 }
 
 // Delete removes a transaction from the Pool.
 func (p *Pool) Delete(t *blockchain.Transaction) {
-	vt, ok := p.ValidTransactions[t.Input.Hash]
+	hash := blockchain.HashSum(t)
+	vt, ok := p.ValidTransactions[hash]
 	if ok {
 		i := p.GetIndex(vt.Transaction)
 		p.Order = append(p.Order[0:i], p.Order[i+1:]...)
-		delete(p.ValidTransactions, t.Input.Hash)
+		delete(p.ValidTransactions, hash)
 	}
 }
 
@@ -127,7 +125,7 @@ func (p *Pool) Update(b *blockchain.Block, bc *blockchain.BlockChain) bool {
 
 // Pop returns the next transaction and removes it from the pool.
 func (p *Pool) Pop() *blockchain.Transaction {
-	if p.Len() > 0 {
+	if p.Size() > 0 {
 		next := p.GetN(0)
 		p.Delete(next)
 		return next
@@ -137,7 +135,7 @@ func (p *Pool) Pop() *blockchain.Transaction {
 
 // Peek returns the next transaction and does not remove it from the pool.
 func (p *Pool) Peek() *blockchain.Transaction {
-	if p.Len() > 0 {
+	if p.Size() > 0 {
 		return p.GetN(0)
 	}
 	return nil
@@ -167,7 +165,7 @@ func (p *Pool) NextBlock(chain *blockchain.BlockChain,
 
 	// Try to grab as many transactions as the block will allow.
 	// Test each transaction to see if we break size before adding.
-	for p.Len() > 0 {
+	for p.Size() > 0 {
 		nextSize := p.Peek().Len()
 		if b.Len()+nextSize < int(size) {
 			b.Transactions = append(b.Transactions, p.Pop())

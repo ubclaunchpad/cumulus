@@ -84,17 +84,32 @@ func (bc *BlockChain) LastBlock() *Block {
 	return bc.Blocks[len(bc.Blocks)-1]
 }
 
-// GetInputTransaction returns the input Transaction to t. If the input does
-// not exist, then GetInputTransaction returns nil.
-func (bc *BlockChain) GetInputTransaction(t *Transaction) *Transaction {
-	if t.Input.BlockNumber > uint32(len(bc.Blocks)) {
+// GetInputTransaction returns the input Transaction referenced by TxHashPointer.
+// If the Transaction does not exist, then GetInputTransaction returns nil.
+func (bc *BlockChain) GetInputTransaction(t *TxHashPointer) *Transaction {
+	if t.BlockNumber > uint32(len(bc.Blocks)) {
 		return nil
 	}
-	b := bc.Blocks[t.Input.BlockNumber]
-	if t.Input.Index > uint32(len(b.Transactions)) {
+	b := bc.Blocks[t.BlockNumber]
+	if t.Index > uint32(len(b.Transactions)) {
 		return nil
 	}
-	return b.Transactions[t.Input.Index]
+	return b.Transactions[t.Index]
+}
+
+// GetAllInputs returns all the transactions referenced by a transaction
+// as inputs. Returns an error if any of the transactios requested could
+// not be found.
+func (bc *BlockChain) GetAllInputs(t *Transaction) ([]*Transaction, error) {
+	txns := []*Transaction{}
+	for _, tx := range t.Inputs {
+		nextTxn := bc.GetInputTransaction(&tx)
+		if nextTxn == nil {
+			return nil, errors.New("input transaction not found")
+		}
+		txns = append(txns, nextTxn)
+	}
+	return txns, nil
 }
 
 // ContainsTransaction returns true if the BlockChain contains the transaction
