@@ -1,11 +1,13 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -125,6 +127,78 @@ func (w *Wallet) Public() Address {
 func (w *Wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
 	r, s, err := ecdsa.Sign(random, w.key(), digest.Marshal())
 	return Signature{R: r, S: s}, err
+}
+
+// UnmarshalJSON unmarshals the given byte slice into the given wallet, and
+// returns an error if one occurs.
+func (w *Wallet) UnmarshalJSON(walletBytes []byte) error {
+	var walletParams map[string]interface{}
+	dec := json.NewDecoder(bytes.NewReader(walletBytes))
+	dec.UseNumber()
+	if err := dec.Decode(&walletParams); err != nil {
+		return err
+	}
+
+	// Initialize private key to avoid SIGSEGV
+	key, err := ecdsa.GenerateKey(curve, crand.Reader)
+	if err != nil {
+		return err
+	}
+	w.PrivateKey = key
+
+	// Get pending transactions
+	txnBytes, err := json.Marshal(walletParams["PendingTxns"])
+	if err != nil {
+		return err
+	}
+	txnDecoder := json.NewDecoder(bytes.NewReader(txnBytes))
+	txnDecoder.UseNumber()
+	if err := txnDecoder.Decode(&w.PendingTxns); err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	// Get balance
+	balanceBytes, err := json.Marshal(walletParams["Balance"])
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	if err := json.Unmarshal(balanceBytes, &w.Balance); err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	// Get private/public keys
+	if err := w.decodeBigInt(walletParams["X"], w.PrivateKey.PublicKey.X); err != nil {
+		fmt.Println(err)
+		return err
+	}
+	if err := w.decodeBigInt(walletParams["Y"], w.PrivateKey.PublicKey.Y); err != nil {
+		fmt.Println(err)
+		return err
+	}
+	if err := w.decodeBigInt(walletParams["D"], w.PrivateKey.D); err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	// Add elliptic curve
+	w.PrivateKey.PublicKey.Curve = curve
+	return nil
+}
+
+// decodeBigInt is a helper function for wallet.UnmarshalJSON. It attempts to
+// set target to the big.Int decoded from the given param. Returns an error if
+// one occurs.
+func (w *Wallet) decodeBigInt(param interface{}, target *big.Int) error {
+	intBytes, err := json.Marshal(param)
+	if err != nil {
+		return err
+	}
+	dec := json.NewDecoder(bytes.NewReader(intBytes))
+	dec.UseNumber()
+	return dec.Decode(target)
 }
 
 // Signature represents a signature of a transaction.

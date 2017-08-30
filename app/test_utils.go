@@ -8,7 +8,7 @@ import (
 	"github.com/ubclaunchpad/cumulus/pool"
 )
 
-func createNewTestBlockRequest(lastBlockHash interface{}) *msg.Request {
+func newTestBlockRequest(lastBlockHash interface{}) *msg.Request {
 	params := make(map[string]interface{}, 1)
 	params["lastBlockHash"] = lastBlockHash
 	return &msg.Request{
@@ -17,7 +17,7 @@ func createNewTestBlockRequest(lastBlockHash interface{}) *msg.Request {
 	}
 }
 
-func createNewTestApp() *App {
+func newTestApp() *App {
 	chain, _ := blockchain.NewValidTestChainAndBlock()
 	return &App{
 		PeerStore:        peer.NewPeerStore("127.0.0.1:8000"),

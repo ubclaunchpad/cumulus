@@ -1,7 +1,7 @@
 package blockchain
 
 import (
-	"bytes"
+	"os"
 	"reflect"
 	"testing"
 
@@ -9,19 +9,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const blockchainFileName = "blockchain.json"
+
 func TestMain(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 }
 
-func TestEncodeDecodeBlockChain(t *testing.T) {
-	b1 := NewTestBlockChain()
-
-	buf := bytes.NewBuffer(make([]byte, 0, b1.Len()))
-
-	b1.Encode(buf)
-	DecodeBlockChain(buf)
-	// TODO: fix this
-	// assert.Equal(t, len(b1.Blocks), len(b2.Blocks))
+func TestSaveAndLoad(t *testing.T) {
+	bc1, _ := NewValidTestChainAndBlock()
+	assert.Nil(t, bc1.Save(blockchainFileName))
+	bc2, err := Load(blockchainFileName)
+	assert.Nil(t, err)
+	assert.Equal(t, bc1.Head, bc2.Head)
+	assert.Equal(t, bc1.Blocks, bc2.Blocks)
+	assert.Nil(t, os.Remove(blockchainFileName))
 }
 
 func TestGetBlock(t *testing.T) {

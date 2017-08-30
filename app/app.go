@@ -30,6 +30,8 @@ var (
 const (
 	blockQueueSize       = 100
 	transactionQueueSize = 100
+	userFileName         = "user.json"
+	blockchainFileName   = "blockchain.json"
 )
 
 // App contains information about a running instance of a Cumulus node
@@ -44,50 +46,65 @@ type App struct {
 	quitChan         chan bool
 }
 
-// Run sets up and starts a new Cumulus node with the
-// given configuration. This should only be called once (except in tests)
-func Run(cfg conf.Config) {
-	log.Info("Starting Cumulus node")
-	config := &cfg
-
-	// TODO: remove this when we have scaleable difficulty
-	consensus.CurrentDifficulty = big.NewInt(2 << 21)
-
-	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
-	user := getCurrentUser()
-	a := App{
-		PeerStore:        peer.NewPeerStore(addr),
+// New returns a new user with the given parameters
+func New(user *User, pStore *peer.PeerStore, chain *blockchain.BlockChain, pool *pool.Pool) *App {
+	return &App{
+		PeerStore:        pStore,
 		CurrentUser:      user,
-		Chain:            createBlockchain(user),
+		Chain:            chain,
 		Miner:            miner.New(),
-		Pool:             getLocalPool(),
+		Pool:             pool,
 		blockQueue:       make(chan *blockchain.Block, blockQueueSize),
 		transactionQueue: make(chan *blockchain.Transaction, transactionQueueSize),
 		quitChan:         make(chan bool),
 	}
+}
 
+// Run sets up and starts a new Cumulus node with the
+// given configuration. This should only be called once (except in tests)
+func Run(cfg conf.Config) {
 	// Set logging level
 	if cfg.Verbose {
 		log.SetLevel(log.DebugLevel)
 	}
 
+	log.Info("Starting Cumulus node")
+	config := &cfg
+	addr := fmt.Sprintf("%s:%d", config.Interface, config.Port)
+
+	// Set starting difficulty (TODO: remove this when we have adjustable difficulty)
+	consensus.CurrentDifficulty = big.NewInt(2 << 21)
+
+	// Try load user info from a file
+	user, err := Load(userFileName)
+	if err != nil {
+		log.WithError(err).Debug("Failed to load user info from file ", userFileName)
+
+		// Create new user and save it to a file
+		user = NewUser()
+		if err := user.Save(userFileName); err != nil {
+			log.WithError(err).Fatal("Failed to save new user info to file", userFileName)
+		} else {
+			log.Info("Saved new user info to file ", userFileName)
+		}
+	} else {
+		log.Info("Loaded user info from file ", userFileName)
+	}
+
+	// Create new app instance and genesis block
+	a := New(user, peer.NewPeerStore(addr), blockchain.New(), pool.New())
+	genesisBlock := blockchain.Genesis(user.Public(), consensus.CurrentTarget(),
+		consensus.StartingBlockReward, []byte{})
+	a.Chain.AppendBlock(genesisBlock)
+
 	// We'll need to wait on at least 2 goroutines (Listen and
 	// MaintainConnections) to start before returning
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
 
 	// Start a goroutine that waits for program termination. Before the program
 	// exits it will flush logs and save the blockchain.
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		log.Info("Saving blockchain and flushing logs...")
-		// TODO
-		logFile.Sync()
-		logFile.Close()
-		os.Exit(0)
-	}()
+	go a.awaitExit(wg)
 
 	// Below we'll connect to peers. After which, requests could begin to
 	// stream in. Kick off a worker to handle requests and pushes.
@@ -101,7 +118,7 @@ func Run(cfg conf.Config) {
 
 	// Start listening on the given interface and port so we can receive
 	// conenctions from other peers
-	log.Infof("Starting listener on %s:%d", cfg.Interface, cfg.Port)
+	log.Infof("Starting listener on %s", addr)
 	a.PeerStore.ListenAddr = addr
 	go func() {
 		err := conn.Listen(addr, a.PeerStore.ConnectionHandler, wg)
@@ -128,20 +145,12 @@ func Run(cfg conf.Config) {
 		}
 		log.Info("Redirecting logs to logfile")
 		log.SetOutput(logFile)
-		go RunConsole(&a)
+		go RunConsole(a)
 	}
 
 	if len(config.Target) > 0 {
-		// Connect to the target and discover its peers.
+		// Connect to the target, discover its peers, and download the blockchain
 		a.ConnectAndDiscover(cfg.Target)
-
-		// Download blockchain
-		log.Info("Syncronizing blockchain")
-		_, err := a.SyncBlockChain()
-		if err != nil {
-			log.WithError(err).Fatal("Failed to download blockchain")
-		}
-		log.Info("Blockchain synchronization complete")
 	}
 
 	if config.Mine {
@@ -163,6 +172,14 @@ func (a *App) ConnectAndDiscover(target string) {
 		log.WithError(err).Fatal("Failed to dial target")
 	}
 	p.Request(peerInfoRequest, a.PeerStore.PeerInfoHandler)
+
+	// Download blockchain
+	log.Info("Syncronizing blockchain")
+	_, err = a.SyncBlockChain()
+	if err != nil {
+		log.WithError(err).Fatal("Failed to download blockchain")
+	}
+	log.Info("Blockchain synchronization complete")
 }
 
 // RequestHandler is called every time a peer sends us a request message expect
@@ -264,12 +281,6 @@ func createBlockchain(user *User) *blockchain.BlockChain {
 
 	bc.AppendBlock(genesisBlock)
 	return bc
-}
-
-// getLocalPool returns an instance of the pool.
-func getLocalPool() *pool.Pool {
-	// TODO: Look for local pool on disk. If doesn't exist,  make a new one.
-	return pool.New()
 }
 
 // HandleWork continually collects new work from existing work channels.
@@ -518,4 +529,20 @@ func (a *App) handleBlockResponse(newBlockChan chan *blockchain.Block,
 		log.Debug("Received response with unexpected status code: ", err.Code)
 		return false, false
 	}
+}
+
+// awaitExit waits until the interrupt or terminate signal and cleans up before
+// cumulus terminates.
+func (a *App) awaitExit(wg *sync.WaitGroup) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	wg.Done()
+	<-c
+	log.Info("Saving blockchain and flushing logs...")
+	if err := a.Chain.Save(blockchainFileName); err != nil {
+		log.WithError(err).Error("Error saving blockchain")
+	}
+	logFile.Sync()
+	logFile.Close()
+	os.Exit(0)
 }

@@ -61,6 +61,13 @@ func RunConsole(a *App) *ishell.Shell {
 			toggleMiner(ctx, a)
 		},
 	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "user",
+		Help: "view or edit current user's info",
+		Func: func(ctx *ishell.Context) {
+			editUser(ctx, a)
+		},
+	})
 
 	shell.Start()
 	emoji.Println(":cloud: Welcome to the :sunny: Cumulus console :cloud:")
@@ -160,7 +167,7 @@ func toggleMiner(ctx *ishell.Context, app *App) {
 func createWallet(ctx *ishell.Context, app *App) {
 	// Create a new wallet and set as CurrentUser's wallet.
 	wallet := blockchain.NewWallet()
-	app.CurrentUser.Wallet = *wallet
+	app.CurrentUser.Wallet = wallet
 	emoji.Println(":credit_card: New wallet created!")
 
 	// Give a printout of the address(es).
@@ -193,4 +200,41 @@ func createTransaction(ctx *ishell.Context, app *App) {
 	} else {
 		emoji.Println(":mailbox_with_mail: Its in the mail!")
 	}
+}
+
+func editUser(ctx *ishell.Context, app *App) {
+	if len(ctx.Args) == 0 {
+		ctx.Println("Current User:")
+		ctx.Println("Name:", app.CurrentUser.Name)
+		ctx.Println("Blocksize:", app.CurrentUser.BlockSize)
+		ctx.Println("Address:", app.CurrentUser.Public())
+		emoji.Println("Emoji Address:", app.CurrentUser.Public().Emoji())
+	} else if len(ctx.Args) == 2 {
+		if ctx.Args[0] == "name" {
+			app.CurrentUser.Name = ctx.Args[1]
+			if err := app.CurrentUser.Save(userFileName); err != nil {
+				ctx.Print(err)
+			}
+			return
+		} else if ctx.Args[0] == "blocksize" {
+			size, err := strconv.ParseUint(ctx.Args[1], 10, 32)
+			if err != nil {
+				ctx.Println(err)
+			} else if size < 1000 || size > 5000000 {
+				ctx.Println("Block size must be between 1000 and 5000000 btyes")
+				return
+			}
+			app.CurrentUser.BlockSize = (uint32)(size)
+			if err := app.CurrentUser.Save(userFileName); err != nil {
+				ctx.Print(err)
+			}
+			return
+		}
+	}
+
+	ctx.Println("\nUsage: 'user [command] [value]")
+	ctx.Println("\nCOMMANDS:")
+	ctx.Println("\t name      \t Set the current user's name")
+	ctx.Println("\t blocksize \t Set the current user's blocksize (must be " +
+		"between 1000 and 5000000 btyes")
 }

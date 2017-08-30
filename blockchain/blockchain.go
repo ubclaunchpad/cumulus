@@ -1,9 +1,9 @@
 package blockchain
 
 import (
-	"encoding/gob"
+	"encoding/json"
 	"errors"
-	"io"
+	"os"
 	"sync"
 )
 
@@ -57,16 +57,46 @@ func (bc *BlockChain) Marshal() []byte {
 	return append(buf, bc.Head.Marshal()...)
 }
 
-// Encode writes the marshalled blockchain to the given io.Writer
-func (bc *BlockChain) Encode(w io.Writer) {
-	gob.NewEncoder(w).Encode(bc)
+// Save writes the blockchain to a file of the given same in the current
+// working directory in JSON format. It returns an error if one occurred, or a
+// pointer to the file that was written to on success.
+func (bc *BlockChain) Save(fileName string) error {
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0775)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	blockchainBytes, err := json.Marshal(bc)
+	if err != nil {
+		return err
+	}
+
+	if _, err = file.Write(blockchainBytes); err != nil {
+		return err
+	}
+	return nil
 }
 
-// DecodeBlockChain reads the marshalled blockchain from the given io.Reader
-func DecodeBlockChain(r io.Reader) *BlockChain {
+// Load attempts to read blockchain info from the file with the given name in the
+// current working directory in JSON format. On success this returns
+// a pointer to a new user constructed from the information in the file.
+// If an error occurrs it is returned.
+func Load(fileName string) (*BlockChain, error) {
+	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0775)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	dec := json.NewDecoder(file)
+	dec.UseNumber()
+
 	var bc BlockChain
-	gob.NewDecoder(r).Decode(&bc)
-	return &bc
+	if err := dec.Decode(&bc); err != nil {
+		return nil, err
+	}
+	return &bc, nil
 }
 
 // AppendBlock adds a block to the end of the block chain.

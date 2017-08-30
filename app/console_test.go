@@ -8,7 +8,7 @@ import (
 )
 
 func TestRunConsoleHasCommands(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	s := RunConsole(a)
 	expected := []string{
 		"address",
@@ -20,6 +20,7 @@ func TestRunConsoleHasCommands(t *testing.T) {
 		"help",
 		"miner",
 		"peers",
+		"user",
 	}
 	c := s.Cmds()
 	found := []string{}
