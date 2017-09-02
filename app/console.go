@@ -220,8 +220,9 @@ func editUser(ctx *ishell.Context, app *App) {
 			size, err := strconv.ParseUint(ctx.Args[1], 10, 32)
 			if err != nil {
 				ctx.Println(err)
-			} else if size < 1000 || size > 5000000 {
-				ctx.Println("Block size must be between 1000 and 5000000 btyes")
+			} else if size < MinBlockSize || size > MaxBlockSize {
+				ctx.Println("Block size must be between", MinBlockSize, "and",
+					MaxBlockSize, "btyes")
 				return
 			}
 			app.CurrentUser.BlockSize = (uint32)(size)
@@ -232,7 +233,7 @@ func editUser(ctx *ishell.Context, app *App) {
 		}
 	}
 
-	ctx.Println("\nUsage: 'user [command] [value]")
+	ctx.Println("\nUsage: user [command] [value]")
 	ctx.Println("\nCOMMANDS:")
 	ctx.Println("\t name      \t Set the current user's name")
 	ctx.Println("\t blocksize \t Set the current user's blocksize (must be " +

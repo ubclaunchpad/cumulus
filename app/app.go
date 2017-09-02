@@ -28,6 +28,10 @@ var (
 )
 
 const (
+	// MaxBlockSize is the maximum size of a block in bytes
+	MaxBlockSize = 5000000
+	// MinBlockSize is the minimum size of a block in bytes
+	MinBlockSize         = 1000
 	blockQueueSize       = 100
 	transactionQueueSize = 100
 	userFileName         = "user.json"
