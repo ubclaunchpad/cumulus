@@ -96,6 +96,7 @@ func Load(fileName string) (*BlockChain, error) {
 	if err := dec.Decode(&bc); err != nil {
 		return nil, err
 	}
+	bc.lock = &sync.RWMutex{}
 	return &bc, nil
 }
 

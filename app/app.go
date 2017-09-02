@@ -79,27 +79,33 @@ func Run(cfg conf.Config) {
 	// Set starting difficulty (TODO: remove this when we have adjustable difficulty)
 	consensus.CurrentDifficulty = big.NewInt(2 << 21)
 
-	// Try load user info from a file
+	// Load user info from a file (or create a new user if there isn't one on disk)
 	user, err := Load(userFileName)
 	if err != nil {
-		log.WithError(err).Debug("Failed to load user info from file ", userFileName)
-
-		// Create new user and save it to a file
 		user = NewUser()
 		if err := user.Save(userFileName); err != nil {
-			log.WithError(err).Fatal("Failed to save new user info to file", userFileName)
+			log.WithError(err).Fatal("Failed to save new user info to ", userFileName)
 		} else {
 			log.Info("Saved new user info to file ", userFileName)
 		}
 	} else {
-		log.Info("Loaded user info from file ", userFileName)
+		log.Info("Loaded user info from ", userFileName)
 	}
 
-	// Create new app instance and genesis block
-	a := New(user, peer.NewPeerStore(addr), blockchain.New(), pool.New())
-	genesisBlock := blockchain.Genesis(user.Public(), consensus.CurrentTarget(),
-		consensus.StartingBlockReward, []byte{})
-	a.Chain.AppendBlock(genesisBlock)
+	// Load blockchain from a file (or create a new one if there isn't one on disk)
+	chain, err := blockchain.Load(blockchainFileName)
+	if err != nil {
+		genesisBlock := blockchain.Genesis(user.Public(), consensus.CurrentTarget(),
+			consensus.StartingBlockReward, []byte{})
+		chain = blockchain.New()
+		chain.AppendBlock(genesisBlock)
+		log.Info("Created new blockchain with genesis block")
+	} else {
+		log.Info("Loaded blockchain from ", blockchainFileName)
+	}
+
+	// Create new app instance
+	a := New(user, peer.NewPeerStore(addr), chain, pool.New())
 
 	// We'll need to wait on at least 2 goroutines (Listen and
 	// MaintainConnections) to start before returning
