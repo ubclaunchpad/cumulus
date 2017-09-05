@@ -12,15 +12,15 @@ func TestRunConsoleHasCommands(t *testing.T) {
 	s := RunConsole(a)
 	expected := []string{
 		"address",
-		"check",
 		"clear",
 		"connect",
-		"create",
 		"exit",
 		"help",
 		"miner",
 		"peers",
+		"send",
 		"user",
+		"wallet",
 	}
 	c := s.Cmds()
 	found := []string{}

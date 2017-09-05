@@ -144,20 +144,6 @@ func Run(cfg conf.Config) {
 	// Wait for goroutines to start
 	wg.Wait()
 
-	// If the console flag was passed, redirect logs to a file and run the console
-	// NOTE: if the log file already exists we will exit with a fatal error here!
-	// This should stop people from running multiple Cumulus nodes that will try
-	// to log to the same file.
-	if cfg.Console {
-		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
-		if err != nil {
-			log.WithError(err).Fatal("Failed to redirect logs to file")
-		}
-		log.Info("Redirecting logs to logfile")
-		log.SetOutput(logFile)
-		go RunConsole(a)
-	}
-
 	if len(config.Target) > 0 {
 		// Connect to the target, discover its peers, and download the blockchain
 		a.ConnectAndDiscover(cfg.Target)
@@ -166,6 +152,17 @@ func Run(cfg conf.Config) {
 	if config.Mine {
 		log.Info("Starting miner")
 		go a.RunMiner()
+	}
+
+	// If the console flag was passed, redirect logs to a file and run the console
+	if cfg.Console {
+		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to redirect logs to file")
+		}
+		log.Info("Redirecting logs to logfile")
+		log.SetOutput(logFile)
+		go RunConsole(a)
 	}
 }
 
@@ -358,8 +355,13 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	}
 
 	// Append to the chain before requesting the next block so that the block
-	// numbers make sense.
+	// numbers make sense. Then update the user's wallet in case transactions
+	// from the block affect it.
 	a.Chain.AppendBlock(blk)
+	if err := a.CurrentUser.Wallet.Update(blk, a.Chain); err != nil {
+		log.WithError(err).Fatal("Attempt to add block with invalid " +
+			"transaction(s) to the blockchain")
+	}
 	if wasMining {
 		a.ResumeMiner(true)
 	}
@@ -548,9 +550,17 @@ func (a *App) awaitExit(wg *sync.WaitGroup) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	wg.Done()
 	<-c
-	log.Info("Saving blockchain and flushing logs...")
+	a.onExit()
+}
+
+// onExit saves app state to disk before exiting.
+func (a *App) onExit() {
+	log.Info("Saving app state and flushing logs...")
 	if err := a.Chain.Save(blockchainFileName); err != nil {
 		log.WithError(err).Error("Error saving blockchain")
+	}
+	if err := a.CurrentUser.Save(userFileName); err != nil {
+		log.WithError(err).Error("Error saving user info")
 	}
 	logFile.Sync()
 	logFile.Close()

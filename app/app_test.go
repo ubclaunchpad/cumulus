@@ -300,7 +300,7 @@ func TestPay(t *testing.T) {
 	// Fail with low balance.
 	assert.NotNil(t, err)
 
-	a.CurrentUser.Wallet.SetBalance(amt)
+	a.CurrentUser.Wallet.Balance = amt
 	err = a.Pay("badf00d", amt)
 
 	// Fail with bad inputs.

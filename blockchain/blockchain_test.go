@@ -17,12 +17,12 @@ func TestMain(t *testing.T) {
 
 func TestSaveAndLoad(t *testing.T) {
 	bc1, _ := NewValidTestChainAndBlock()
-	assert.Nil(t, bc1.Save(blockchainFileName))
-	bc2, err := Load(blockchainFileName)
+	assert.Nil(t, bc1.Save("blockchainTestFile.json"))
+	bc2, err := Load("blockchainTestFile.json")
 	assert.Nil(t, err)
 	assert.Equal(t, bc1.Head, bc2.Head)
 	assert.Equal(t, bc1.Blocks, bc2.Blocks)
-	assert.Nil(t, os.Remove(blockchainFileName))
+	assert.Nil(t, os.Remove("blockchainTestFile.json"))
 }
 
 func TestGetBlock(t *testing.T) {

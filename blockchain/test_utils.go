@@ -3,6 +3,7 @@ package blockchain
 import (
 	crand "crypto/rand"
 	"crypto/sha256"
+	"math"
 	"math/big"
 	mrand "math/rand"
 	"sync"
@@ -321,6 +322,11 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 
 	cb, _ := NewValidCloudBaseTestTransaction()
 
+	// Update CloudBase transaction amount so it fits the blockchain
+	timesHalved := float64((len(bc.Blocks) / 210000 /* Block reward halving rate */))
+	cb.Outputs[0].Amount = 25 * 2 << 32 /* Starting block reward */ /
+		uint64(math.Pow(float64(2), timesHalved))
+
 	blk := Block{
 		BlockHeader: BlockHeader{
 			BlockNumber: 3,
@@ -363,7 +369,7 @@ func NewValidCloudBaseTestTransaction() (*Transaction, Address) {
 		Index:       0,
 	}
 	cbReward := TxOutput{
-		Amount:    25,
+		Amount:    25 * 2 << 32, // Starting block reward
 		Recipient: w.Public().Repr(),
 	}
 	cbTxBody := TxBody{

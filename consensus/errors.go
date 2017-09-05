@@ -87,7 +87,7 @@ const (
 	// BadBlockNumber is returned when block number is not one greater than
 	// previous block.
 	BadBlockNumber
-	// BadHash is returned when the block contains incorrect hash.
+	// BadHash is returned when the block contains an incorrect hash.
 	BadHash
 	// DoubleSpend is returned when two transactions in the block share inputs,
 	// but outputs > inputs.
