@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,7 +157,7 @@ func Run(cfg conf.Config) {
 
 	// If the console flag was passed, redirect logs to a file and run the console
 	if cfg.Console {
-		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
+		logFile, err := os.OpenFile("logfile", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to redirect logs to file")
 		}
@@ -259,7 +260,7 @@ func (a *App) PushHandler(push *msg.Push) {
 		}
 		block, err := blockchain.DecodeBlockJSON(blockBytes)
 		if err != nil {
-			// Invalid block payload
+			log.WithError(err).Debug("Received invalid block")
 			return
 		}
 
@@ -267,13 +268,20 @@ func (a *App) PushHandler(push *msg.Push) {
 		a.blockQueue <- block
 
 	case msg.ResourceTransaction:
-		txn, ok := push.Resource.(*blockchain.Transaction)
-		if ok {
-			log.Debug("Adding transaction to work queue")
-			a.transactionQueue <- txn
-		} else {
-			log.Error("Could not cast resource to transaction")
+		txnBytes, err := json.Marshal(push.Resource)
+		if err != nil {
+			log.WithError(err).Debug("Received invalid transaction")
+			return
 		}
+		var txn blockchain.Transaction
+		dec := json.NewDecoder(bytes.NewReader(txnBytes))
+		dec.UseNumber()
+		if err := dec.Decode(&txn); err != nil {
+			log.WithError(err).Debug("Received invalid transaction")
+			return
+		}
+		log.Debug("Adding transaction to work queue")
+		a.transactionQueue <- &txn
 	default:
 		// Invalid resource type. Ignore
 	}
@@ -390,7 +398,7 @@ func (a *App) RunMiner() {
 		miningResult := a.Miner.Mine(blockToMine)
 
 		if miningResult.Complete {
-			log.Info("Successfully mined a block!")
+			log.Info("Successfully mined block number", blockToMine.BlockNumber)
 			a.HandleBlock(blockToMine)
 			push := msg.Push{
 				ResourceType: msg.ResourceBlock,

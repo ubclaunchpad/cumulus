@@ -17,7 +17,7 @@ deps:
 	glide install
 
 clean: cumulus
-	rm cumulus
+	rm -f cumulus blockchain.json user.json logfile
 
 install-glide:
 	sh scripts/install_glide.sh

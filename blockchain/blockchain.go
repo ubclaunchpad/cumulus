@@ -61,7 +61,7 @@ func (bc *BlockChain) Marshal() []byte {
 // working directory in JSON format. It returns an error if one occurred, or a
 // pointer to the file that was written to on success.
 func (bc *BlockChain) Save(fileName string) error {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0775)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (bc *BlockChain) Save(fileName string) error {
 // a pointer to a new user constructed from the information in the file.
 // If an error occurrs it is returned.
 func Load(fileName string) (*BlockChain, error) {
-	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0775)
+	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}
