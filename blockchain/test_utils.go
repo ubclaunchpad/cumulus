@@ -323,9 +323,8 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 	cb, _ := NewValidCloudBaseTestTransaction()
 
 	// Update CloudBase transaction amount so it fits the blockchain
-	timesHalved := float64((len(bc.Blocks) / 210000 /* Block reward halving rate */))
-	cb.Outputs[0].Amount = 25 * 2 << 32 /* Starting block reward */ /
-		uint64(math.Pow(float64(2), timesHalved))
+	timesHalved := float64((len(bc.Blocks) / BlockRewardHalvingRate))
+	cb.Outputs[0].Amount = StartingBlockReward / uint64(math.Pow(float64(2), timesHalved))
 
 	blk := Block{
 		BlockHeader: BlockHeader{
@@ -369,7 +368,7 @@ func NewValidCloudBaseTestTransaction() (*Transaction, Address) {
 		Index:       0,
 	}
 	cbReward := TxOutput{
-		Amount:    25 * 2 << 32, // Starting block reward
+		Amount:    StartingBlockReward,
 		Recipient: w.Public().Repr(),
 	}
 	cbTxBody := TxBody{

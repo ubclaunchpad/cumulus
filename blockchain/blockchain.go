@@ -7,6 +7,17 @@ import (
 	"sync"
 )
 
+const (
+	// CoinValue is the transaction amount that represents one Cumulus coin
+	CoinValue uint64 = 1 << 32
+	// StartingBlockReward is the mining reward that the blockchain will begin
+	// with.
+	StartingBlockReward uint64 = 25 * CoinValue
+	// blockRewardHalvingRate is the number of blocks that need to be mined
+	// before the blockReward is halved
+	BlockRewardHalvingRate int = 210000
+)
+
 // BlockChain represents a linked list of blocks
 type BlockChain struct {
 	Blocks []*Block

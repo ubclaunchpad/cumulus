@@ -255,19 +255,12 @@ func (w *Wallet) SetPending(txn *Transaction) error {
 	return nil
 }
 
-// DropAllPending drops pending transactions if they appear in txns and updates
-// the wallet balance accordingly. Returns an error if any of the given
-// transactions are not in the blockchain.
+// DropAllPending drops pending transactions if they appear in txns. Returns an
+// error if any of the given transactions are not in the blockchain.
 func (w *Wallet) DropAllPending(txns []*Transaction, bc *BlockChain) error {
 	for _, t := range txns {
 		if p, i := w.IsPending(t); p {
 			w.DropPending(i)
-			totalInput, err := t.GetTotalInput(bc)
-			if err != nil {
-				return err
-			}
-			outputToSender := t.GetTotalOutputFor(w.Public().Repr())
-			w.Balance -= totalInput - outputToSender
 		}
 	}
 	return nil
@@ -276,7 +269,7 @@ func (w *Wallet) DropAllPending(txns []*Transaction, bc *BlockChain) error {
 // DropPending drops a single pending transaction by index in the pending list.
 func (w *Wallet) DropPending(i int) {
 	if i < len(w.PendingTxns) && i >= 0 {
-		log.Info("dropping transaction with hash %s", HashSum(w.PendingTxns[i]))
+		log.Info("Pending transaction verified")
 		w.PendingTxns = append(w.PendingTxns[:i], w.PendingTxns[i+1:]...)
 	}
 }
@@ -297,7 +290,7 @@ func (w *Wallet) IsPending(txn *Transaction) (bool, int) {
 func (w *Wallet) GetEffectiveBalance() uint64 {
 	r := w.Balance
 	for _, t := range w.PendingTxns {
-		r -= t.GetTotalOutput()
+		r -= t.GetTotalOutput() - t.GetTotalOutputFor(t.Sender.Repr())
 	}
 	return r
 }
@@ -308,17 +301,30 @@ func (w *Wallet) GetEffectiveBalance() uint64 {
 func (w *Wallet) Update(block *Block, bc *BlockChain) error {
 	// Update wallet balance with any transactions with intputs to or outputs
 	// from the given wallet.
-	w.Balance += block.GetTotalOutputFor(w.Public().Repr())
+	totalOutput := block.GetTotalOutputFor(w.Public().Repr())
 	totalInput, err := block.GetTotalInputFrom(w.Public().Repr(), bc)
 	if err != nil {
 		return err
 	}
-	w.Balance -= totalInput
+	w.Balance += totalOutput - totalInput
 
 	// Update pending transactions
-	txns := *block.GetTransactionsFrom(w.Public().Repr())
+	txns := block.GetTransactionsFrom(w.Public().Repr())
 	if err := w.DropAllPending(txns, bc); err != nil {
 		return err
+	}
+	return nil
+}
+
+// Refresh sets the wallet's balance and  updates it's set of pending transactions
+// based on the transaction information in the given blockchain. Returns an
+// error if any of the transactions in the blockchain cannot be found.
+func (w *Wallet) Refresh(bc *BlockChain) error {
+	w.Balance = uint64(0)
+	for _, b := range bc.Blocks {
+		if err := w.Update(b, bc); err != nil {
+			return err
+		}
 	}
 	return nil
 }

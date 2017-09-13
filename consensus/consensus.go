@@ -84,8 +84,8 @@ func VerifyCloudBase(bc *blockchain.BlockChain,
 	}
 
 	// Determine the reward associated with that specific block.
-	timesHalved := float64(((i + 1) / blockRewardHalvingRate))
-	reward := StartingBlockReward / uint64(math.Pow(float64(2), timesHalved))
+	timesHalved := float64(((i + 1) / blockchain.BlockRewardHalvingRate))
+	reward := blockchain.StartingBlockReward / uint64(math.Pow(float64(2), timesHalved))
 
 	// Check that the output is properly set.
 	if len(t.Outputs) != 1 || t.Outputs[0].Recipient == blockchain.NilAddr.Repr() {

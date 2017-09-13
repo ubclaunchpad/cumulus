@@ -97,9 +97,13 @@ func Run(cfg conf.Config) {
 	chain, err := blockchain.Load(blockchainFileName)
 	if err != nil {
 		genesisBlock := blockchain.Genesis(user.Public(), consensus.CurrentTarget(),
-			consensus.StartingBlockReward, []byte{})
+			blockchain.StartingBlockReward, []byte{})
 		chain = blockchain.New()
 		chain.AppendBlock(genesisBlock)
+		if err := user.Wallet.Refresh(chain); err != nil {
+			log.WithError(err).Fatal("Failed to set user wallet information " +
+				"based on the newly created blockchain")
+		}
 		log.Info("Created new blockchain with genesis block")
 	} else {
 		log.Info("Loaded blockchain from ", blockchainFileName)
@@ -292,7 +296,7 @@ func (a *App) PushHandler(push *msg.Push) {
 func createBlockchain(user *User) *blockchain.BlockChain {
 	bc := blockchain.New()
 	genesisBlock := blockchain.Genesis(user.Wallet.Public(),
-		consensus.CurrentTarget(), consensus.StartingBlockReward, []byte{})
+		consensus.CurrentTarget(), blockchain.StartingBlockReward, []byte{})
 
 	bc.AppendBlock(genesisBlock)
 	return bc
@@ -313,11 +317,23 @@ func (a *App) HandleWork() {
 	}
 }
 
-// HandleTransaction handles new instance of TransactionWork.
+// HandleTransaction handles new transactions.
 func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 	a.Chain.RLock()
 	defer a.Chain.RUnlock()
 
+	// If the transaction is not already in our pool, propagate it to the
+	// network. This will ensure that transactions don't bounce back and forth
+	// endlessly between nodes.
+	if a.Pool.Get(blockchain.HashSum(txn)) != nil {
+		a.PeerStore.Broadcast(msg.Push{
+			ResourceType: msg.ResourceTransaction,
+			Resource:     txn,
+		})
+		return
+	}
+
+	// We don't have this transaction in our pool, so we can try add it.
 	code := a.Pool.Push(txn, a.Chain)
 	if code == consensus.ValidTransaction {
 		log.Debug("Added transaction to pool from address: " + txn.Sender.Repr())
@@ -326,9 +342,8 @@ func (a *App) HandleTransaction(txn *blockchain.Transaction) {
 	}
 }
 
-// HandleBlock handles new instance of BlockWork.
+// HandleBlock handles new blocks.
 func (a *App) HandleBlock(blk *blockchain.Block) {
-	log.Info("Received new block")
 	wasMining := a.Miner.PauseIfRunning()
 
 	a.Chain.Lock()
@@ -344,6 +359,12 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 		// The block was invalid wrt our chain. Maybe our chain is out of date.
 		// Update it and try again.
 		chainChanged, err := a.SyncBlockChain()
+		if chainChanged {
+			// We must update our wallet to reflect the new state of the blockchain
+			if err := a.CurrentUser.Wallet.Refresh(a.Chain); err != nil {
+				log.WithError(err).Fatal("Failed to update wallet")
+			}
+		}
 		if err != nil {
 			log.WithError(err).Error("Error synchronizing blockchain")
 			if wasMining {
@@ -373,7 +394,7 @@ func (a *App) HandleBlock(blk *blockchain.Block) {
 	if wasMining {
 		a.ResumeMiner(true)
 	}
-	log.Debugf("Added block number %d to chain", blk.BlockNumber)
+	log.Infof("Added block number %d to chain", blk.BlockNumber)
 	log.Debug("Chain length: ", len(a.Chain.Blocks))
 	return
 }
@@ -398,7 +419,7 @@ func (a *App) RunMiner() {
 		miningResult := a.Miner.Mine(blockToMine)
 
 		if miningResult.Complete {
-			log.Info("Successfully mined block number", blockToMine.BlockNumber)
+			log.Info("Successfully mined block ", blockToMine.BlockNumber)
 			a.HandleBlock(blockToMine)
 			push := msg.Push{
 				ResourceType: msg.ResourceBlock,
