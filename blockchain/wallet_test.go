@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,4 +72,26 @@ func TestGetWalletBalances(t *testing.T) {
 
 	assert.Equal(t, w.Balance, txn.GetTotalOutput())
 	assert.Equal(t, w.GetEffectiveBalance(), uint64(0))
+}
+
+func TestUnmarshalJSON(t *testing.T) {
+	w1 := NewWallet()
+	walletBytes, err := json.Marshal(w1)
+	assert.Nil(t, err)
+	var w2 Wallet
+	err = w2.UnmarshalJSON(walletBytes)
+	assert.Nil(t, err)
+	assert.Equal(t, w1, &w2)
+}
+
+func TestUpdate(t *testing.T) {
+	bc, wallets := NewValidBlockChainFixture()
+	assert.Nil(t, wallets["bob"].Update(bc.Blocks[2], bc))
+	assert.Equal(t, wallets["bob"].Balance, uint64(1))
+}
+
+func TestRefresh(t *testing.T) {
+	bc, wallets := NewValidBlockChainFixture()
+	assert.Nil(t, wallets["bob"].Refresh(bc))
+	assert.Equal(t, wallets["bob"].Balance, uint64(1))
 }

@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -249,8 +248,7 @@ func (w *Wallet) SetPending(txn *Transaction) error {
 	if bal >= spend {
 		w.PendingTxns = append(w.PendingTxns, txn)
 	} else {
-		msg := fmt.Sprintf("wallet balance is too low %v < %v", bal, spend)
-		return errors.New(msg)
+		return fmt.Errorf("Wallet balance is too low %v < %v", bal, spend)
 	}
 	return nil
 }

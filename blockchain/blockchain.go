@@ -13,7 +13,7 @@ const (
 	// StartingBlockReward is the mining reward that the blockchain will begin
 	// with.
 	StartingBlockReward uint64 = 25 * CoinValue
-	// blockRewardHalvingRate is the number of blocks that need to be mined
+	// BlockRewardHalvingRate is the number of blocks that need to be mined
 	// before the blockReward is halved
 	BlockRewardHalvingRate int = 210000
 )
@@ -147,15 +147,16 @@ func (bc *BlockChain) GetAllInputs(t *Transaction) ([]*Transaction, error) {
 	for _, tx := range t.Inputs {
 		nextTxn := bc.GetInputTransaction(&tx)
 		if nextTxn == nil {
-			return nil, errors.New("input transaction not found")
+			return nil, errors.New("Input transaction not found")
 		}
 		txns = append(txns, nextTxn)
 	}
 	return txns, nil
 }
 
-// ContainsTransaction returns true if the BlockChain contains the transaction
-// in a block between start and stop as indexes.
+// ContainsTransaction returns true, the block index, and the transaction index
+// if the BlockChain contains the transaction in a block between start and stop
+// indexes.
 func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (bool, uint32, uint32) {
 	for i := start; i < stop; i++ {
 		if exists, j := bc.Blocks[i].ContainsTransaction(t); exists {
