@@ -1,10 +1,12 @@
 package app
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/consensus"
 	"github.com/ubclaunchpad/cumulus/miner"
 	"github.com/ubclaunchpad/cumulus/peer"
 	"gopkg.in/kyokomi/emoji.v1"
@@ -21,17 +23,20 @@ var (
 func RunConsole(a *App) *ishell.Shell {
 	shell = ishell.New()
 
+	// Set commands
 	shell.AddCmd(&ishell.Cmd{
-		Name: "create",
-		Help: "create a new wallet hash or transaction",
+		Name: "send",
+		Help: "send coins to another wallet",
 		Func: func(ctx *ishell.Context) {
-			create(ctx, a)
+			send(ctx, a)
 		},
 	})
 	shell.AddCmd(&ishell.Cmd{
-		Name: "check",
-		Help: "check the status of a transaction or wallet",
-		Func: check,
+		Name: "wallet",
+		Help: "view the status of a wallet",
+		Func: func(ctx *ishell.Context) {
+			checkWallet(ctx, a)
+		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "address",
@@ -61,33 +66,77 @@ func RunConsole(a *App) *ishell.Shell {
 			toggleMiner(ctx, a)
 		},
 	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "user",
+		Help: "view or edit current user's info",
+		Func: func(ctx *ishell.Context) {
+			editUser(ctx, a)
+		},
+	})
 
+	// Set interrupt handler
+	shell.Interrupt(func(ctx *ishell.Context, count int, input string) {
+		ctx.Println("Saving app state and flushing logs...")
+		a.onExit()
+	})
 	shell.Start()
 	emoji.Println(":cloud: Welcome to the :sunny: Cumulus console :cloud:")
 	return shell
 }
 
-func create(ctx *ishell.Context, app *App) {
-	choice := ctx.MultiChoice([]string{
-		"Wallet",
-		"Transaction",
-	}, "What would you like to create?")
-	if choice == 0 {
-		createWallet(ctx, app)
+func send(ctx *ishell.Context, app *App) {
+	if len(ctx.Args) < 2 {
+		ctx.Println("Usage: send [amount] [public address]")
+		return
+	}
+
+	amount, err := strconv.ParseFloat(ctx.Args[0], 64)
+	if err != nil {
+		ctx.Println(err)
+		return
+	} else if amount <= 0 {
+		ctx.Println("Amount must be a positive decimal value")
+		return
+	}
+	amount *= float64(consensus.CoinValue)
+	addr := ctx.Args[1]
+
+	// Try to make a payment.
+	err = app.Pay(addr, uint64(amount))
+	if err != nil {
+		emoji.Print(":disappointed: ")
+		ctx.Println(err.Error())
 	} else {
-		createTransaction(ctx, app)
+		emoji.Println(":mailbox_with_mail: Its in the mail!")
 	}
 }
 
-func check(ctx *ishell.Context) {
-	choice := ctx.MultiChoice([]string{
-		"Wallet",
-		"Transaction",
-	}, "What would you like to check the status of?")
-	if choice == 0 {
-		ctx.Println("Wallet status: ")
+func checkWallet(ctx *ishell.Context, app *App) {
+	app.Chain.RLock()
+	defer app.Chain.RUnlock()
+
+	wallet := app.CurrentUser.Wallet
+
+	// Show actual and effective balance
+	ctx.Println("Balance:", wallet.Balance,
+		"(", float64(wallet.Balance)/float64(consensus.CoinValue), "cumuli )")
+	ctx.Println("Effective Balance:", wallet.GetEffectiveBalance(),
+		"(", float64(wallet.GetEffectiveBalance())/float64(consensus.CoinValue), "cumuli )")
+
+	// Show list of pending transactions
+	if len(wallet.PendingTxns) > 0 {
+		ctx.Println("Pending Transactions:")
+		for i, txn := range wallet.PendingTxns {
+			ctx.Println("\nTransaction ", strconv.Itoa(i))
+			txnBytes, err := json.Marshal(txn)
+			if err != nil {
+				ctx.Println(err)
+				return
+			}
+			ctx.Println(string(txnBytes))
+		}
 	} else {
-		ctx.Println("Transaction status: ")
+		ctx.Println("No pending transactions")
 	}
 }
 
@@ -115,52 +164,59 @@ func connect(ctx *ishell.Context, a *App) {
 }
 
 func toggleMiner(ctx *ishell.Context, app *App) {
+	usage := func(ctx *ishell.Context) {
+		ctx.Println("\nUsage: miner [command]")
+		ctx.Println("\nCOMMANDS:")
+		ctx.Println("\t start \t Start the miner")
+		ctx.Println("\t stop \t Stop the miner")
+	}
+
 	if len(ctx.Args) != 1 {
 		if app.Miner.State() == miner.Running {
-			shell.Println("Miner is running.")
+			shell.Println("Miner is running")
 		} else if app.Miner.State() == miner.Paused {
-			shell.Println("Miner is paused.")
+			shell.Println("Miner is paused")
 		} else {
-			shell.Println("Miner is stopped.")
+			shell.Println("Miner is stopped")
 		}
-		shell.Println("Use 'miner start' or 'miner stop' to start or stop the miner.")
+		usage(ctx)
 		return
 	}
 
 	switch ctx.Args[0] {
 	case "start":
 		if app.Miner.State() == miner.Running {
-			shell.Println("Miner is already running.")
+			shell.Println("Miner is already running")
 		} else if app.Miner.State() == miner.Paused {
 			app.Miner.ResumeMining()
-			shell.Println("Resumed mining.")
+			shell.Println("Resumed mining")
 		} else {
 			go app.RunMiner()
-			shell.Println("Started miner.")
+			shell.Println("Started miner")
 		}
 	case "stop":
 		if app.Miner.State() == miner.Stopped {
-			shell.Println("Miner is already stopped.")
+			shell.Println("Miner is already stopped")
 			return
 		}
 		app.Miner.StopMining()
-		shell.Println("Stopped miner.")
+		shell.Println("Stopped miner")
 	case "pause":
 		wasRunning := app.Miner.PauseIfRunning()
 		if wasRunning {
-			shell.Println("Paused miner.")
+			shell.Println("Paused miner")
 		} else {
-			shell.Println("Miner was not running.")
+			shell.Println("Miner was not running")
 		}
 	default:
-		shell.Println("Usage: miner [start] | [stop]")
+		usage(ctx)
 	}
 }
 
 func createWallet(ctx *ishell.Context, app *App) {
 	// Create a new wallet and set as CurrentUser's wallet.
 	wallet := blockchain.NewWallet()
-	app.CurrentUser.Wallet = *wallet
+	app.CurrentUser.Wallet = wallet
 	emoji.Println(":credit_card: New wallet created!")
 
 	// Give a printout of the address(es).
@@ -170,27 +226,40 @@ func createWallet(ctx *ishell.Context, app *App) {
 	ctx.Println("")
 }
 
-func createTransaction(ctx *ishell.Context, app *App) {
-	// Read in the recipient address.
-	emoji.Print(":credit_card:")
-	ctx.Println(" Enter recipient wallet address")
-	toAddress := shell.ReadLine()
-
-	// Get amount from user.
-	emoji.Print(":dollar:")
-	ctx.Println(" Enter amount to send: ")
-	amount, err := strconv.ParseUint(shell.ReadLine(), 10, 64)
-	if err != nil {
-		emoji.Println(":disappointed: Invalid number format. Please enter an amount in decimal format.")
-		return
+func editUser(ctx *ishell.Context, app *App) {
+	if len(ctx.Args) == 0 {
+		ctx.Println("Current User:")
+		ctx.Println("Name:", app.CurrentUser.Name)
+		ctx.Println("Blocksize:", app.CurrentUser.BlockSize)
+		ctx.Println("Address:", app.CurrentUser.Public().Repr())
+		emoji.Println("Emoji Address:", app.CurrentUser.Public().Emoji())
+	} else if len(ctx.Args) == 2 {
+		if ctx.Args[0] == "name" {
+			app.CurrentUser.Name = ctx.Args[1]
+			if err := app.CurrentUser.Save(userFileName); err != nil {
+				ctx.Print(err)
+			}
+			return
+		} else if ctx.Args[0] == "blocksize" {
+			size, err := strconv.ParseUint(ctx.Args[1], 10, 32)
+			if err != nil {
+				ctx.Println(err)
+			} else if size < MinBlockSize || size > MaxBlockSize {
+				ctx.Println("Block size must be between", MinBlockSize, "and",
+					MaxBlockSize, "btyes")
+				return
+			}
+			app.CurrentUser.BlockSize = (uint32)(size)
+			if err := app.CurrentUser.Save(userFileName); err != nil {
+				ctx.Print(err)
+			}
+			return
+		}
 	}
 
-	// Try to make a payment.
-	err = app.Pay(toAddress, amount)
-	if err != nil {
-		emoji.Println(":disappointed: Transaction failed!")
-		ctx.Println(err.Error())
-	} else {
-		emoji.Println(":mailbox_with_mail: Its in the mail!")
-	}
+	ctx.Println("\nUsage: user [command] [value]")
+	ctx.Println("\nCOMMANDS:")
+	ctx.Println("\t name      \t Set the current user's name")
+	ctx.Println("\t blocksize \t Set the current user's blocksize (must be " +
+		"between 1000 and 5000000 btyes)")
 }

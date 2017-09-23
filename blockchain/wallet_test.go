@@ -17,7 +17,7 @@ func TestSetAllPending(t *testing.T) {
 	txn := NewTestTransaction()
 
 	// Set the balance approprately to handle the txn.
-	w.SetBalance(txn.GetTotalOutput())
+	w.Balance = txn.GetTotalOutput()
 
 	// Set and check.
 	w.SetAllPending([]*Transaction{txn})
@@ -31,13 +31,34 @@ func TestSetAllPending(t *testing.T) {
 func TestDropAllPending(t *testing.T) {
 	w := NewWallet()
 	txn := NewTestTransaction()
-	w.SetBalance(txn.GetTotalOutput())
+
+	// Make a fake blockchain that contains transactions that this transaction
+	// references as it's inputs
+	block := &Block{
+		Transactions: []*Transaction{
+			&Transaction{
+				TxBody: TxBody{
+					Outputs: []TxOutput{
+						TxOutput{
+							Amount:    txn.TxBody.Outputs[0].Amount,
+							Recipient: txn.Sender.Repr(),
+						},
+					},
+				},
+			},
+		},
+	}
+	bc := &BlockChain{
+		Blocks: []*Block{block},
+	}
+
+	w.Balance = txn.GetTotalOutput()
 	w.SetAllPending([]*Transaction{txn})
 
 	// Drop all pending
 	result, _ := w.IsPending(txn)
 	assert.True(t, result)
-	w.DropAllPending([]*Transaction{txn})
+	w.DropAllPending([]*Transaction{txn}, bc)
 	result, _ = w.IsPending(txn)
 	assert.False(t, result)
 }
@@ -45,9 +66,9 @@ func TestDropAllPending(t *testing.T) {
 func TestGetWalletBalances(t *testing.T) {
 	w := NewWallet()
 	txn := NewTestTransaction()
-	w.SetBalance(txn.GetTotalOutput())
+	w.Balance = txn.GetTotalOutput()
 	w.SetAllPending([]*Transaction{txn})
 
-	assert.Equal(t, w.GetBalance(), txn.GetTotalOutput())
+	assert.Equal(t, w.Balance, txn.GetTotalOutput())
 	assert.Equal(t, w.GetEffectiveBalance(), uint64(0))
 }

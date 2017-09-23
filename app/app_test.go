@@ -1,30 +1,37 @@
 package app
 
 import (
+	"os"
 	"testing"
 	"time"
 
-	"github.com/ubclaunchpad/cumulus/common/constants"
-	"github.com/ubclaunchpad/cumulus/consensus"
-
-	"github.com/ubclaunchpad/cumulus/conn"
-	"github.com/ubclaunchpad/cumulus/peer"
-
-	"github.com/ubclaunchpad/cumulus/miner"
-
-	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/cumulus/blockchain"
+	"github.com/ubclaunchpad/cumulus/common/constants"
+	"github.com/ubclaunchpad/cumulus/conf"
+	"github.com/ubclaunchpad/cumulus/conn"
+	"github.com/ubclaunchpad/cumulus/consensus"
+	"github.com/ubclaunchpad/cumulus/miner"
 	"github.com/ubclaunchpad/cumulus/msg"
+	"github.com/ubclaunchpad/cumulus/peer"
+	"github.com/ubclaunchpad/cumulus/pool"
 )
 
-func init() {
-	log.SetLevel(log.ErrorLevel)
+func TestNew(t *testing.T) {
+	ps := peer.NewPeerStore("123")
+	user := NewUser()
+	chain := blockchain.NewTestBlockChain()
+	pool := pool.New()
+	a := New(user, ps, chain, pool)
+	assert.Equal(t, ps, a.PeerStore)
+	assert.Equal(t, user, a.CurrentUser)
+	assert.Equal(t, chain, a.Chain)
+	assert.Equal(t, pool, a.Pool)
 }
 
 func TestPushHandlerNewBlock(t *testing.T) {
 	// Should put a block in the blockWorkQueue.
-	a := createNewTestApp()
+	a := newTestApp()
 	_, b := blockchain.NewValidTestChainAndBlock()
 	push := msg.Push{
 		ResourceType: msg.ResourceBlock,
@@ -40,7 +47,7 @@ func TestPushHandlerNewBlock(t *testing.T) {
 
 func TestPushHandlerNewTestTransaction(t *testing.T) {
 	// Should put a transaction in the transactionWorkQueue.
-	a := createNewTestApp()
+	a := newTestApp()
 	txn := blockchain.NewTestTransaction()
 	push := msg.Push{
 		ResourceType: msg.ResourceTransaction,
@@ -56,9 +63,9 @@ func TestPushHandlerNewTestTransaction(t *testing.T) {
 
 func TestRequestHandlerNewBlockOK(t *testing.T) {
 	// Request a new block by hash and verify we get the right one.
-	a := createNewTestApp()
+	a := newTestApp()
 
-	req := createNewTestBlockRequest(a.Chain.Blocks[1].LastBlock)
+	req := newTestBlockRequest(a.Chain.Blocks[1].LastBlock)
 	resp := a.RequestHandler(req)
 	block, ok := resp.Resource.(*blockchain.Block)
 
@@ -67,11 +74,11 @@ func TestRequestHandlerNewBlockOK(t *testing.T) {
 }
 
 func TestRequestHandlerNewBlockBadParams(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 
 	// Set up a request.
 	hash := "definitelynotahash"
-	req := createNewTestBlockRequest(hash)
+	req := newTestBlockRequest(hash)
 
 	resp := a.RequestHandler(req)
 	_, ok := resp.Resource.(*blockchain.Block)
@@ -82,10 +89,10 @@ func TestRequestHandlerNewBlockBadParams(t *testing.T) {
 }
 
 func TestRequestHandlerNewBlockBadType(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 
 	// Set up a request.
-	req := createNewTestBlockRequest("doesntmatter")
+	req := newTestBlockRequest("doesntmatter")
 	req.ResourceType = 25
 
 	resp := a.RequestHandler(req)
@@ -97,10 +104,10 @@ func TestRequestHandlerNewBlockBadType(t *testing.T) {
 }
 
 func TestRequestHandlerPeerInfo(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 
 	// Set up a request.
-	req := createNewTestBlockRequest("doesntmatter")
+	req := newTestBlockRequest("doesntmatter")
 	req.ResourceType = msg.ResourcePeerInfo
 
 	resp := a.RequestHandler(req)
@@ -112,7 +119,7 @@ func TestRequestHandlerPeerInfo(t *testing.T) {
 }
 
 func TestHandleTransactionOK(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	bc, blk := blockchain.NewValidTestChainAndBlock()
 	a.Chain = bc
 	txn := blk.Transactions[1]
@@ -122,13 +129,13 @@ func TestHandleTransactionOK(t *testing.T) {
 }
 
 func TestHandleTransactionNotOK(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	a.HandleTransaction(blockchain.NewTestTransaction())
 	assert.True(t, a.Pool.Empty())
 }
 
 func TestHandleValidBlock(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	i := 0
 
 	// TODO: Start miner.
@@ -148,7 +155,7 @@ func TestHandleValidBlock(t *testing.T) {
 }
 
 func TestHandleInvalidBlock(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	i := 0
 
 	// TODO: Start miner.
@@ -162,16 +169,12 @@ func TestHandleInvalidBlock(t *testing.T) {
 	// TODO: Assert pool untouched.
 }
 
-func TestGetLocalPool(t *testing.T) {
-	assert.NotNil(t, getLocalPool())
-}
-
 func TestCreateBlockchain(t *testing.T) {
 	assert.NotNil(t, createBlockchain(NewUser()))
 }
 
 func TestHandleBlock(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	go a.HandleWork()
 	time.Sleep(50 * time.Millisecond)
 	a.blockQueue <- blockchain.NewTestBlock()
@@ -179,7 +182,7 @@ func TestHandleBlock(t *testing.T) {
 }
 
 func TestHandleTransaction(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	go a.HandleWork()
 	time.Sleep(50 * time.Millisecond)
 	a.transactionQueue <- blockchain.NewTestTransaction()
@@ -189,7 +192,7 @@ func TestHandleTransaction(t *testing.T) {
 func TestRunMiner(t *testing.T) {
 	oldDifficulty := consensus.CurrentDifficulty
 	consensus.CurrentDifficulty = constants.MaxTarget
-	a := createNewTestApp()
+	a := newTestApp()
 	go a.RunMiner()
 	time.Sleep(time.Second / 2)
 	assert.Equal(t, int(a.Miner.State()), int(miner.Running))
@@ -211,7 +214,7 @@ func TestRunMiner(t *testing.T) {
 
 func TestMakeBlockRequest(t *testing.T) {
 	bc := conn.NewBufConn(false, true)
-	a := createNewTestApp()
+	a := newTestApp()
 	p := peer.New(bc, a.PeerStore, "")
 	a.PeerStore.Add(p)
 	done := make(chan bool, 1)
@@ -227,14 +230,14 @@ func TestMakeBlockRequest(t *testing.T) {
 }
 
 func TestMakeBlockRequestNoPeers(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	rh := func(res *msg.Response) {}
 	err := a.makeBlockRequest(a.Chain.LastBlock(), rh)
 	assert.NotNil(t, err)
 }
 
 func TestHandleBlockResponse(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	newBlockChan := make(chan *blockchain.Block, 1)
 	errChan := make(chan *msg.ProtocolError, 1)
 
@@ -267,7 +270,7 @@ func TestHandleBlockResponse(t *testing.T) {
 }
 
 func TestHandleWork(t *testing.T) {
-	a := createNewTestApp()
+	a := newTestApp()
 	go a.HandleWork()
 
 	// Roll the last block off of the chain, add to channel (expect it added back).
@@ -291,15 +294,28 @@ func TestHandleWork(t *testing.T) {
 
 func TestPay(t *testing.T) {
 	amt := uint64(5)
-	a := createNewTestApp()
+	a := newTestApp()
 	err := a.Pay("badf00d", amt)
 
 	// Fail with low balance.
 	assert.NotNil(t, err)
 
-	a.CurrentUser.Wallet.SetBalance(amt)
+	a.CurrentUser.Wallet.Balance = amt
 	err = a.Pay("badf00d", amt)
 
 	// Fail with bad inputs.
 	assert.NotNil(t, err)
+}
+
+func TestRun(t *testing.T) {
+	cfg := conf.Config{
+		Interface: "127.0.0.1",
+		Port:      8080,
+		Target:    "",
+		Verbose:   true,
+		Mine:      true,
+		Console:   false,
+	}
+	Run(cfg)
+	assert.Nil(t, os.Remove(userFileName))
 }

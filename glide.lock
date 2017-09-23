@@ -1,12 +1,14 @@
 hash: 4d8297229dc2aa4ab257d98205eed701d6ceaa35e9cb4f2da3c8f527fd89c36d
-updated: 2017-08-26T15:49:06.04832444-07:00
+updated: 2017-08-28T21:48:19.17868382-07:00
 imports:
 - name: github.com/abiosoft/ishell
-  version: a24a06e34a7a9d8f894fb339b3e77333e4fc75ac
+  version: 1fe4da16846908f352ed09310705a9c84f4b9f97
+- name: github.com/ammario/crand
+  version: f30c14fd0b28f2dd8d2e5849d5d1dc7751508ca1
 - name: github.com/chzyer/readline
   version: 41eea22f717c616615e1e59aa06cf831f9901f35
 - name: github.com/fatih/color
-  version: 62e9147c64a1ed519147b62a56a14e83e2be02c1
+  version: 67c513e5729f918f5e69786686770c27141a4490
 - name: github.com/flynn-archive/go-shlex
   version: 3f9db97f856818214da2e1057f8ad84803971cff
 - name: github.com/fsnotify/fsnotify
@@ -14,7 +16,7 @@ imports:
 - name: github.com/google/uuid
   version: 064e2069ce9c359c118179501254f67d7d37ba24
 - name: github.com/hashicorp/hcl
-  version: 392dba7d905ed5d04a5794ba89f558b27e2ba1ca
+  version: 8f6b1344a92ff8877cf24a5de9177bf7d0a2a187
   subpackages:
   - hcl/ast
   - hcl/parser
@@ -37,17 +39,17 @@ imports:
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
 - name: github.com/pelletier/go-toml
-  version: 69d355db5304c0f7f809a2edc054553e7142f016
+  version: 9c1b4e331f1e3d98e72600677699fbe212cd6d16
 - name: github.com/Sirupsen/logrus
-  version: 181d419aa9e2223811b824e8f0b4af96f9ba9302
+  version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - name: github.com/spf13/afero
-  version: 9be650865eab0c12963d8753212f4f9c66cdcf12
+  version: 36f8810e2e3d7eeac4ac05b57f65690fbfba62a2
   subpackages:
   - mem
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: 34594c771f2c18301dc152640ad40ece28795373
+  version: 2df9a531813370438a4d79bfc33e21f58063ed87
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
@@ -59,15 +61,16 @@ imports:
   subpackages:
   - assert
 - name: golang.org/x/crypto
-  version: 558b6879de74bc843225cde5686419267ff707ca
+  version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:
   - ssh/terminal
 - name: golang.org/x/sys
-  version: 0f826bdd13b500be0f1d4004938ad978fcc6031e
+  version: 2d6f6f883a06fc0d5f4b14a81e4c28705ea64c15
   subpackages:
   - unix
+  - windows
 - name: golang.org/x/text
-  version: a467ab3c3977c4a820c2a4a886d54eb7d68901f0
+  version: ac87088df8ef557f1e32cd00ed0b6fbc3f7ddafb
   subpackages:
   - transform
   - unicode/norm
@@ -76,7 +79,7 @@ imports:
 - name: gopkg.in/kyokomi/emoji.v1
   version: 7e06b236c489543f53868841f188a294e3383eab
 - name: gopkg.in/yaml.v2
-  version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
+  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9

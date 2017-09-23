@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"math"
@@ -82,6 +83,12 @@ func (t *Transaction) Len() int {
 	return len(t.Marshal())
 }
 
+// Equal returns true if the signatures of the given transactions are equal
+// (i.e. the transactions are the same).
+func (t *Transaction) Equal(txnToCompare *Transaction) bool {
+	return bytes.Compare(t.Marshal(), txnToCompare.Marshal()) == 0
+}
+
 // Marshal converts a Transaction to a byte slice
 func (t *Transaction) Marshal() []byte {
 	var buf []byte
@@ -132,7 +139,6 @@ func (t *Transaction) GetTotalOutputFor(recipient string) uint64 {
 // GetTotalInput sums the input amounts from the transaction.
 // Requires the blockchain for lookups.
 func (t *Transaction) GetTotalInput(bc *BlockChain) (uint64, error) {
-
 	result := uint64(0)
 	// This is a bit crazy; filter all input transactions
 	// by this senders address and sum the outputs.

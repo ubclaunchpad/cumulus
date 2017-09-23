@@ -103,3 +103,52 @@ func (b *Block) ContainsTransaction(t *Transaction) (bool, uint32) {
 func (b *Block) GetCloudBaseTransaction() *Transaction {
 	return b.Transactions[0]
 }
+
+// GetTransactionsFrom returns all the transactions from the given sender in
+// the given block.
+func (b *Block) GetTransactionsFrom(sender string) *[]*Transaction {
+	txns := make([]*Transaction, 0)
+	for _, txn := range b.Transactions {
+		if txn.TxBody.Sender.Repr() == sender {
+			txns = append(txns, txn)
+		}
+	}
+	return &txns
+}
+
+// GetTransactionsTo returns all the transactions to the given recipient in
+// the given block.
+func (b *Block) GetTransactionsTo(recipient string) *[]*Transaction {
+	txns := make([]*Transaction, 0)
+	for _, txn := range b.Transactions {
+		if txn.GetTotalOutputFor(recipient) > 0 {
+			txns = append(txns, txn)
+		}
+	}
+	return &txns
+}
+
+// GetTotalInputFrom returns the total input from the given sender in the given
+// block. Returns an error if the input to one or more of the inputs to the
+// transactions in the given block could not be found in the blockchain.
+func (b *Block) GetTotalInputFrom(sender string, bc *BlockChain) (uint64, error) {
+	totalInput := uint64(0)
+	for _, t := range b.Transactions {
+		input, err := t.GetTotalInput(bc)
+		if err != nil {
+			return 0, err
+		}
+		totalInput += input
+	}
+	return totalInput, nil
+}
+
+// GetTotalOutputFor sums the outputs referenced to a specific recipient in the
+// given block. recipient is an address checksum hex string.
+func (b *Block) GetTotalOutputFor(recipient string) uint64 {
+	total := uint64(0)
+	for _, txn := range b.Transactions {
+		total += txn.GetTotalOutputFor(recipient)
+	}
+	return total
+}

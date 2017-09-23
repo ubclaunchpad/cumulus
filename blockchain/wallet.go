@@ -1,11 +1,13 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -127,6 +129,72 @@ func (w *Wallet) Sign(digest Hash, random io.Reader) (Signature, error) {
 	return Signature{R: r, S: s}, err
 }
 
+// UnmarshalJSON unmarshals the given byte slice into the given wallet, and
+// returns an error if one occurs.
+func (w *Wallet) UnmarshalJSON(walletBytes []byte) error {
+	var walletParams map[string]interface{}
+	dec := json.NewDecoder(bytes.NewReader(walletBytes))
+	dec.UseNumber()
+	if err := dec.Decode(&walletParams); err != nil {
+		return err
+	}
+
+	// Initialize private key to avoid SIGSEGV
+	key, err := ecdsa.GenerateKey(curve, crand.Reader)
+	if err != nil {
+		return err
+	}
+	w.PrivateKey = key
+
+	// Get pending transactions
+	txnBytes, err := json.Marshal(walletParams["PendingTxns"])
+	if err != nil {
+		return err
+	}
+	txnDecoder := json.NewDecoder(bytes.NewReader(txnBytes))
+	txnDecoder.UseNumber()
+	if err := txnDecoder.Decode(&w.PendingTxns); err != nil {
+		return err
+	}
+
+	// Get balance
+	balanceBytes, err := json.Marshal(walletParams["Balance"])
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(balanceBytes, &w.Balance); err != nil {
+		return err
+	}
+
+	// Get private/public keys
+	if err := w.decodeBigInt(walletParams["X"], w.PrivateKey.PublicKey.X); err != nil {
+		return err
+	}
+	if err := w.decodeBigInt(walletParams["Y"], w.PrivateKey.PublicKey.Y); err != nil {
+		return err
+	}
+	if err := w.decodeBigInt(walletParams["D"], w.PrivateKey.D); err != nil {
+		return err
+	}
+
+	// Add elliptic curve
+	w.PrivateKey.PublicKey.Curve = curve
+	return nil
+}
+
+// decodeBigInt is a helper function for wallet.UnmarshalJSON. It attempts to
+// set target to the big.Int decoded from the given param. Returns an error if
+// one occurs.
+func (w *Wallet) decodeBigInt(param interface{}, target *big.Int) error {
+	intBytes, err := json.Marshal(param)
+	if err != nil {
+		return err
+	}
+	dec := json.NewDecoder(bytes.NewReader(intBytes))
+	dec.UseNumber()
+	return dec.Decode(target)
+}
+
 // Signature represents a signature of a transaction.
 type Signature struct {
 	R *big.Int
@@ -173,8 +241,8 @@ func (w *Wallet) SetAllPending(txns []*Transaction) {
 	}
 }
 
-// SetPending appends one transaction to the pending set of transaction
-// if the wallet effective balance is high enough to accomodate.
+// SetPending appends one transaction to the pending set of transactions
+// if the wallet's effective balance is high enough to accomodate.
 func (w *Wallet) SetPending(txn *Transaction) error {
 	bal := w.GetEffectiveBalance()
 	spend := txn.GetTotalOutput()
@@ -187,16 +255,25 @@ func (w *Wallet) SetPending(txn *Transaction) error {
 	return nil
 }
 
-// DropAllPending drops pending transactions if they apper in txns.
-func (w *Wallet) DropAllPending(txns []*Transaction) {
+// DropAllPending drops pending transactions if they appear in txns and updates
+// the wallet balance accordingly. Returns an error if any of the given
+// transactions are not in the blockchain.
+func (w *Wallet) DropAllPending(txns []*Transaction, bc *BlockChain) error {
 	for _, t := range txns {
 		if p, i := w.IsPending(t); p {
 			w.DropPending(i)
+			totalInput, err := t.GetTotalInput(bc)
+			if err != nil {
+				return err
+			}
+			outputToSender := t.GetTotalOutputFor(w.Public().Repr())
+			w.Balance -= totalInput - outputToSender
 		}
 	}
+	return nil
 }
 
-// DropPending a single pending transaction by index in the pending list.
+// DropPending drops a single pending transaction by index in the pending list.
 func (w *Wallet) DropPending(i int) {
 	if i < len(w.PendingTxns) && i >= 0 {
 		log.Info("dropping transaction with hash %s", HashSum(w.PendingTxns[i]))
@@ -208,7 +285,7 @@ func (w *Wallet) DropPending(i int) {
 // If true, it also returns the integer index of the transaction.
 func (w *Wallet) IsPending(txn *Transaction) (bool, int) {
 	for i, t := range w.PendingTxns {
-		if HashSum(t) == HashSum(txn) {
+		if t.Equal(txn) {
 			return true, i
 		}
 	}
@@ -225,13 +302,23 @@ func (w *Wallet) GetEffectiveBalance() uint64 {
 	return r
 }
 
-// GetBalance returns the raw balance without calculating pending transactions.
-func (w *Wallet) GetBalance() uint64 {
-	// TODO: Get historical wallet activity, cache and update block by block.
-	return w.Balance
-}
+// Update updates the wallet's balance and set of pending transactions based
+// on the transaction information in the given block. Returns an error if any
+// of the transactions in the given block cannot be found in the blockchain.
+func (w *Wallet) Update(block *Block, bc *BlockChain) error {
+	// Update wallet balance with any transactions with intputs to or outputs
+	// from the given wallet.
+	w.Balance += block.GetTotalOutputFor(w.Public().Repr())
+	totalInput, err := block.GetTotalInputFrom(w.Public().Repr(), bc)
+	if err != nil {
+		return err
+	}
+	w.Balance -= totalInput
 
-// SetBalance idempotently sets the account balance.
-func (w *Wallet) SetBalance(b uint64) {
-	w.Balance = b
+	// Update pending transactions
+	txns := *block.GetTransactionsFrom(w.Public().Repr())
+	if err := w.DropAllPending(txns, bc); err != nil {
+		return err
+	}
+	return nil
 }

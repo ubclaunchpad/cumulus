@@ -27,6 +27,13 @@ func TestTransactionLen(t *testing.T) {
 	assert.Equal(t, tx.Len(), txLen)
 }
 
+func TestTransactionEqual(t *testing.T) {
+	t1 := NewTestTransaction()
+	t2 := NewTestTransaction()
+	assert.True(t, t1.Equal(t1))
+	assert.False(t, t1.Equal(t2))
+}
+
 func TestTransactionGetTotalOutput(t *testing.T) {
 	tx := NewTestTransaction()
 	tx.Outputs = []TxOutput{

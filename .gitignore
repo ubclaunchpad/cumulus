@@ -35,3 +35,7 @@ vendor
 
 # Log files
 logfile
+
+# Saved app data
+user.json
+blockchain.json
