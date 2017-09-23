@@ -19,7 +19,7 @@ func TestPublic(t *testing.T) {
 func TestSaveAndLoad(t *testing.T) {
 	user1 := NewUser()
 	assert.Nil(t, user1.Save("userTestFile.json"))
-	user2, err := Load("userTestFile.json")
+	user2, err := LoadUser("userTestFile.json")
 	assert.Nil(t, err)
 	assert.Equal(t, user1, user2)
 	assert.Nil(t, os.Remove("userTestFile.json"))

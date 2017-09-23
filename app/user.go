@@ -29,7 +29,7 @@ func NewUser() *User {
 	}
 }
 
-// Public returns the public key (address) of the given user
+// Public returns the public key of the given user
 func (u *User) Public() blockchain.Address {
 	return u.Wallet.Public()
 }
@@ -55,12 +55,12 @@ func (u *User) Save(fileName string) error {
 	return nil
 }
 
-// Load attempts to read user info from the file with the given name in the
+// LoadUser attempts to read user info from the file with the given name in the
 // current working directory in JSON format. On success this returns
 // a pointer to a new user constructed from the information in the file.
 // If an error occurrs it is returned.
-func Load(fileName string) (*User, error) {
-	userFile, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0775)
+func LoadUser(fileName string) (*User, error) {
+	userFile, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}

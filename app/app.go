@@ -80,7 +80,7 @@ func Run(cfg conf.Config) {
 	consensus.CurrentDifficulty = big.NewInt(2 << 21)
 
 	// Load user info from a file (or create a new user if there isn't one on disk)
-	user, err := Load(userFileName)
+	user, err := LoadUser(userFileName)
 	if err != nil {
 		user = NewUser()
 		if err := user.Save(userFileName); err != nil {
