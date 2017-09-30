@@ -34,7 +34,7 @@ func TestDropAllPending(t *testing.T) {
 	txn := NewTestTransaction()
 
 	// Make a fake blockchain that contains transactions that this transaction
-	// references as it's inputs
+	// references as its inputs
 	block := &Block{
 		Transactions: []*Transaction{
 			&Transaction{

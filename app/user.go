@@ -158,7 +158,7 @@ func (a *App) collectInputsForTxn(sender string, amount uint64) ([]blockchain.Tx
 		// for the transaction we want to send.
 		for i, txn := range txns {
 			if i != 0 {
-				// This transaction is not a CloudBase transaction. Add it's
+				// This transaction is not a CloudBase transaction. Add its
 				// inputs to a map of spent transactions so we don't spend them.
 				for _, hashPtr := range txn.Inputs {
 					spentTxn := a.Chain.GetInputTransaction(&hashPtr)

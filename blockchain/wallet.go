@@ -314,7 +314,7 @@ func (w *Wallet) Update(block *Block, bc *BlockChain) error {
 	return nil
 }
 
-// Refresh sets the wallet's balance and  updates it's set of pending transactions
+// Refresh sets the wallet's balance and  updates its set of pending transactions
 // based on the transaction information in the given blockchain. Returns an
 // error if any of the transactions in the blockchain cannot be found.
 func (w *Wallet) Refresh(bc *BlockChain) error {
