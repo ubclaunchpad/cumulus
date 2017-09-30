@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	c "github.com/ubclaunchpad/cumulus/common/constants"
-	"github.com/ubclaunchpad/cumulus/common/util"
 )
 
 // NewTestHash produces a hash.
@@ -99,55 +98,6 @@ func NewTestBlockChain() *BlockChain {
 	bc.Head = HashSum(bc.Blocks[nBlocks-1])
 	bc.lock = &sync.RWMutex{}
 	return &bc
-}
-
-// NewTestInputBlock produces new block with given transactions.
-func NewTestInputBlock(t []*Transaction) *Block {
-	return &Block{
-		BlockHeader: BlockHeader{
-			BlockNumber: 0,
-			LastBlock:   NewTestHash(),
-			Target:      NewValidTestTarget(),
-			Time:        util.UnixNow(),
-			Nonce:       0,
-		},
-		Transactions: t,
-	}
-}
-
-// NewTestOutputBlock produces new block with given transactions and given input
-// block.
-func NewTestOutputBlock(t []*Transaction, input *Block) *Block {
-	return &Block{
-		BlockHeader: BlockHeader{
-			BlockNumber: input.BlockNumber + 1,
-			LastBlock:   HashSum(input),
-			Target:      NewValidTestTarget(),
-			Time:        util.UnixNow(),
-			Nonce:       0,
-		},
-		Transactions: t,
-	}
-}
-
-// NewTestTransactionValue creates a new transaction with specific value a at
-// index i in block number b.
-func NewTestTransactionValue(s, r *Wallet, a uint64, i uint32, b uint32) (*Transaction, error) {
-	tbody := TxBody{
-		Sender:  s.Public(),
-		Inputs:  make([]TxHashPointer, 1),
-		Outputs: make([]TxOutput, 1),
-	}
-	tbody.Outputs[0] = TxOutput{
-		Amount:    a,
-		Recipient: r.Public().Repr(),
-	}
-	tbody.Inputs[0] = TxHashPointer{
-		BlockNumber: b,
-		Hash:        NewTestHash(),
-		Index:       i,
-	}
-	return tbody.Sign(*s, crand.Reader)
 }
 
 // NewValidBlockChainFixture creates a valid blockchain of three blocks
@@ -323,9 +273,8 @@ func NewValidTestChainAndBlock() (*BlockChain, *Block) {
 	cb, _ := NewValidCloudBaseTestTransaction()
 
 	// Update CloudBase transaction amount so it fits the blockchain
-	timesHalved := float64((len(bc.Blocks) / 210000 /* Block reward halving rate */))
-	cb.Outputs[0].Amount = 25 * 2 << 32 /* Starting block reward */ /
-		uint64(math.Pow(float64(2), timesHalved))
+	timesHalved := float64((len(bc.Blocks) / BlockRewardHalvingRate))
+	cb.Outputs[0].Amount = StartingBlockReward / uint64(math.Pow(float64(2), timesHalved))
 
 	blk := Block{
 		BlockHeader: BlockHeader{
@@ -369,7 +318,7 @@ func NewValidCloudBaseTestTransaction() (*Transaction, Address) {
 		Index:       0,
 	}
 	cbReward := TxOutput{
-		Amount:    25 * 2 << 32, // Starting block reward
+		Amount:    StartingBlockReward,
 		Recipient: w.Public().Repr(),
 	}
 	cbTxBody := TxBody{

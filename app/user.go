@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	crand "crypto/rand"
@@ -38,7 +39,7 @@ func (u *User) Public() blockchain.Address {
 // directory in JSON format. It returns an error if one occurred, or a pointer
 // to the file that was written to on success.
 func (u *User) Save(fileName string) error {
-	userFile, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0775)
+	userFile, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -91,7 +92,7 @@ func (a *App) Pay(to string, amount uint64) error {
 	// A legitimate transaction must be built.
 	tbody := blockchain.TxBody{
 		Sender: wallet.Public(),
-		Inputs: *inputTxns,
+		Inputs: inputTxns,
 		Outputs: []blockchain.TxOutput{
 			blockchain.TxOutput{
 				Recipient: to,
@@ -136,7 +137,7 @@ func (a *App) Pay(to string, amount uint64) error {
 // from the given sender of the given amount, and the total value of all the
 // inputs returned. Returns an error if there are not enough transactions to the
 // given sender in the blockchain to make a new transaction of the given amount.
-func (a *App) collectInputsForTxn(sender string, amount uint64) (*[]blockchain.TxHashPointer,
+func (a *App) collectInputsForTxn(sender string, amount uint64) ([]blockchain.TxHashPointer,
 	uint64, error) {
 
 	a.Chain.RLock()
@@ -144,33 +145,57 @@ func (a *App) collectInputsForTxn(sender string, amount uint64) (*[]blockchain.T
 
 	total := uint64(0)
 	inputs := make([]blockchain.TxHashPointer, 0)
+	spentTxns := make(map[blockchain.Hash]*blockchain.Transaction, 0)
 
 	// Iterate through the blockchain in reverse, searching for transactions to
 	// sender.
-	for i := len(a.Chain.Blocks) - 1; i > 0; i-- {
+	for i := len(a.Chain.Blocks) - 1; i >= 0; i-- {
 		block := a.Chain.Blocks[i]
-		txns := *block.GetTransactionsTo(sender)
+		txns := block.GetTransactionsTo(sender)
 
 		// Add all the transactions to sender to our list of potential input
 		// transactions until the total is greater that or equal to the amount
 		// for the transaction we want to send.
 		for i, txn := range txns {
+			if i != 0 {
+				// This transaction is not a CloudBase transaction. Add its
+				// inputs to a map of spent transactions so we don't spend them.
+				for _, hashPtr := range txn.Inputs {
+					spentTxn := a.Chain.GetInputTransaction(&hashPtr)
+					if spentTxn == nil {
+						log.Fatal("Transaction in blockchain references noexistent input")
+					}
+					spentTxns[blockchain.HashSum(spentTxn)] = spentTxn
+				}
+			}
+
+			if spentTxns[blockchain.HashSum(txn)] != nil {
+				// This transaction has already been used as an input to another
+				// transaction
+				continue
+			}
+
+			// This transaction has not been spent so we can use it
 			outputToSender := txn.GetTotalOutputFor(sender)
 			txnPtr := blockchain.TxHashPointer{
 				BlockNumber: block.BlockNumber,
 				Hash:        blockchain.HashSum(block),
 				Index:       uint32(i),
 			}
+
 			if outputToSender >= amount {
+				// This transaction alone has an amount large enough to be our
+				// only input, so return it
 				inputs = []blockchain.TxHashPointer{txnPtr}
-				return &inputs, outputToSender, nil
+				return inputs, outputToSender, nil
 			}
+
 			inputs = append(inputs, txnPtr)
 			total += outputToSender
 			if total >= amount {
-				return &inputs, total, nil
+				return inputs, total, nil
 			}
 		}
 	}
-	return nil, total, errors.New("Insufficient funds")
+	return nil, 0, errors.New("Insufficient funds")
 }

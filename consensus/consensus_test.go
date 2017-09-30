@@ -433,7 +433,8 @@ func TestVerifiyCloudBaseNoInputs(t *testing.T) {
 func TestVerifyGenesisBlock(t *testing.T) {
 	miner := blockchain.NewWallet()
 	currentTarget := blockchain.BigIntToHash(c.MaxTarget)
-	gb := blockchain.Genesis(miner.Public(), currentTarget, StartingBlockReward, []byte{})
+	gb := blockchain.Genesis(miner.Public(), currentTarget,
+		blockchain.StartingBlockReward, []byte{})
 	bc := &blockchain.BlockChain{
 		Blocks: []*blockchain.Block{},
 		Head:   blockchain.NilHash,
@@ -576,7 +577,8 @@ func TestVerifyGenesisBlockBadGenesisCloudBaseTransaction(t *testing.T) {
 func TestVerifyGenesisBlockBadGenesisTarget(t *testing.T) {
 	miner := blockchain.NewWallet()
 	currentTarget := blockchain.BigIntToHash(c.MaxTarget)
-	gb := blockchain.Genesis(miner.Public(), currentTarget, StartingBlockReward, []byte{})
+	gb := blockchain.Genesis(miner.Public(), currentTarget,
+		blockchain.StartingBlockReward, []byte{})
 	gb.Target = blockchain.BigIntToHash(util.BigExp(2, 255))
 	bc := &blockchain.BlockChain{
 		Blocks: []*blockchain.Block{gb},
@@ -597,7 +599,8 @@ func TestVerifyGenesisBlockBadGenesisTarget(t *testing.T) {
 func TestVerifyGenesisBlockBadGenesisTime(t *testing.T) {
 	miner := blockchain.NewWallet()
 	currentTarget := blockchain.BigIntToHash(c.MaxTarget)
-	gb := blockchain.Genesis(miner.Public(), currentTarget, StartingBlockReward, []byte{})
+	gb := blockchain.Genesis(miner.Public(), currentTarget,
+		blockchain.StartingBlockReward, []byte{})
 	gb.Time = 0
 	bc := &blockchain.BlockChain{
 		Blocks: []*blockchain.Block{gb},

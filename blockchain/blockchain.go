@@ -7,6 +7,17 @@ import (
 	"sync"
 )
 
+const (
+	// CoinValue is the transaction amount that represents one Cumulus coin
+	CoinValue uint64 = 1 << 32
+	// StartingBlockReward is the mining reward that the blockchain will begin
+	// with.
+	StartingBlockReward uint64 = 25 * CoinValue
+	// BlockRewardHalvingRate is the number of blocks that need to be mined
+	// before the blockReward is halved
+	BlockRewardHalvingRate int = 210000
+)
+
 // BlockChain represents a linked list of blocks
 type BlockChain struct {
 	Blocks []*Block
@@ -61,7 +72,7 @@ func (bc *BlockChain) Marshal() []byte {
 // working directory in JSON format. It returns an error if one occurred, or a
 // pointer to the file that was written to on success.
 func (bc *BlockChain) Save(fileName string) error {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0775)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -83,7 +94,7 @@ func (bc *BlockChain) Save(fileName string) error {
 // a pointer to a new user constructed from the information in the file.
 // If an error occurrs it is returned.
 func Load(fileName string) (*BlockChain, error) {
-	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0775)
+	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -136,15 +147,16 @@ func (bc *BlockChain) GetAllInputs(t *Transaction) ([]*Transaction, error) {
 	for _, tx := range t.Inputs {
 		nextTxn := bc.GetInputTransaction(&tx)
 		if nextTxn == nil {
-			return nil, errors.New("input transaction not found")
+			return nil, errors.New("Input transaction not found")
 		}
 		txns = append(txns, nextTxn)
 	}
 	return txns, nil
 }
 
-// ContainsTransaction returns true if the BlockChain contains the transaction
-// in a block between start and stop as indexes.
+// ContainsTransaction returns true, the block index, and the transaction index
+// if the BlockChain contains the transaction in a block between start and stop
+// indexes.
 func (bc *BlockChain) ContainsTransaction(t *Transaction, start, stop uint32) (bool, uint32, uint32) {
 	for i := start; i < stop; i++ {
 		if exists, j := bc.Blocks[i].ContainsTransaction(t); exists {

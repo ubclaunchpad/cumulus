@@ -15,19 +15,19 @@ func TestCurrentTarget(t *testing.T) {
 
 func TestCurrentBlockReward(t *testing.T) {
 	bc, _ := blockchain.NewValidBlockChainFixture()
-	if CurrentBlockReward(bc) != StartingBlockReward {
+	if CurrentBlockReward(bc) != blockchain.StartingBlockReward {
 		t.Fail()
 	}
-	for i := len(bc.Blocks); i < blockRewardHalvingRate; i++ {
+	for i := len(bc.Blocks); i < blockchain.BlockRewardHalvingRate; i++ {
 		bc.AppendBlock(new(blockchain.Block))
 	}
-	if CurrentBlockReward(bc) != StartingBlockReward/2 {
+	if CurrentBlockReward(bc) != blockchain.StartingBlockReward/2 {
 		t.Fail()
 	}
-	for i := 0; i < blockRewardHalvingRate; i++ {
+	for i := 0; i < blockchain.BlockRewardHalvingRate; i++ {
 		bc.AppendBlock(new(blockchain.Block))
 	}
-	if CurrentBlockReward(bc) != StartingBlockReward/4 {
+	if CurrentBlockReward(bc) != blockchain.StartingBlockReward/4 {
 		t.Fail()
 	}
 }

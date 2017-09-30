@@ -78,3 +78,47 @@ func TestEqual(t *testing.T) {
 	block2 := NewTestBlock()
 	assert.False(t, (&block1.BlockHeader).Equal(&block2.BlockHeader))
 }
+
+func TestBlockLen(t *testing.T) {
+	assert.True(t, NewTestBlock().Len() > 0)
+}
+
+func TestGetCloudBaseTransaction(t *testing.T) {
+	b := NewTestBlock()
+	assert.Equal(t, b.GetCloudBaseTransaction(), b.Transactions[0])
+}
+
+func TestGetTransactionsFrom(t *testing.T) {
+	bc, wallets := NewValidBlockChainFixture()
+	expectedResult := []*Transaction{
+		bc.Blocks[2].Transactions[1],
+	}
+	senderHash := wallets["sender"].Public().Repr()
+	assert.Equal(t, bc.Blocks[2].GetTransactionsFrom(senderHash), expectedResult)
+}
+
+func TestGetTransactionsTo(t *testing.T) {
+	bc, wallets := NewValidBlockChainFixture()
+	expectedResult := []*Transaction{
+		bc.Blocks[2].Transactions[1],
+	}
+	bobHash := wallets["bob"].Public().Repr()
+	assert.Equal(t, bc.Blocks[2].GetTransactionsTo(bobHash), expectedResult)
+}
+
+func TestGetTotalInputFrom(t *testing.T) {
+	bc, wallets := NewValidBlockChainFixture()
+	expectedAmount := bc.Blocks[2].Transactions[1].Outputs[0].Amount
+	senderHash := wallets["sender"].Public().Repr()
+	amount, err := bc.Blocks[2].GetTotalInputFrom(senderHash, bc)
+	assert.Nil(t, err)
+	assert.Equal(t, amount, expectedAmount)
+}
+
+func TestBlockGetTotalOutputFor(t *testing.T) {
+	bc, wallets := NewValidBlockChainFixture()
+	expectedAmount := bc.Blocks[2].Transactions[1].Outputs[0].Amount
+	bobHash := wallets["bob"].Public().Repr()
+	amount := bc.Blocks[2].GetTotalOutputFor(bobHash)
+	assert.Equal(t, amount, expectedAmount)
+}

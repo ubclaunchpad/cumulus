@@ -1,12 +1,11 @@
 package app
 
 import (
-	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
-	"github.com/ubclaunchpad/cumulus/consensus"
 	"github.com/ubclaunchpad/cumulus/miner"
 	"github.com/ubclaunchpad/cumulus/peer"
 	"gopkg.in/kyokomi/emoji.v1"
@@ -98,14 +97,14 @@ func send(ctx *ishell.Context, app *App) {
 		ctx.Println("Amount must be a positive decimal value")
 		return
 	}
-	amount *= float64(consensus.CoinValue)
+	amount *= float64(blockchain.CoinValue)
 	addr := ctx.Args[1]
 
 	// Try to make a payment.
+	ctx.Println("Sending amount", coinValue(uint64(amount)), "to", addr)
 	err = app.Pay(addr, uint64(amount))
 	if err != nil {
-		emoji.Print(":disappointed: ")
-		ctx.Println(err.Error())
+		emoji.Println(":disappointed: ", err)
 	} else {
 		emoji.Println(":mailbox_with_mail: Its in the mail!")
 	}
@@ -118,22 +117,25 @@ func checkWallet(ctx *ishell.Context, app *App) {
 	wallet := app.CurrentUser.Wallet
 
 	// Show actual and effective balance
-	ctx.Println("Balance:", wallet.Balance,
-		"(", float64(wallet.Balance)/float64(consensus.CoinValue), "cumuli )")
-	ctx.Println("Effective Balance:", wallet.GetEffectiveBalance(),
-		"(", float64(wallet.GetEffectiveBalance())/float64(consensus.CoinValue), "cumuli )")
+	ctx.Println("Balance:", coinValue(wallet.Balance))
+	ctx.Println("Effective Balance:", coinValue(wallet.GetEffectiveBalance()))
 
 	// Show list of pending transactions
 	if len(wallet.PendingTxns) > 0 {
 		ctx.Println("Pending Transactions:")
 		for i, txn := range wallet.PendingTxns {
 			ctx.Println("\nTransaction ", strconv.Itoa(i))
-			txnBytes, err := json.Marshal(txn)
-			if err != nil {
-				ctx.Println(err)
-				return
+
+			var recipient string
+			for _, output := range txn.Outputs {
+				if output.Recipient != txn.Sender.Repr() {
+					recipient = output.Recipient
+					break
+				}
 			}
-			ctx.Println(string(txnBytes))
+
+			ctx.Println("\tAmount:", coinValue(txn.GetTotalOutputFor(recipient)))
+			ctx.Println("\tRecipient:", recipient)
 		}
 	} else {
 		ctx.Println("No pending transactions")
@@ -262,4 +264,8 @@ func editUser(ctx *ishell.Context, app *App) {
 	ctx.Println("\t name      \t Set the current user's name")
 	ctx.Println("\t blocksize \t Set the current user's blocksize (must be " +
 		"between 1000 and 5000000 btyes)")
+}
+
+func coinValue(amount uint64) string {
+	return fmt.Sprintf("%d (%f cumuli)", amount, float64(amount)/float64(blockchain.CoinValue))
 }

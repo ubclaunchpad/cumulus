@@ -39,9 +39,13 @@ func (p *Pool) Empty() bool {
 	return p.Size() == 0
 }
 
-// Get returns the tranasction with input transaction Hash h.
+// Get returns the tranasction with transaction Hash h. Returns nil if
+// there is not transaction in the pool with the given hashsum.
 func (p *Pool) Get(h blockchain.Hash) *blockchain.Transaction {
-	return p.ValidTransactions[h].Transaction
+	if pooledTxn := p.ValidTransactions[h]; pooledTxn != nil {
+		return pooledTxn.Transaction
+	}
+	return nil
 }
 
 // GetN returns the Nth transaction in the pool.

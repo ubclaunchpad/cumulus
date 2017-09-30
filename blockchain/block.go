@@ -106,26 +106,26 @@ func (b *Block) GetCloudBaseTransaction() *Transaction {
 
 // GetTransactionsFrom returns all the transactions from the given sender in
 // the given block.
-func (b *Block) GetTransactionsFrom(sender string) *[]*Transaction {
+func (b *Block) GetTransactionsFrom(sender string) []*Transaction {
 	txns := make([]*Transaction, 0)
 	for _, txn := range b.Transactions {
 		if txn.TxBody.Sender.Repr() == sender {
 			txns = append(txns, txn)
 		}
 	}
-	return &txns
+	return txns
 }
 
-// GetTransactionsTo returns all the transactions to the given recipient in
-// the given block.
-func (b *Block) GetTransactionsTo(recipient string) *[]*Transaction {
+// GetTransactionsTo returns all the transactions with outputs to the given
+// recipient in the given block.
+func (b *Block) GetTransactionsTo(recipient string) []*Transaction {
 	txns := make([]*Transaction, 0)
 	for _, txn := range b.Transactions {
 		if txn.GetTotalOutputFor(recipient) > 0 {
 			txns = append(txns, txn)
 		}
 	}
-	return &txns
+	return txns
 }
 
 // GetTotalInputFrom returns the total input from the given sender in the given
@@ -134,11 +134,13 @@ func (b *Block) GetTransactionsTo(recipient string) *[]*Transaction {
 func (b *Block) GetTotalInputFrom(sender string, bc *BlockChain) (uint64, error) {
 	totalInput := uint64(0)
 	for _, t := range b.Transactions {
-		input, err := t.GetTotalInput(bc)
-		if err != nil {
-			return 0, err
+		if t.Sender.Repr() == sender {
+			input, err := t.GetTotalInput(bc)
+			if err != nil {
+				return 0, err
+			}
+			totalInput += input
 		}
-		totalInput += input
 	}
 	return totalInput, nil
 }
