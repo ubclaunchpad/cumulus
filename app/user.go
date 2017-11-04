@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 
 	crand "crypto/rand"
@@ -16,23 +17,55 @@ import (
 
 // User holds basic user information.
 type User struct {
-	Wallet    *blockchain.Wallet
-	Name      string
-	BlockSize uint32
+	Wallet       *blockchain.Wallet
+	Name         string
+	BlockSize    uint32
+	CryptoWallet bool
 }
 
 // NewUser creates a new user
 func NewUser() *User {
 	return &User{
-		Wallet:    blockchain.NewWallet(),
-		BlockSize: blockchain.DefaultBlockSize,
-		Name:      "Default User",
+		Wallet:       blockchain.NewWallet(),
+		BlockSize:    blockchain.DefaultBlockSize,
+		Name:         "Default User",
+		CryptoWallet: false,
 	}
 }
 
 // Public returns the public key of the given user
 func (u *User) Public() blockchain.Address {
 	return u.Wallet.Public()
+}
+
+// EncryptPrivateKey encrypts the user's private key
+func (u *User) EncryptPrivateKey(password string) error {
+	if !u.CryptoWallet {
+		pk := u.Wallet.PrivateKey.D.Bytes()
+		pk, err := Encrypt(pk, password)
+		if err != nil {
+			return err
+		}
+
+		u.Wallet.PrivateKey.D = new(big.Int).SetBytes(pk)
+		u.CryptoWallet = true
+	}
+	return nil
+}
+
+// DecryptPrivateKey decrypts the user's private key
+func (u *User) DecryptPrivateKey(password string) error {
+	if u.CryptoWallet {
+		pk := u.Wallet.PrivateKey.D.Bytes()
+		pk, err := Decrypt(pk, password)
+		if err != nil {
+			return err
+		}
+
+		u.Wallet.PrivateKey.D = new(big.Int).SetBytes(pk)
+		u.CryptoWallet = false
+	}
+	return nil
 }
 
 // Save writes the user to a file of the given name in the current working
@@ -74,6 +107,7 @@ func LoadUser(fileName string) (*User, error) {
 	if err := dec.Decode(&u); err != nil {
 		return nil, err
 	}
+
 	return &u, nil
 }
 
