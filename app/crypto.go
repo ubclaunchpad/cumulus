@@ -1,16 +1,11 @@
 package app
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha512"
-	"io"
-	"io/ioutil"
-	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -22,69 +17,43 @@ const nonceSize = 12
 const saltSize = 16
 
 // Encrypt encrypts a file with a password
-func Encrypt(filePath string, password string) {
-
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		log.WithError(err).Fatal("Failed to open file")
-	}
-
-	plainText, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		log.WithError(err).Fatal("Failed to read opened file")
-	}
+func Encrypt(plainText []byte, password string) ([]byte, error) {
 
 	passwordBytes := []byte(password)
 
 	salt := make([]byte, saltSize)
-	_, err = rand.Read(salt)
+	_, err := rand.Read(salt)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to generate salt")
+		return nil, err
 	}
 
 	key := pbkdf2.Key(passwordBytes, salt, 4096, 32, sha512.New)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to generate AES cipher")
+		return nil, err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to generate new AES-GCM")
+		return nil, err
 	}
 
 	nonce := make([]byte, nonceSize)
 	_, err = rand.Read(nonce)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to generate nonce")
+		return nil, err
 	}
 
 	cipherText := aesgcm.Seal(nil, nonce, plainText, nil)
 	cipherText = append(cipherText, salt...)
 	cipherText = append(cipherText, nonce...)
 
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.WithError(err).Fatal("Failed to create new file for cipher text")
-	}
-
-	_, err = io.Copy(file, bytes.NewReader(cipherText))
-	if err != nil {
-		log.WithError(err).Fatal("Failed to copy cipher text to file")
-	}
+	return cipherText, nil
 }
 
 // Decrypt decrypts a file with a given password
-func Decrypt(filePath string, password string) {
-
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		log.WithError(err).Fatal("Failed to open file")
-	}
-
-	cipherText, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		log.WithError(err).Fatal("Failed to read opened file")
-	}
+func Decrypt(cipherText []byte, password string) ([]byte, error) {
 
 	passwordBytes := []byte(password)
 
@@ -96,12 +65,12 @@ func Decrypt(filePath string, password string) {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to generate AES cipher")
+		return nil, err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to generate new AES-GCM")
+		return nil, err
 	}
 
 	plainText, err := aesgcm.Open(
@@ -111,16 +80,14 @@ func Decrypt(filePath string, password string) {
 		nil,
 	)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to generate plain text")
+		return nil, err
 	}
 
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.WithError(err).Fatal("Failed to create new file for plain text")
-	}
+	return plainText, nil
+}
 
-	_, err = io.Copy(file, bytes.NewReader(plainText))
-	if err != nil {
-		log.WithError(err).Fatal("Failed to copy plain text to file")
-	}
+// InvalidPassword is returned from Decrypt if an invalid password is used to
+// decrypt the ciphertext
+func InvalidPassword(err error) bool {
+	return err.Error() == "cipher: message authentication failed"
 }
