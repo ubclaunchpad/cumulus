@@ -72,6 +72,13 @@ func RunConsole(a *App) *ishell.Shell {
 			editUser(ctx, a)
 		},
 	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "cryptowallet",
+		Help: "enable or disable password protection for private key storage",
+		Func: func(ctx *ishell.Context) {
+			cryptoWallet(ctx, a)
+		},
+	})
 
 	// Set interrupt handler
 	shell.Interrupt(func(ctx *ishell.Context, count int, input string) {
@@ -81,6 +88,20 @@ func RunConsole(a *App) *ishell.Shell {
 	shell.Start()
 	emoji.Println(":cloud: Welcome to the :sunny: Cumulus console :cloud:")
 	return shell
+}
+
+func cryptoWallet(ctx *ishell.Context, app *App) {
+	if len(ctx.Args) < 1 {
+		ctx.Println("Usage: cryptowallet [enable/disable]")
+		return
+	}
+
+	switch ctx.Args[0] {
+	case "enable":
+	case "disable":
+	default:
+		ctx.Println("")
+	}
 }
 
 func send(ctx *ishell.Context, app *App) {
