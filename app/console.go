@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/abiosoft/ishell"
@@ -90,6 +91,38 @@ func RunConsole(a *App) *ishell.Shell {
 	return shell
 }
 
+func encrypt(ctx *ishell.Context, app *App, password string) error {
+	err := app.CurrentUser.EncryptPrivateKey(password)
+	if err != nil {
+		log.Printf("Unable to encrypt private key: %s", err.Error())
+		return err
+	}
+
+	if err := app.CurrentUser.Save(userFileName); err != nil {
+		app.CurrentUser.DecryptPrivateKey(password)
+		ctx.Print(err)
+		return err
+	}
+
+	return nil
+}
+
+func decrypt(ctx *ishell.Context, app *App, password string) error {
+	err := app.CurrentUser.DecryptPrivateKey(password)
+	if err != nil {
+		log.Printf("Unable to decrypt private key: %s", err.Error())
+		return err
+	}
+
+	if err := app.CurrentUser.Save(userFileName); err != nil {
+		app.CurrentUser.EncryptPrivateKey(password)
+		ctx.Print(err)
+		return err
+	}
+
+	return nil
+}
+
 func cryptoWallet(ctx *ishell.Context, app *App) {
 	if len(ctx.Args) < 1 {
 		ctx.Println("Usage: cryptowallet [enable/disable]")
@@ -98,7 +131,33 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 
 	switch ctx.Args[0] {
 	case "enable":
+		if app.CurrentUser.CryptoWallet {
+			ctx.Print("CryptoWallet is already enabled.")
+		} else {
+			ctx.Print("Please enter password: ")
+			password := ctx.ReadPassword()
+			err := encrypt(ctx, app, password)
+			if err != nil {
+				ctx.Println("Unable to decrypt private key")
+			}
+		}
 	case "disable":
+		if !app.CurrentUser.CryptoWallet {
+			ctx.Print("CryptoWallet is already disabled.")
+		} else {
+			ctx.Println("Please enter password: ")
+			password := ctx.ReadPassword()
+			err := decrypt(ctx, app, password)
+			if InvalidPassword(err) {
+				ctx.Println("Inavalid password, please try again: ")
+				password := ctx.ReadPassword()
+				err := decrypt(ctx, app, password)
+				if err != nil {
+					ctx.Println("Unable to decrypt private key")
+				}
+			}
+
+		}
 	default:
 		ctx.Println("")
 	}
@@ -121,9 +180,27 @@ func send(ctx *ishell.Context, app *App) {
 	amount *= float64(blockchain.CoinValue)
 	addr := ctx.Args[1]
 
+	password := ""
+	if app.CurrentUser.CryptoWallet {
+		ctx.Println("Please enter password to decrypt private key: ")
+		password = ctx.ReadPassword()
+		err := decrypt(ctx, app, password)
+		if err != nil {
+			ctx.Println("Unable to decrypt private key")
+			return
+		}
+	}
 	// Try to make a payment.
 	ctx.Println("Sending amount", coinValue(uint64(amount)), "to", addr)
 	err = app.Pay(addr, uint64(amount))
+
+	if app.CurrentUser.CryptoWallet {
+		err := encrypt(ctx, app, password)
+		if err != nil {
+			ctx.Println("Unable to re-encrypt private key, CryptoWallet disabled")
+		}
+	}
+
 	if err != nil {
 		emoji.Println(":disappointed: ", err)
 	} else {
