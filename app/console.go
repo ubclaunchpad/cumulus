@@ -110,7 +110,7 @@ func encrypt(ctx *ishell.Context, app *App, password string) error {
 func decrypt(ctx *ishell.Context, app *App, password string) error {
 	err := app.CurrentUser.DecryptPrivateKey(password)
 	if err != nil {
-		log.Printf("Unable to decrypt private key: %s", err.Error())
+		//log.Printf("Unable to decrypt private key: %s", err.Error())
 		return err
 	}
 
@@ -132,34 +132,46 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 	switch ctx.Args[0] {
 	case "enable":
 		if app.CurrentUser.CryptoWallet {
-			ctx.Print("CryptoWallet is already enabled.")
+			ctx.Print("CryptoWallet is already enabled")
 		} else {
 			ctx.Print("Please enter password: ")
 			password := ctx.ReadPassword()
 			err := encrypt(ctx, app, password)
 			if err != nil {
-				ctx.Println("Unable to decrypt private key")
+				ctx.Print("Unable to decrypt private key")
+			} else {
+				ctx.Print("Successfully enabled cryptowallet")
 			}
 		}
 	case "disable":
 		if !app.CurrentUser.CryptoWallet {
-			ctx.Print("CryptoWallet is already disabled.")
+			ctx.Print("CryptoWallet is already disabled")
 		} else {
-			ctx.Println("Please enter password: ")
+			ctx.Print("Please enter password: ")
 			password := ctx.ReadPassword()
 			err := decrypt(ctx, app, password)
 			if InvalidPassword(err) {
-				ctx.Println("Inavalid password, please try again: ")
+				ctx.Print("Inavalid password, please try again: ")
 				password := ctx.ReadPassword()
 				err := decrypt(ctx, app, password)
 				if err != nil {
 					ctx.Println("Unable to decrypt private key")
 				}
+			} else {
+				ctx.Print("Successfully disabled cryptowallet")
 			}
 
 		}
+	case "status":
+		var s string
+		if app.CurrentUser.CryptoWallet {
+			s = "enabled"
+		} else {
+			s = "disabled"
+		}
+		ctx.Printf("cryptowallet status: %s", s)
 	default:
-		ctx.Println("")
+		//Fall through
 	}
 }
 

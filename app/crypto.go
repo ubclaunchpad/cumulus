@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha512"
+	"strings"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -89,5 +90,8 @@ func Decrypt(cipherText []byte, password string) ([]byte, error) {
 // InvalidPassword is returned from Decrypt if an invalid password is used to
 // decrypt the ciphertext
 func InvalidPassword(err error) bool {
-	return err.Error() == "cipher: message authentication failed"
+	if err == nil {
+		return false
+	}
+	return strings.Compare(err.Error(), "cipher: message authentication failed") == 0
 }
