@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
@@ -146,22 +147,24 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 	case "disable":
 		if !app.CurrentUser.CryptoWallet {
 			ctx.Print("CryptoWallet is already disabled")
-		} else {
-			ctx.Print("Please enter password: ")
-			password := ctx.ReadPassword()
-			err := decrypt(ctx, app, password)
-			if InvalidPassword(err) {
-				ctx.Print("Inavalid password, please try again: ")
-				password := ctx.ReadPassword()
-				err := decrypt(ctx, app, password)
-				if err != nil {
-					ctx.Println("Unable to decrypt private key")
-				}
-			} else {
-				ctx.Print("Successfully disabled cryptowallet")
-			}
-
+			return
 		}
+		ctx.Print("Please enter password: ")
+		password := ctx.ReadPassword()
+		err := decrypt(ctx, app, password)
+
+		// Invalid password, try again
+		if InvalidPassword(err) {
+			ctx.Print("Inavalid password, please try again: ")
+			password = ctx.ReadPassword()
+			err = decrypt(ctx, app, password)
+		}
+		if err != nil {
+			ctx.Println("Unable to decrypt private key")
+			return
+		}
+		ctx.Print("Successfully disabled cryptowallet")
+		return
 	case "status":
 		var s string
 		if app.CurrentUser.CryptoWallet {
@@ -194,22 +197,31 @@ func send(ctx *ishell.Context, app *App) {
 
 	password := ""
 	if app.CurrentUser.CryptoWallet {
-		ctx.Println("Please enter password to decrypt private key: ")
+		ctx.Print("Please enter cryptowallet password: ")
 		password = ctx.ReadPassword()
-		err := decrypt(ctx, app, password)
+		err = decrypt(ctx, app, password)
+
+		// Invalid password, try again
+		if InvalidPassword(err) {
+			ctx.Print("Inavalid password, please try again: ")
+			password = ctx.ReadPassword()
+			err = decrypt(ctx, app, password)
+		}
 		if err != nil {
-			ctx.Println("Unable to decrypt private key")
+			ctx.Println("Cannot proceed with transaction, unable to decrypt private key")
 			return
 		}
 	}
+
 	// Try to make a payment.
 	ctx.Println("Sending amount", coinValue(uint64(amount)), "to", addr)
 	err = app.Pay(addr, uint64(amount))
 
-	if app.CurrentUser.CryptoWallet {
+	// Re-enable crypto wallet
+	if strings.Compare(password, "") != 0 {
 		err := encrypt(ctx, app, password)
 		if err != nil {
-			ctx.Println("Unable to re-encrypt private key, CryptoWallet disabled")
+			ctx.Print("Unable to re-enable cryptowallet")
 		}
 	}
 
