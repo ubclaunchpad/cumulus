@@ -72,6 +72,10 @@ func (u *User) DecryptPrivateKey(password string) error {
 // directory in JSON format. It returns an error if one occurred, or a pointer
 // to the file that was written to on success.
 func (u *User) Save(fileName string) error {
+	if _, err := os.Stat(fileName); !os.IsNotExist(err) {
+		os.Remove(fileName)
+	}
+
 	userFile, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
