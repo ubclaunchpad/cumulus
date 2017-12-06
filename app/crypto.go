@@ -14,10 +14,12 @@ import (
 https://golang.org/src/crypto/cipher/example_test.go
 */
 
-const nonceSize = 12
-const saltSize = 16
+const (
+	nonceSize = 12
+	saltSize  = 16
+)
 
-// Encrypt encrypts a file with a password
+// Encrypt encrypts cipherText with a given password
 func Encrypt(plainText []byte, password string) ([]byte, error) {
 
 	passwordBytes := []byte(password)
@@ -53,7 +55,7 @@ func Encrypt(plainText []byte, password string) ([]byte, error) {
 	return cipherText, nil
 }
 
-// Decrypt decrypts a file with a given password
+// Decrypt decrypts cipherText with a given password
 func Decrypt(cipherText []byte, password string) ([]byte, error) {
 
 	passwordBytes := []byte(password)
