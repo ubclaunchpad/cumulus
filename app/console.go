@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/abiosoft/ishell"
 	"github.com/ubclaunchpad/cumulus/blockchain"
@@ -198,22 +197,24 @@ func send(ctx *ishell.Context, app *App) {
 	amount *= float64(blockchain.CoinValue)
 	addr := ctx.Args[1]
 
+	cryptoWallet := false
 	password := ""
 	if app.CurrentUser.CryptoWallet {
 		ctx.Print("Please enter cryptowallet password: ")
 		password = ctx.ReadPassword()
-		err = decryptUser(ctx, app, password)
+		err = app.CurrentUser.DecryptPrivateKey(password)
 
 		// Invalid password, try again
 		if InvalidPassword(err) {
 			ctx.Print("Inavalid password, please try again: ")
 			password = ctx.ReadPassword()
-			err = decryptUser(ctx, app, password)
+			err = app.CurrentUser.DecryptPrivateKey(password)
 		}
 		if err != nil {
 			ctx.Println("Cannot proceed with transaction, unable to decrypt private key")
 			return
 		}
+		cryptoWallet = true
 	}
 
 	// Try to make a payment.
@@ -221,10 +222,11 @@ func send(ctx *ishell.Context, app *App) {
 	err = app.Pay(addr, uint64(amount))
 
 	// Re-enable crypto wallet
-	if strings.Compare(password, "") != 0 {
-		err := encryptUser(ctx, app, password)
+	if cryptoWallet {
+		err := app.CurrentUser.EncryptPrivateKey(password)
 		if err != nil {
-			ctx.Print("Unable to re-enable cryptowallet")
+			ctx.Println("Error re-encrypting private key locally")
+			panic(err)
 		}
 	}
 
