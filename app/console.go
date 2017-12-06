@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -92,10 +91,9 @@ func RunConsole(a *App) *ishell.Shell {
 	return shell
 }
 
-func encrypt(ctx *ishell.Context, app *App, password string) error {
+func encryptUser(ctx *ishell.Context, app *App, password string) error {
 	err := app.CurrentUser.EncryptPrivateKey(password)
 	if err != nil {
-		log.Printf("Unable to encrypt private key: %s", err.Error())
 		return err
 	}
 
@@ -108,10 +106,9 @@ func encrypt(ctx *ishell.Context, app *App, password string) error {
 	return nil
 }
 
-func decrypt(ctx *ishell.Context, app *App, password string) error {
+func decryptUser(ctx *ishell.Context, app *App, password string) error {
 	err := app.CurrentUser.DecryptPrivateKey(password)
 	if err != nil {
-		//log.Printf("Unable to decrypt private key: %s", err.Error())
 		return err
 	}
 
@@ -126,7 +123,10 @@ func decrypt(ctx *ishell.Context, app *App, password string) error {
 
 func cryptoWallet(ctx *ishell.Context, app *App) {
 	if len(ctx.Args) < 1 {
-		ctx.Println("Usage: cryptowallet [enable/disable]")
+		ctx.Println("\nUsage: cryptowallet [command]")
+		ctx.Println("\nCOMMANDS:")
+		ctx.Println("\t enable \t Enable cryptowallet")
+		ctx.Println("\t disable \t Disable cryptowallet")
 		return
 	}
 
@@ -137,7 +137,7 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 		} else {
 			ctx.Print("Please enter password: ")
 			password := ctx.ReadPassword()
-			err := encrypt(ctx, app, password)
+			err := encryptUser(ctx, app, password)
 			if err != nil {
 				ctx.Print("Unable to decrypt private key")
 			} else {
@@ -151,13 +151,13 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 		}
 		ctx.Print("Please enter password: ")
 		password := ctx.ReadPassword()
-		err := decrypt(ctx, app, password)
+		err := decryptUser(ctx, app, password)
 
 		// Invalid password, try again
 		if InvalidPassword(err) {
 			ctx.Print("Inavalid password, please try again: ")
 			password = ctx.ReadPassword()
-			err = decrypt(ctx, app, password)
+			err = decryptUser(ctx, app, password)
 		}
 		if err != nil {
 			ctx.Println("Unable to decrypt private key")
@@ -174,7 +174,10 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 		}
 		ctx.Printf("cryptowallet status: %s", s)
 	default:
-		//Fall through
+		ctx.Println("\nUsage: cryptowallet [command]")
+		ctx.Println("\nCOMMANDS:")
+		ctx.Println("\t enable \t Enable cryptowallet")
+		ctx.Println("\t disable \t Disable cryptowallet")
 	}
 }
 
@@ -199,13 +202,13 @@ func send(ctx *ishell.Context, app *App) {
 	if app.CurrentUser.CryptoWallet {
 		ctx.Print("Please enter cryptowallet password: ")
 		password = ctx.ReadPassword()
-		err = decrypt(ctx, app, password)
+		err = decryptUser(ctx, app, password)
 
 		// Invalid password, try again
 		if InvalidPassword(err) {
 			ctx.Print("Inavalid password, please try again: ")
 			password = ctx.ReadPassword()
-			err = decrypt(ctx, app, password)
+			err = decryptUser(ctx, app, password)
 		}
 		if err != nil {
 			ctx.Println("Cannot proceed with transaction, unable to decrypt private key")
@@ -219,7 +222,7 @@ func send(ctx *ishell.Context, app *App) {
 
 	// Re-enable crypto wallet
 	if strings.Compare(password, "") != 0 {
-		err := encrypt(ctx, app, password)
+		err := encryptUser(ctx, app, password)
 		if err != nil {
 			ctx.Print("Unable to re-enable cryptowallet")
 		}
