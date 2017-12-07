@@ -14,6 +14,7 @@ func TestRunConsoleHasCommands(t *testing.T) {
 		"address",
 		"clear",
 		"connect",
+		"cryptowallet",
 		"exit",
 		"help",
 		"miner",

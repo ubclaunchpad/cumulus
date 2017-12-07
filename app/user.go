@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 
 	crand "crypto/rand"
@@ -16,17 +17,19 @@ import (
 
 // User holds basic user information.
 type User struct {
-	Wallet    *blockchain.Wallet
-	Name      string
-	BlockSize uint32
+	Wallet       *blockchain.Wallet
+	Name         string
+	BlockSize    uint32
+	CryptoWallet bool
 }
 
 // NewUser creates a new user
 func NewUser() *User {
 	return &User{
-		Wallet:    blockchain.NewWallet(),
-		BlockSize: blockchain.DefaultBlockSize,
-		Name:      "Default User",
+		Wallet:       blockchain.NewWallet(),
+		BlockSize:    blockchain.DefaultBlockSize,
+		Name:         "Default User",
+		CryptoWallet: false,
 	}
 }
 
@@ -35,10 +38,44 @@ func (u *User) Public() blockchain.Address {
 	return u.Wallet.Public()
 }
 
+// EncryptPrivateKey encrypts the user's private key
+func (u *User) EncryptPrivateKey(password string) error {
+	if !u.CryptoWallet {
+		pk := u.Wallet.PrivateKey.D.Bytes()
+		pk, err := Encrypt(pk, password)
+		if err != nil {
+			return err
+		}
+
+		u.Wallet.PrivateKey.D = new(big.Int).SetBytes(pk)
+		u.CryptoWallet = true
+	}
+	return nil
+}
+
+// DecryptPrivateKey decrypts the user's private key
+func (u *User) DecryptPrivateKey(password string) error {
+	if u.CryptoWallet {
+		pk := u.Wallet.PrivateKey.D.Bytes()
+		pk, err := Decrypt(pk, password)
+		if err != nil {
+			return err
+		}
+
+		u.Wallet.PrivateKey.D = new(big.Int).SetBytes(pk)
+		u.CryptoWallet = false
+	}
+	return nil
+}
+
 // Save writes the user to a file of the given name in the current working
 // directory in JSON format. It returns an error if one occurred, or a pointer
 // to the file that was written to on success.
 func (u *User) Save(fileName string) error {
+	if _, err := os.Stat(fileName); !os.IsNotExist(err) {
+		os.Remove(fileName)
+	}
+
 	userFile, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
@@ -74,6 +111,7 @@ func LoadUser(fileName string) (*User, error) {
 	if err := dec.Decode(&u); err != nil {
 		return nil, err
 	}
+
 	return &u, nil
 }
 

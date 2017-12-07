@@ -72,6 +72,13 @@ func RunConsole(a *App) *ishell.Shell {
 			editUser(ctx, a)
 		},
 	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "cryptowallet",
+		Help: "enable or disable password protection for private key storage",
+		Func: func(ctx *ishell.Context) {
+			cryptoWallet(ctx, a)
+		},
+	})
 
 	// Set interrupt handler
 	shell.Interrupt(func(ctx *ishell.Context, count int, input string) {
@@ -81,6 +88,96 @@ func RunConsole(a *App) *ishell.Shell {
 	shell.Start()
 	emoji.Println(":cloud: Welcome to the :sunny: Cumulus console :cloud:")
 	return shell
+}
+
+func encryptUser(ctx *ishell.Context, app *App, password string) error {
+	err := app.CurrentUser.EncryptPrivateKey(password)
+	if err != nil {
+		return err
+	}
+
+	if err := app.CurrentUser.Save(userFileName); err != nil {
+		app.CurrentUser.DecryptPrivateKey(password)
+		ctx.Print(err)
+		return err
+	}
+
+	return nil
+}
+
+func decryptUser(ctx *ishell.Context, app *App, password string) error {
+	err := app.CurrentUser.DecryptPrivateKey(password)
+	if err != nil {
+		return err
+	}
+
+	if err := app.CurrentUser.Save(userFileName); err != nil {
+		app.CurrentUser.EncryptPrivateKey(password)
+		ctx.Print(err)
+		return err
+	}
+
+	return nil
+}
+
+func cryptoWallet(ctx *ishell.Context, app *App) {
+	if len(ctx.Args) < 1 {
+		ctx.Println("\nUsage: cryptowallet [command]")
+		ctx.Println("\nCOMMANDS:")
+		ctx.Println("\t enable \t Enable cryptowallet")
+		ctx.Println("\t disable \t Disable cryptowallet")
+		return
+	}
+
+	switch ctx.Args[0] {
+	case "enable":
+		if app.CurrentUser.CryptoWallet {
+			ctx.Print("CryptoWallet is already enabled")
+		} else {
+			ctx.Print("Please enter password: ")
+			password := ctx.ReadPassword()
+			err := encryptUser(ctx, app, password)
+			if err != nil {
+				ctx.Print("Unable to decrypt private key")
+			} else {
+				ctx.Print("Successfully enabled cryptowallet")
+			}
+		}
+	case "disable":
+		if !app.CurrentUser.CryptoWallet {
+			ctx.Print("CryptoWallet is already disabled")
+			return
+		}
+		ctx.Print("Please enter password: ")
+		password := ctx.ReadPassword()
+		err := decryptUser(ctx, app, password)
+
+		// Invalid password, try again
+		if InvalidPassword(err) {
+			ctx.Print("Inavalid password, please try again: ")
+			password = ctx.ReadPassword()
+			err = decryptUser(ctx, app, password)
+		}
+		if err != nil {
+			ctx.Println("Unable to decrypt private key")
+			return
+		}
+		ctx.Print("Successfully disabled cryptowallet")
+		return
+	case "status":
+		var s string
+		if app.CurrentUser.CryptoWallet {
+			s = "enabled"
+		} else {
+			s = "disabled"
+		}
+		ctx.Printf("cryptowallet status: %s", s)
+	default:
+		ctx.Println("\nUsage: cryptowallet [command]")
+		ctx.Println("\nCOMMANDS:")
+		ctx.Println("\t enable \t Enable cryptowallet")
+		ctx.Println("\t disable \t Disable cryptowallet")
+	}
 }
 
 func send(ctx *ishell.Context, app *App) {
@@ -100,9 +197,39 @@ func send(ctx *ishell.Context, app *App) {
 	amount *= float64(blockchain.CoinValue)
 	addr := ctx.Args[1]
 
+	cryptoWallet := false
+	password := ""
+	if app.CurrentUser.CryptoWallet {
+		ctx.Print("Please enter cryptowallet password: ")
+		password = ctx.ReadPassword()
+		err = app.CurrentUser.DecryptPrivateKey(password)
+
+		// Invalid password, try again
+		if InvalidPassword(err) {
+			ctx.Print("Inavalid password, please try again: ")
+			password = ctx.ReadPassword()
+			err = app.CurrentUser.DecryptPrivateKey(password)
+		}
+		if err != nil {
+			ctx.Println("Cannot proceed with transaction, unable to decrypt private key")
+			return
+		}
+		cryptoWallet = true
+	}
+
 	// Try to make a payment.
 	ctx.Println("Sending amount", coinValue(uint64(amount)), "to", addr)
 	err = app.Pay(addr, uint64(amount))
+
+	// Re-enable crypto wallet
+	if cryptoWallet {
+		err := app.CurrentUser.EncryptPrivateKey(password)
+		if err != nil {
+			ctx.Println("Error re-encrypting private key locally")
+			panic(err)
+		}
+	}
+
 	if err != nil {
 		emoji.Println(":disappointed: ", err)
 	} else {
