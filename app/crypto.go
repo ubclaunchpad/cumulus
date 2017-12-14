@@ -22,7 +22,10 @@ const (
 
 // Password complexity constants
 const (
-	minPasswordLen = 8
+	// minPasswordLen represents the min password length in characters
+	minPasswordLen = 10
+	// maxPasswordLen = 128 represents the max password length in characters
+	maxPasswordLen = 128
 )
 
 // Encrypt encrypts cipherText with a given password
@@ -97,7 +100,7 @@ func Decrypt(cipherText []byte, password string) ([]byte, error) {
 
 // VerifyPasswordComplexity verifies password complexity
 func VerifyPasswordComplexity(password string) bool {
-	return len(password) >= minPasswordLen
+	return (len(password) >= minPasswordLen) && (len(password) <= maxPasswordLen)
 }
 
 // InvalidPassword is returned from Decrypt if an invalid password is used to
