@@ -27,3 +27,15 @@ func TestInvalidPassword(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestPasswordComplexity(t *testing.T) {
+	test := "1234567"
+	if app.VerifyPasswordComplexity(test) {
+		t.Fail()
+	}
+
+	test = "12345678"
+	if !app.VerifyPasswordComplexity(test) {
+		t.Fail()
+	}
+}
