@@ -14,9 +14,15 @@ import (
 https://golang.org/src/crypto/cipher/example_test.go
 */
 
+// Encryption utility constants
 const (
 	nonceSize = 12
 	saltSize  = 16
+)
+
+// Password complexity constants
+const (
+	minPasswordLen = 8
 )
 
 // Encrypt encrypts cipherText with a given password
@@ -87,6 +93,11 @@ func Decrypt(cipherText []byte, password string) ([]byte, error) {
 	}
 
 	return plainText, nil
+}
+
+// VerifyPasswordComplexity verifies password complexity
+func VerifyPasswordComplexity(password string) bool {
+	return len(password) >= minPasswordLen
 }
 
 // InvalidPassword is returned from Decrypt if an invalid password is used to

@@ -136,11 +136,20 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 		} else {
 			ctx.Print("Please enter password: ")
 			password := ctx.ReadPassword()
+			if !VerifyPasswordComplexity(password) {
+				ctx.Println("Invalid password length (min 8 chars)")
+				ctx.Print("Please re-enter password: ")
+				password = ctx.ReadPassword()
+			}
+			if !VerifyPasswordComplexity(password) {
+				ctx.Println("Invalid password length, unable to encrypt private key")
+				break
+			}
 			err := encryptUser(ctx, app, password)
 			if err != nil {
-				ctx.Print("Unable to decrypt private key")
+				ctx.Println("Unable to encrypt private key")
 			} else {
-				ctx.Print("Successfully enabled cryptowallet")
+				ctx.Println("Successfully enabled cryptowallet")
 			}
 		}
 	case "disable":
@@ -160,10 +169,9 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 		}
 		if err != nil {
 			ctx.Println("Unable to decrypt private key")
-			return
+		} else {
+			ctx.Print("Successfully disabled cryptowallet")
 		}
-		ctx.Print("Successfully disabled cryptowallet")
-		return
 	case "status":
 		var s string
 		if app.CurrentUser.CryptoWallet {
