@@ -134,17 +134,33 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 		if app.CurrentUser.CryptoWallet {
 			ctx.Print("CryptoWallet is already enabled")
 		} else {
-			ctx.Print("Please enter password: ")
+			ctx.Print("Enter password: ")
 			password := ctx.ReadPassword()
+
+			// Verify password complexity
 			if !VerifyPasswordComplexity(password) {
 				ctx.Println("Invalid password length (min 8 chars)")
-				ctx.Print("Please re-enter password: ")
+				ctx.Print("Re-enter password: ")
 				password = ctx.ReadPassword()
 			}
 			if !VerifyPasswordComplexity(password) {
 				ctx.Println("Invalid password length, unable to encrypt private key")
 				break
 			}
+
+			// Confirm password
+			ctx.Print("Confirm password: ")
+			password2 := ctx.ReadPassword()
+			if password != password2 {
+				ctx.Println("Passwords do not match")
+				ctx.Print("Confirm password: ")
+				password2 = ctx.ReadPassword()
+			}
+			if password != password2 {
+				ctx.Println("Passwords do not match, unable to encrypt private key")
+				break
+			}
+
 			err := encryptUser(ctx, app, password)
 			if err != nil {
 				ctx.Println("Unable to encrypt private key")
@@ -157,13 +173,13 @@ func cryptoWallet(ctx *ishell.Context, app *App) {
 			ctx.Print("CryptoWallet is already disabled")
 			return
 		}
-		ctx.Print("Please enter password: ")
+		ctx.Print("Enter password: ")
 		password := ctx.ReadPassword()
 		err := decryptUser(ctx, app, password)
 
 		// Invalid password, try again
 		if InvalidPassword(err) {
-			ctx.Print("Inavalid password, please try again: ")
+			ctx.Print("Inavalid password, try again: ")
 			password = ctx.ReadPassword()
 			err = decryptUser(ctx, app, password)
 		}
@@ -208,13 +224,13 @@ func send(ctx *ishell.Context, app *App) {
 	cryptoWallet := false
 	password := ""
 	if app.CurrentUser.CryptoWallet {
-		ctx.Print("Please enter cryptowallet password: ")
+		ctx.Print("Enter cryptowallet password: ")
 		password = ctx.ReadPassword()
 		err = app.CurrentUser.DecryptPrivateKey(password)
 
 		// Invalid password, try again
 		if InvalidPassword(err) {
-			ctx.Print("Inavalid password, please try again: ")
+			ctx.Print("Inavalid password, try again: ")
 			password = ctx.ReadPassword()
 			err = app.CurrentUser.DecryptPrivateKey(password)
 		}
