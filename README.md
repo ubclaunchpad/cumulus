@@ -3,11 +3,11 @@
 </p>
 
 <div align="center">
-  <h1>Cumulus</h1>
+  <h1>Cumulus 💸</h1>
 </div>
 
 <p align="center">
-  Crypto-currency that doesn't waste your time.  
+  Cryptocurrency that doesn't waste your time.  
 </p>
 
 <p align="center">
@@ -36,9 +36,11 @@
 
 ## Introduction
 
-At Launch Pad we’ve been interested in crypto-currency and blockchain tech for a while now, and after several months of experimentation we’re excited to announce our latest project. Cumulus is a new cryptocurrency with its own blockchain and token. The current command line interface allows users to create wallets, mine coins, and send funds to other users.
+At [UBC Launch Pad](http://www.ubclaunchpad.com) we’ve been interested in crypto-currency and blockchain tech for a while now, and after several months of experimentation we’re excited to announce our latest project. Cumulus is a new cryptocurrency with its own blockchain and token. The current command line interface allows users to create wallets, mine coins, and send funds to other users.
 
 There are a lot of cryptocurrencies out there already, so it’s a fair question to ask what makes Cumulus special over other, more entrenched currencies like Bitcoin and Ethereum. The short answer is because we’re all excited by the possibilities created by this technology! In addition, there are many problems in the blockchain space that remain to be solved. Other cryptocurrencies have significant downsides like small block sizes and vast computation waste spent securing the network. We are addressing many of these problems in Cumulus. Beyond that, we see massive opportunities in this space in the years to come. Cumulus is the infrastructure on which we can build in the blockchain space as it matures.
+
+You can read more about Cumulus in the [Medium post introducting the project](https://medium.com/ubc-launch-pad-software-engineering-blog/introducing-cumulus-940456b7e05c) as well as the [extensive wiki documentation](https://github.com/ubclaunchpad/cumulus/wiki).
 
 ## Building
 
