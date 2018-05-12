@@ -14,10 +14,8 @@ run-console: cumulus
 	./cumulus run -c
 
 deps:
-	glide install
+	go get -u github.com/golang/dep/cmd/dep
+	dep ensure
 
 clean: cumulus
 	rm -f cumulus blockchain.json user.json logfile
-
-install-glide:
-	sh scripts/install_glide.sh

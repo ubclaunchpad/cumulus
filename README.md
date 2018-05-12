@@ -1,29 +1,63 @@
-# Cumulus
+<p align="center">
+  <img src="/.static/create-transaction.png" width="50%"/>
+</p>
 
-Crypto-currency that doesn't waste your time.  
+<div align="center">
+  <h1>Cumulus</h1>
+</div>
 
-[![ZenHub](https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png)](https://zenhub.com)
-[![Coverage Status](https://coveralls.io/repos/github/ubclaunchpad/cumulus/badge.svg?branch=dev)](https://coveralls.io/github/ubclaunchpad/cumulus?branch=dev)
-[![Build Status](https://travis-ci.org/ubclaunchpad/cumulus.svg?branch=dev)](https://travis-ci.org/ubclaunchpad/cumulus)
-[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](https://godoc.org/github.com/ubclaunchpad/cumulus)
+<p align="center">
+  Crypto-currency that doesn't waste your time.  
+</p>
 
-## Installation
+<p align="center">
+  <a href="https://travis-ci.org/ubclaunchpad/cumulus">
+    <img src="https://travis-ci.org/ubclaunchpad/cumulus.svg?branch=dev" alt="Build Status" />
+  </a>
 
-Install dependencies. We need to manually use version 0.11.1 of Glide temporarily because 0.12 introduced a bug in recursive dependencies.
+  <a href="https://coveralls.io/github/ubclaunchpad/cumulus?branch=dev">
+    <img src="https://coveralls.io/repos/github/ubclaunchpad/cumulus/badge.svg?branch=dev" alt="Coverage" />
+  </a>
 
-Install Glide.
-```sh
-make install-glide
+  <a href="https://godoc.org/github.com/ubclaunchpad/cumulus">
+    <img src="https://godoc.org/github.com/golang/gddo?status.svg" alt="GoDocs" />
+  </a>
+
+  <a href="https://goreportcard.com/report/github.com/ubclaunchpad/cumulus">
+    <img src="https://goreportcard.com/badge/github.com/ubclaunchpad/cumulus" alt="Clean code" />
+  </a>
+
+  <a href="https://zenhub.com">
+    <img src="https://img.shields.io/badge/Shipping_faster_with-ZenHub-5e60ba.svg?style=flat" alt="Shipping faster with ZenHub" />
+  </a>
+</p>
+
+<br>
+
+## Introduction
+
+At Launch Pad we’ve been interested in crypto-currency and blockchain tech for a while now, and after several months of experimentation we’re excited to announce our latest project. Cumulus is a new cryptocurrency with its own blockchain and token. The current command line interface allows users to create wallets, mine coins, and send funds to other users.
+
+There are a lot of cryptocurrencies out there already, so it’s a fair question to ask what makes Cumulus special over other, more entrenched currencies like Bitcoin and Ethereum. The short answer is because we’re all excited by the possibilities created by this technology! In addition, there are many problems in the blockchain space that remain to be solved. Other cryptocurrencies have significant downsides like small block sizes and vast computation waste spent securing the network. We are addressing many of these problems in Cumulus. Beyond that, we see massive opportunities in this space in the years to come. Cumulus is the infrastructure on which we can build in the blockchain space as it matures.
+
+## Building
+
+First, [install Go](https://golang.org/doc/install#install) and grab the Cumulus source code:
+
+```bash
+$> go get -u github.com/ubclaunchpad/cumulus
 ```
 
-Get dependencies.
+Cumulus uses [dep](https://github.com/golang/dep) for dependency management. The following will install dep and run `dep ensure`:
+
 ```sh
 make deps
 ```
 
-Build.
+You can now build and run Cumulus:
+
 ```sh
-make
+make run-console
 ```
 
 ## Testing
