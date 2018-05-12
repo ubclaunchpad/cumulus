@@ -11,7 +11,7 @@ install:
 - dep ensure
 
 script:
-- go test -race -coverprofile=coverage.out ./...
+- go test -coverprofile=coverage.out ./...
 - goveralls -coverprofile=coverage.out -service=travis-ci
 
 before_deploy:
