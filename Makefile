@@ -1,14 +1,12 @@
 .PHONY: test deps clean install_glide
 
-PACKAGES = `go list ./... | grep -v vendor/`
-
 all: cumulus
 
 cumulus:
 	go build
 
 test:
-	go test $(PACKAGES) --cover
+	go test ./... --cover
 
 run-console: cumulus
 	./cumulus run -c
