@@ -42,12 +42,33 @@ There are a lot of cryptocurrencies out there already, so it’s a fair question
 
 You can read more about Cumulus in the [Medium post introducting the project](https://medium.com/ubc-launch-pad-software-engineering-blog/introducing-cumulus-940456b7e05c) as well as the [extensive wiki documentation](https://github.com/ubclaunchpad/cumulus/wiki).
 
+## Installation
+
+**MacOS** - the Cumulus CLI can be installed using [Homebrew](https://brew.sh):
+
+```bash
+brew install ubclaunchpad/tap/cumulus
+```
+
+**Windows** - the Cumulus CLI can be installed using [Scoop](http://scoop.sh):
+
+```bash
+scoop bucket add ubclaunchpad https://github.com/ubclaunchpad/scoop-bucket
+scoop install cumulus
+```
+
+You can check the installation and see the Cumulus CLI documentation by running:
+
+```bash
+cumulus --help
+```
+
 ## Building
 
 First, [install Go](https://golang.org/doc/install#install) and grab the Cumulus source code:
 
 ```bash
-$> go get -u github.com/ubclaunchpad/cumulus
+go get -u github.com/ubclaunchpad/cumulus
 ```
 
 Cumulus uses [dep](https://github.com/golang/dep) for dependency management. The following will install dep and run `dep ensure`:
