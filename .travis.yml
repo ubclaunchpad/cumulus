@@ -13,18 +13,3 @@ install:
 script:
 - go test -coverprofile=coverage.out ./...
 - goveralls -coverprofile=coverage.out -service=travis-ci
-
-before_deploy:
-- bash .scripts/release.sh
-
-deploy:
-  provider: releases
-  skip_cleanup: true
-  api_key:
-    secure: wYLC11JpLI1NIxfTCx1wQCODfUZonxZOn45JMRXPwJ9pslyTwcgPZKXn4KKj+NNzA4eEXjGJbuOD+gjBQqcNeeMLZEXKjC8GpYYx7x02U0ETcsezgGiJ2OHITnjNjNTH0ojeNbzmLJOTpUw9NGqukvJepRjpsoR9eBDzUJBMlpJPExZOthsIr+Z7OPxyuR6QxUfJ/rw2PZ9yJvO5Oi6vOOyPq4NYdbKPIunXVN0xXG7//p+Qc7RBkjYCULq6o1GGieKKgAKq0iqRia2dkKKYXJFXOnEaRpCPZCs73dCe+bWhmpeqGlKQtz0/XrT7+l4Ibx//Rzp1v+13EqpTfJQRLBtmjTVjDse2P5cwOyygxN2J+5UC0OlasmPo6QZjwmnbunysC2eERIfq/ZiW7gXhRL4KDuzbU5hbxOT0bCTgDVz2KzCHBDP6HTj5t9FlsAxgnwqeOOD61pCS8UODbj+981Qw+jq4NOrMZ6xUXDiLFo43krd4Wn5V7dEN6n7tGnorMcbCJYpKNzIaEGW/0GhPc2U7RRme3rCyVsw/24e7oFDa2V+YO/73dHXn/lJOXHFV0bgdmHiuzhm9puKXnEF6f5AGL6iIUy8ierR8xrXf0JjaLSZPa4iJQ6MsW5uh3Dm6mlnGLhZbppWCp0oTHLyZIYtfMQ1BvQ7+ixEaEWsEj0A=
-  file_glob: true
-  file: cumulus.*
-  go: "1.10"
-  on:
-    tags: true
-    repo: ubclaunchpad/cumulus
